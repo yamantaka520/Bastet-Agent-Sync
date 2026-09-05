@@ -8,6 +8,7 @@ import {
   type Settings,
   type Diagnostic,
 } from "./model";
+import CloudPanel from "./CloudPanel";
 import cat from "../assets/calico.png";
 
 export default function App() {
@@ -168,6 +169,7 @@ export default function App() {
             {t.saved}
           </p>
         )}
+        <CloudPanel native={native} locale={settings.locale} />
         <section className="panel diagnostic-panel">
           <div className="section-heading">
             <div>

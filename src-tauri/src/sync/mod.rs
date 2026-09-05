@@ -1,7 +1,7 @@
 //! Immutable text snapshots in an isolated inbox. This module never writes agent profiles.
 pub mod bundle;
 pub mod diagnostic;
-mod storage;
+pub(crate) mod storage;
 #[cfg(test)]
 mod tests;
 use bundle::{Bundle, Entry, Result, Snapshot, Stream, MAX_OBJECTS, MAX_WIRE};
@@ -163,6 +163,50 @@ impl Replica {
     }
     fn read_all(&self) -> Result<(BTreeMap<String, Bundle>, Vec<Issue>)> {
         collect(&self.objects(), &self.identity.space)
+    }
+    /// Validated immutable transport boundary; never exposes an active agent store.
+    pub fn space_id(&self) -> &str {
+        &self.identity.space
+    }
+    pub fn transport_bundles(&self) -> Result<BTreeMap<String, Bundle>> {
+        let (all, issues) = self.read_all()?;
+        if !issues.is_empty() {
+            return Err("local_store_damaged".into());
+        }
+        let (journal, invalid) = graph(&all);
+        let excluded: std::collections::BTreeSet<_> = journal
+            .pending
+            .iter()
+            .chain(invalid.iter().map(|i| &i.object))
+            .collect();
+        Ok(all
+            .iter()
+            .filter(|(id, _)| !excluded.contains(id))
+            .map(|(id, b)| (id.clone(), b.clone()))
+            .collect())
+    }
+    pub fn receive_bundles(&self, incoming: &BTreeMap<String, Bundle>) -> Result<usize> {
+        let (mut all, issues) = self.read_all()?;
+        if !issues.is_empty() {
+            return Err("local_store_damaged".into());
+        }
+        for (id, b) in incoming {
+            b.validate()?;
+            if b.id != *id || b.snapshot.space != self.identity.space {
+                return Err("space_mismatch".into());
+            }
+            all.insert(id.clone(), b.clone());
+        }
+        capacity(&all)?;
+        let mut received = 0;
+        for (id, b) in incoming {
+            received += usize::from(storage::immutable(
+                &self.objects().join(format!("{id}.json")),
+                &b.bytes()?,
+            )?);
+        }
+        self.checkpoint()?;
+        Ok(received)
     }
     pub fn checkpoint(&self) -> Result<Journal> {
         let (objects, _) = self.read_all()?;

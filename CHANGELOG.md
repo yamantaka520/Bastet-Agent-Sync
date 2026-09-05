@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-dev — M3 preview, 2026-09-05
+
+- Added desktop OAuth PKCE/state flow, fixed HTTPS endpoints and refresh-token credential storage with no file fallback.
+- Added encrypted snapshot envelopes, random recovery keys, authenticated space binding and bounded Drive upload/download/listing operations.
+- Added durable preallocated-ID recovery for uncertain folder creation, conservative HTTP errors and bounded backoff policy.
+- Connected validated replicas to a durable encrypted exchange queue with key proof, ambiguous-upload reconciliation, direction handling and conflict-preserving two-replica tests.
+- Added five-language cloud configuration status and synthetic encryption/recovery check; unconfigured builds cannot start Google login.
+- Added crypto, callback, recovery, HTTP fixture and UI tests. Google OAuth client is not configured; real-account transfer, native credential-store verification, Picker, space/key wizard and GUI queue orchestration remain pending.
+
 ## 0.1.0-dev — M2, 2026-09-05
 
 - Added immutable SHA-256 text snapshots, a space identity and a locked local replica with recoverable checkpoints.

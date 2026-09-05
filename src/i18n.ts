@@ -22,7 +22,7 @@ const en = {
   tagline: "A little closer. On every computer.",
   setup: "Your sync space",
   intro: "Bring your agents along. Start by choosing what belongs here.",
-  foundation: "Snapshot core · M2",
+  foundation: "Cloud preview · M3",
   preview: "Browser preview — open the desktop app for local features.",
   source: "Choose your agents",
   sourceHint:
@@ -36,7 +36,7 @@ const en = {
   defaults: "Use default",
   destination: "Choose a home in Drive",
   destinationHint:
-    "Choose an existing local Drive folder. Direct Google sign-in arrives in M3.",
+    "Choose an existing local Drive folder. Google sign-in configuration is shown in the cloud panel.",
   folder: "Sync folder",
   browse: "Browse",
   localOnly: "Local folder selected; cloud connection is not verified.",
@@ -100,7 +100,7 @@ const zhHant: Messages = {
   tagline: "每次換電腦，都更靠近熟悉的工作。",
   setup: "你的同步空間",
   intro: "帶著 Agent 一起走。先選擇要同步的夥伴。",
-  foundation: "同步核心 · M2",
+  foundation: "雲端預覽 · M3",
   preview: "瀏覽器預覽 — 請開啟桌面程式使用本機功能。",
   source: "選擇你的 Agent",
   sourceHint: "目前只偵測候選資料夾，對話相容性尚未驗證。",
@@ -112,7 +112,8 @@ const zhHant: Messages = {
   custom: "指定路徑",
   defaults: "使用預設",
   destination: "在 Drive 安個家",
-  destinationHint: "選擇既有的本機 Drive 資料夾。Google 直接登入將於 M3 加入。",
+  destinationHint:
+    "選擇既有的本機 Drive 資料夾。Google 登入配置狀態顯示於雲端面板。",
   folder: "同步資料夾",
   browse: "瀏覽",
   localOnly: "已選擇本機目錄；尚未驗證雲端連線。",
@@ -173,7 +174,7 @@ const zhHans: Messages = {
   tagline: "每次换电脑，都更贴近熟悉的工作。",
   setup: "你的同步空间",
   intro: "带着 Agent 一起走。先选择要同步的伙伴。",
-  foundation: "同步核心 · M2",
+  foundation: "云端预览 · M3",
   preview: "浏览器预览 — 请打开桌面应用使用本地功能。",
   source: "选择你的 Agent",
   sourceHint: "目前仅检测候选数据文件夹，尚未验证对话兼容性。",
@@ -185,7 +186,8 @@ const zhHans: Messages = {
   custom: "指定路径",
   defaults: "使用默认值",
   destination: "在 Drive 安个家",
-  destinationHint: "选择现有的本地 Drive 文件夹。Google 直接登录将在 M3 加入。",
+  destinationHint:
+    "选择现有的本地 Drive 文件夹。Google 登录配置状态显示于云端面板。",
   folder: "同步文件夹",
   browse: "浏览",
   localOnly: "已选择本地目录；尚未验证云端连接。",
@@ -247,7 +249,7 @@ const ja: Messages = {
   tagline: "いつもの仕事を、どのコンピューターでも。",
   setup: "同期スペース",
   intro: "エージェントと一緒に。まず同期する相手を選びましょう。",
-  foundation: "同期コア · M2",
+  foundation: "クラウドプレビュー · M3",
   preview:
     "ブラウザープレビュー — ローカル機能にはデスクトップアプリが必要です。",
   source: "エージェントを選択",
@@ -261,7 +263,7 @@ const ja: Messages = {
   defaults: "既定に戻す",
   destination: "Drive の保存先",
   destinationHint:
-    "既存のローカル Drive フォルダーを選択します。Google ログインは M3 で追加予定です。",
+    "既存のローカル Drive フォルダーを選択します。Google ログインの設定状況はクラウドパネルに表示されます。",
   folder: "同期フォルダー",
   browse: "参照",
   localOnly: "ローカルフォルダーを選択しました。クラウド接続は未検証です。",
@@ -324,7 +326,7 @@ const ko: Messages = {
   tagline: "어느 컴퓨터에서나 익숙한 작업을.",
   setup: "동기화 공간",
   intro: "에이전트와 함께하세요. 먼저 동기화할 대상을 선택하세요.",
-  foundation: "동기화 코어 · M2",
+  foundation: "클라우드 미리보기 · M3",
   preview: "브라우저 미리 보기 — 로컬 기능은 데스크톱 앱에서 사용하세요.",
   source: "에이전트 선택",
   sourceHint: "후보 폴더만 감지합니다. 대화 호환성은 아직 검증하지 않았습니다.",
@@ -337,7 +339,7 @@ const ko: Messages = {
   defaults: "기본값 사용",
   destination: "Drive 저장 위치",
   destinationHint:
-    "기존 로컬 Drive 폴더를 선택하세요. Google 직접 로그인은 M3에 추가됩니다.",
+    "기존 로컬 Drive 폴더를 선택하세요. Google 로그인 설정 상태는 클라우드 패널에 표시됩니다.",
   folder: "동기화 폴더",
   browse: "찾아보기",
   localOnly:

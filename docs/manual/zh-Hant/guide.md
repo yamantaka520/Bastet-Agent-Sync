@@ -53,3 +53,9 @@ Windows／Linux 建置與實際系統匣行為需驗證。M1 不進行雲端登�
 這不是 Agent 原生同步。Google Drive 登入、加密傳輸、原生對話恢復與排程仍待完成。v1 核心只接收事先整理的文字檔，保留所有版本，不傳播刪除。
 
 [M2 詳細規格](../../SNAPSHOT_PROTOCOL.md)
+
+## 🐈 M3 雲端預覽
+
+已實作 OAuth／憑證庫程式、加密 Drive API 與合成資料加密／恢復檢查。預設版本尚無 OAuth Client，登入停用。本機 HTTP 測試不代表真實 Google 或兩台電腦驗證。加密佇列已能交換兩個隔離副本、保留分支與重試 ID；空間／金鑰引導、Picker 與 GUI 佇列控制仍待完成。
+
+[Technical contract / 技術文件](../../CLOUD_SECURITY.md)

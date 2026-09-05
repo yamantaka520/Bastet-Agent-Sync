@@ -1,3 +1,4 @@
+pub mod cloud;
 mod model;
 pub mod sync;
 use model::{Agent, Settings};
@@ -108,6 +109,7 @@ async fn run_sync_diagnostic() -> Result<sync::diagnostic::Diagnostic, String> {
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(cloud::desktop::CloudState::default())
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("settings.json");
             let settings = model::load(&path).ok().flatten();
@@ -156,7 +158,12 @@ pub fn run() {
             scan_agents,
             choose_folder,
             save_settings,
-            run_sync_diagnostic
+            run_sync_diagnostic,
+            cloud::desktop::cloud_status,
+            cloud::desktop::connect_google,
+            cloud::desktop::disconnect_google,
+            cloud::desktop::create_google_folder,
+            cloud::desktop::run_crypto_diagnostic
         ])
         .run(tauri::generate_context!())
         .expect("desktop runtime failed");

@@ -1,5 +1,16 @@
 # Validation
 
+## M3 cloud preview — 2026-09-05
+
+- Rust: **37 tests passed** (36 on Windows because the existing Unix symlink test is excluded); frontend: **11 tests passed**. HTTP fixtures bind only to loopback and need a test environment that permits local sockets.
+- Crypto tests cover randomized authenticated encryption, recovery, wrong key/space, modified nonce/ciphertext and truncation. OAuth tests cover callback state/parameter rejection and the RFC S256 vector.
+- Loopback HTTP fixtures verify encrypted multipart upload/download, pagination, incomplete listing, wrong parent, duplicate-ID responses and 401/403/429/503 errors. No production Google endpoint is contacted by these tests.
+- Durable journals preserve allocated IDs after ambiguous folder creation and snapshot upload. Two encrypted fixture replicas preserve branches, avoid repeated publication, and refuse a wrong key or missing space proof before exchange.
+- Frontend tests cover all five cloud dictionaries, browser isolation, unconfigured login, explicit connection/creation actions and clearing stale diagnostic success.
+- TypeScript/Vite build, Rust formatting and Clippy with warnings denied were checked. macOS debug app built and launched; the native encryption/recovery button returned success with synthetic data, and Google login was visibly disabled because no product client is configured.
+- This is a **partial M3 preview**, not the M3 acceptance gate. Native keychain round trips, actual browser consent/token exchange, real Drive transfer, Picker/shared-folder grants and two-physical-computer recovery are unverified. Space/key wizard and GUI queue orchestration remain open. [Precise contract](CLOUD_SECURITY.md).
+- Three-platform CI is tracked separately from local macOS evidence.
+
 ## M2 snapshot core — 2026-09-05
 
 - Local Rust: **24 tests passed** (6 foundation + 18 snapshot/transport tests; the Unix symlink case is not run on Windows).

@@ -53,3 +53,9 @@ Windows／Linux 构建和实际托盘行为需要验证。M1 不进行云端登�
 这不是 Agent 原生同步。Google Drive 登录、加密传输、原生对话恢复和调度仍待完成。v1 核心只接收预先整理的文本文件，保留所有版本，不传播删除。
 
 [M2 详细规范](../../SNAPSHOT_PROTOCOL.md)
+
+## 🐈 M3 云端预览
+
+已实现 OAuth／凭据库代码、加密 Drive API 和合成数据加密／恢复检查。默认版本没有 OAuth Client，登录停用。本机 HTTP 测试不代表真实 Google 或两台电脑验证。加密队列已能交换两个隔离副本、保留分支和重试 ID；空间／密钥引导、Picker 和 GUI 队列控制仍待完成。
+
+[Technical contract / 技術文件](../../CLOUD_SECURITY.md)

@@ -5,7 +5,7 @@
 
 **Your agents. Your conversations. Across your computers.**
 
-![Stage](https://img.shields.io/badge/stage-M2%20development-orange)
+![Stage](https://img.shields.io/badge/stage-M3%20preview-orange)
 ![Platforms](https://img.shields.io/badge/targets-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
@@ -15,6 +15,8 @@
 A local-first desktop companion for synchronizing agent settings, skills, memory and conversations through Google Drive. Part of the Bastet family.
 
 > **Development, not a sync release.** The desktop includes five-language setup and an isolated snapshot-core check. The M2 core preserves divergent histories, verifies hashes and recovers its index after interruption. Real agent transport is not enabled. Cloud transfer, bidirectional synchronization and native cross-computer conversation restoration are planned and not yet verified. [Evidence and gaps](docs/VALIDATION.md).
+
+M3 preview adds a five-language cloud panel, encrypted transport primitives and an isolated encryption/recovery check. Google login requires a distributor-configured OAuth client. [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 
 ## ✨ Planned experience
 

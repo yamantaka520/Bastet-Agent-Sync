@@ -53,3 +53,9 @@ The snapshot core is implemented. Click **Run isolated check** in the desktop ap
 This is not native agent synchronization. Google Drive login, encrypted transport, native session restoration and scheduling remain pending. The v1 core accepts prepared text files only, preserves all versions and does not propagate deletions.
 
 [M2 details](../../SNAPSHOT_PROTOCOL.md)
+
+## 🐈 M3 cloud preview
+
+OAuth/credential-store code, encrypted Drive API operations and a synthetic encryption/recovery check are implemented. The default build has no OAuth client, so login is disabled. Local HTTP fixture tests are not real Google or two-device tests. The encrypted queue now exchanges two isolated replicas with preserved branches and durable retry IDs. The space/key wizard, Picker and GUI queue orchestration remain pending.
+
+[Technical contract / 技術文件](../../CLOUD_SECURITY.md)

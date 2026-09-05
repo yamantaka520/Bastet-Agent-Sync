@@ -577,3 +577,13 @@ footer p {
   margin: 6px 0 0;
   font-size: 22px;
 }
+
+.cloud-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-block: 16px;
+}
+.cloud-panel small {
+  overflow-wrap: anywhere;
+}

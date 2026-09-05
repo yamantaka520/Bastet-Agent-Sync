@@ -13,7 +13,10 @@ import App from "../src/App";
 const api = vi.hoisted(() => ({ native: false, invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => api.native,
-  invoke: api.invoke,
+  invoke: (command: string, ...args: unknown[]) =>
+    command === "cloud_status"
+      ? Promise.resolve({ configured: false, connected: false })
+      : api.invoke(command, ...args),
 }));
 afterEach(() => {
   cleanup();

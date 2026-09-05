@@ -25,3 +25,11 @@ tempfile = "3"
 sha2 = "0.10"
 uuid = { version = "1", features = ["v4"] }
 fs2 = "0.4"
+chacha20poly1305 = "0.10.1"
+base64 = "0.22"
+zeroize = "1"
+rand = "0.8"
+url = "2"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+webbrowser = "1"
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
