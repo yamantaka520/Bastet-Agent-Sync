@@ -5,7 +5,7 @@
 - 58 default Rust tests plus 20 frontend tests pass. One installed-CLI integration test is opt-in and separately passed against two isolated temporary memory homes (79 total executed checks). It verifies official export, backup, merge and repeat stability.
 - Worker tests verify unsupported selections do not veto AMOS, failed apply retries, no repeat publication, and cancellation before transfer. This is not physical two-device acceptance.
 - Installed CLI discovery was corrected to include the standard memory virtual environment. The source-checkout CLI on the development host was unusable; the active installed environment passed. AMOS normalizes unset link activation timestamps; fingerprint normalization prevents that from becoming a new edit.
-- Native Google upload and interactive cross-platform behavior are recorded separately after smoke testing.
+- Native macOS 0.2.1 (`9d657c5`) launched with seven saved selections and a separate ChatGPT Work card. Start switched to a live worker and Pause; unsupported sources were skipped. First exchange was observed waiting inside macOS `SecKeychainFindGenericPassword`, with zero completed transfer counters. User-side keychain authorization is pending; successful real upload or second-device merge is **not claimed**. Previous 0.2.0 CI passed all three platforms; new run 33965425045 was in progress at capture.
 
 ## 0.2.0 status and update interface — 2026-09-05
 
