@@ -2,6 +2,7 @@
 
 ## 0.3.2 capacity follow-up — 2026-09-05
 
+- Optimized macOS build `e9e3268` and a separate staged `.app` bundle passed; bundle version and executable equality were checked. The running 0.3.1 bundle was not replaced. [0.3.2 CI 33971964621](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33971964621) is in progress at capture.
 - Local validation: 66 default Rust tests, 23 frontend tests and one opt-in installed AMOS integration passed (90 total). Clippy with warnings denied, formatting, document/link checks and version parity passed.
 
 - Optimized 0.3.1 passed the credential wait and reported **25 Claude conversations captured, 16 additional bundles uploaded, no size errors**. Claude Code reported the same 25 through the shared profile with zero duplicate uploads. This supersedes the pending observation below and resolves both original large Claude histories.
