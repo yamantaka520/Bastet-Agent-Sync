@@ -37,3 +37,5 @@ npm run tauri dev
 ## 🐈 下载与安装
 
 [版本与下载](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)：点击版本号，在 Release notes 下载对应系统安装包。Windows 内置 WebView2 并检测补装；macOS 使用系统 WebKit；Linux 运行下载的 `sh install-linux.sh` 自动选择 apt/dnf、校验并补齐依赖。无需 Node.js 或 Rust。AMOS CLI 和 Agent 账号需另行设置。macOS 未公证、Windows 无 Authenticode，可能显示系统信任提示。
+
+macOS 首次打开若被阻止，确认下载来源后，在「系统设置 → 隐私与安全性 → 仍要打开」确认此 App。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)

@@ -154,3 +154,7 @@ Grok help 指出對話恢復與程式碼快照恢復為不同操作。所有適�
 ## 自動同步與 ChatGPT Work 修正（2026-09-05）
 
 使用者指出全選仍不能開始是實作缺失；Agent Memory OS 應勾選即可自動處理，不能要求手動匯出／匯入。ChatGPT Work 要獨立列為來源。0.2.1 接上 AMOS 正式 CLI、自動 Drive 交換及備份／合併工作程序；其他来源的未支援狀態不再全面阻擋。Work 原生任務搬移與其他 Agent 對話適配器仍未完成，不得冒稱已支援。
+
+## 三平台安裝與首次發布（2026-09-06）
+
+使用者要求每個 Release 包含 macOS、Windows、Linux 安裝檔；安裝時偵測並補齊 App 必要執行元件。完成後已授權公開第一個 Release；點選版本號進入的五語 Release notes 必須列出安裝檔直接下載連結。Agent 帳號與本機服務設定保留使用者管理，詳細安裝界線見 [Release notes](docs/RELEASE_NOTES.md)。
