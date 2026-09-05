@@ -94,6 +94,9 @@ pub fn retry_delay(
     ))
 }
 impl Drive {
+    pub fn is_connected(&self) -> bool {
+        !self.token.expired()
+    }
     pub fn new(token: AccessToken) -> Result<Self> {
         Ok(Self {
             client: http()?,

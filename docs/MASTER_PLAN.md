@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: M2 snapshot core implemented; M3 OAuth/encryption preview implemented with offline tests. Real-account and two-device gates remain open; native agent transport remains gated. This is the implementation roadmap; REQUIREMENTS.md preserves the detailed product requirements. User-facing plan and guide: [English](manual/en/guide.md) · [繁體中文](manual/zh-Hant/guide.md) · [简体中文](manual/zh-Hans/guide.md) · [日本語](manual/ja/guide.md) · [한국어](manual/ko/guide.md).
+Status: M2 snapshot core implemented; M3 OAuth/encryption preview and resumable guided/manual setup implemented with offline tests. Real-account and two-device gates remain open; native agent transport remains gated. This is the implementation roadmap; REQUIREMENTS.md preserves the detailed product requirements. User-facing plan and guide: [English](manual/en/guide.md) · [繁體中文](manual/zh-Hant/guide.md) · [简体中文](manual/zh-Hans/guide.md) · [日本語](manual/ja/guide.md) · [한국어](manual/ko/guide.md).
 
 ## Product
 
@@ -40,3 +40,5 @@ Exact Claude desktop import API; Codex desktop versus CLI session parity; Agy pe
 M2 protocol and precise limitations: [SNAPSHOT_PROTOCOL.md](SNAPSHOT_PROTOCOL.md). The journal is a rebuildable checkpoint backed by immutable objects. No deletion propagation, native import, encryption or background scheduling is included in the M2 core.
 
 M3 implementation boundaries and release gates: [Cloud transport and encryption](CLOUD_SECURITY.md).
+
+Setup wizard, resume/restart and manual configuration: [Setup contract](SETUP_WIZARD.md).

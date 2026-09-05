@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-dev — Resumable setup wizard, 2026-09-05
+
+- Added five-stage guided setup and a manual mode sharing the same saved, validated progress.
+- Added resume navigation and explicit restart with archived records; no Drive files, credentials or keys are deleted.
+- Added native Desktop OAuth configuration import, manual folder ID/link verification and durable space/key preparation.
+- Added recovery-kit export/readback, verified import and final folder/key proof check; secrets never enter renderer state.
+- Added per-step restart, interrupted proof upload, wrong-key, manual-mode and cancellation tests. Real-account acceptance remains pending.
+
 ## 0.1.0-dev — M3 preview, 2026-09-05
 
 - Added desktop OAuth PKCE/state flow, fixed HTTPS endpoints and refresh-token credential storage with no file fallback.

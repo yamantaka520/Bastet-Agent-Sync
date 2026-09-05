@@ -56,6 +56,12 @@ This is not native agent synchronization. Google Drive login, encrypted transpor
 
 ## 🐈 M3 cloud preview
 
-OAuth/credential-store code, encrypted Drive API operations and a synthetic encryption/recovery check are implemented. The default build has no OAuth client, so login is disabled. Local HTTP fixture tests are not real Google or two-device tests. The encrypted queue now exchanges two isolated replicas with preserved branches and durable retry IDs. The space/key wizard, Picker and GUI queue orchestration remain pending.
+OAuth/credential-store code, encrypted Drive API operations and a synthetic encryption/recovery check are implemented. The default build has no OAuth client, so login is disabled. Local HTTP fixture tests are not real Google or two-device tests. The encrypted queue now exchanges two isolated replicas with preserved branches and durable retry IDs. The space/key wizard is now implemented (see below); Picker and GUI sync orchestration remain pending.
 
 [Technical contract / 技術文件](../../CLOUD_SECURITY.md)
+
+## 🐈 Guided setup, resume and manual configuration
+
+The Drive wizard has five steps: login configuration, Google authorization, folder, encryption/recovery, and final review. Completed steps and mode are saved automatically. Reopen to resume, or Start again to archive the old progress without deleting Drive data or keys. Manual setup expands every section with the same validation. Import your own Desktop OAuth JSON if the build has no client; a folder ID/link can be entered directly. Save a recovery kit before verifying a new space, or import the other computer’s kit to join. Completion verifies setup only; Agent sync remains gated.
+
+[Setup contract / 設定文件](../../SETUP_WIZARD.md)

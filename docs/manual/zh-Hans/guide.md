@@ -56,6 +56,12 @@ Windows／Linux 构建和实际托盘行为需要验证。M1 不进行云端登�
 
 ## 🐈 M3 云端预览
 
-已实现 OAuth／凭据库代码、加密 Drive API 和合成数据加密／恢复检查。默认版本没有 OAuth Client，登录停用。本机 HTTP 测试不代表真实 Google 或两台电脑验证。加密队列已能交换两个隔离副本、保留分支和重试 ID；空间／密钥引导、Picker 和 GUI 队列控制仍待完成。
+已实现 OAuth／凭据库代码、加密 Drive API 和合成数据加密／恢复检查。默认版本没有 OAuth Client，登录停用。本机 HTTP 测试不代表真实 Google 或两台电脑验证。加密队列已能交换两个隔离副本、保留分支和重试 ID；空间／密钥引导现已实现（见下方）；Picker 和 GUI 同步控制仍待完成。
 
 [Technical contract / 技術文件](../../CLOUD_SECURITY.md)
+
+## 🐈 引导向导、接续和手动设置
+
+Drive 向导分为登录设置、Google 授权、文件夹、加密／恢复和最后检查五步。完成的步骤和模式自动保存，重新打开后可继续；重新开始会归档旧进度，不删除 Drive 数据或密钥。完全手动设置展开所有区域，仍使用相同验证。无内置 Client 时可导入自己的桌面 OAuth JSON，也可直接输入文件夹 ID／链接。新空间先保存恢复文件再验证；加入另一台电脑的空间则导入其恢复文件。完成设置不等于启用 Agent 同步。
+
+[Setup contract / 設定文件](../../SETUP_WIZARD.md)

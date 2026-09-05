@@ -7,3 +7,6 @@ pub mod pending;
 pub mod queue;
 pub mod vault;
 pub type Result<T> = std::result::Result<T, String>;
+
+pub mod wizard;
+pub mod wizard_desktop;

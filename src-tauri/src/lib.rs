@@ -159,10 +159,10 @@ pub fn run() {
             choose_folder,
             save_settings,
             run_sync_diagnostic,
-            cloud::desktop::cloud_status,
-            cloud::desktop::connect_google,
-            cloud::desktop::disconnect_google,
-            cloud::desktop::create_google_folder,
+            cloud::wizard_desktop::wizard_get,
+            cloud::wizard_desktop::wizard_navigate,
+            cloud::wizard_desktop::wizard_restart,
+            cloud::wizard_desktop::wizard_execute,
             cloud::desktop::run_crypto_diagnostic
         ])
         .run(tauri::generate_context!())

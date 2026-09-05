@@ -16,7 +16,7 @@ A local-first desktop companion for synchronizing agent settings, skills, memory
 
 > **Development, not a sync release.** The desktop includes five-language setup and an isolated snapshot-core check. The M2 core preserves divergent histories, verifies hashes and recovers its index after interruption. Real agent transport is not enabled. Cloud transfer, bidirectional synchronization and native cross-computer conversation restoration are planned and not yet verified. [Evidence and gaps](docs/VALIDATION.md).
 
-M3 preview adds a five-language cloud panel, encrypted transport primitives and an isolated encryption/recovery check. Google login requires a distributor-configured OAuth client. [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
+M3 preview adds a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 
 ## ✨ Planned experience
 

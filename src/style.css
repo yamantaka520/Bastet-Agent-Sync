@@ -587,3 +587,129 @@ footer p {
 .cloud-panel small {
   overflow-wrap: anywhere;
 }
+
+.wizard-toolbar,
+.wizard-navigation {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.wizard-toolbar [role="group"] {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wizard-toolbar button[aria-pressed="true"] {
+  background: #e9eddf;
+  border-color: #939a79;
+}
+.wizard-save {
+  color: #63734e;
+  font-size: 12px;
+  margin-block: 16px 8px;
+}
+.wizard-panel progress {
+  width: 100%;
+  height: 6px;
+  accent-color: #78835c;
+}
+.wizard-steps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 0;
+  gap: 8px;
+  margin-block: 14px 20px;
+}
+.wizard-steps button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  white-space: normal;
+  text-align: left;
+  min-height: 100px;
+}
+.wizard-steps button[aria-current="step"] {
+  border-color: #9b835c;
+  background: #fbf7ee;
+}
+.wizard-steps small {
+  font-size: 10px;
+  color: #747567;
+}
+.wizard-step {
+  border-top: 1px solid #e8e5dc;
+  padding-block: 16px;
+}
+.wizard-step code,
+.wizard-review dd {
+  overflow-wrap: anywhere;
+}
+.wizard-note,
+.wizard-restart {
+  background: #f5f1e8;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.wizard-note ol {
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.wizard-step label {
+  display: block;
+  margin-top: 16px;
+}
+.wizard-step input {
+  display: block;
+  width: 100%;
+  margin-block: 6px 10px;
+}
+.wizard-folders {
+  list-style: none;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+}
+.wizard-folders button {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 6px;
+}
+.wizard-folders small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.wizard-checks {
+  list-style: none;
+  padding: 0;
+  line-height: 1.9;
+  font-size: 13px;
+}
+.wizard-review {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px;
+  font-size: 13px;
+}
+.wizard-review dd {
+  margin: 0;
+}
+.wizard-selected,
+.wizard-complete {
+  color: #53623c;
+}
+.wizard-diagnostic {
+  margin-top: 20px;
+  border-top: 1px solid #e8e5dc;
+  padding-top: 18px;
+}
+@media (max-width: 1000px) {
+  .wizard-steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -56,6 +56,12 @@ Windows／Linux 建置與實際系統匣行為需驗證。M1 不進行雲端登�
 
 ## 🐈 M3 雲端預覽
 
-已實作 OAuth／憑證庫程式、加密 Drive API 與合成資料加密／恢復檢查。預設版本尚無 OAuth Client，登入停用。本機 HTTP 測試不代表真實 Google 或兩台電腦驗證。加密佇列已能交換兩個隔離副本、保留分支與重試 ID；空間／金鑰引導、Picker 與 GUI 佇列控制仍待完成。
+已實作 OAuth／憑證庫程式、加密 Drive API 與合成資料加密／恢復檢查。預設版本尚無 OAuth Client，登入停用。本機 HTTP 測試不代表真實 Google 或兩台電腦驗證。加密佇列已能交換兩個隔離副本、保留分支與重試 ID；空間／金鑰引導現已實作（見下方）；Picker 與 GUI 同步控制仍待完成。
 
 [Technical contract / 技術文件](../../CLOUD_SECURITY.md)
+
+## 🐈 引導精靈、接續與手動設定
+
+Drive 精靈分為登入設定、Google 授權、資料夾、加密／恢復及最後檢查五步。完成的步驟與模式會自動保存，重開後可接續；重新開始會封存舊進度，不刪除 Drive 資料或金鑰。完全手動設定展開所有區段，仍使用相同驗證。無內建 Client 時可匯入自己的桌面 OAuth JSON，也可直接輸入資料夾 ID／連結。新空間先保存恢復檔再驗證；加入另一台電腦的空間則匯入其恢復檔。完成設定不等於啟用 Agent 同步。
+
+[Setup contract / 設定文件](../../SETUP_WIZARD.md)

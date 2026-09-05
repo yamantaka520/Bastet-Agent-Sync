@@ -14,7 +14,7 @@ pub struct Binding {
     pub proof: String,
 }
 impl Binding {
-    fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> Result<()> {
         if [&self.folder, &self.space, &self.proof]
             .iter()
             .all(|s| token(s))

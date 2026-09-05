@@ -1,5 +1,14 @@
 # Validation
 
+## Resumable Drive setup — 2026-09-05
+
+- **43 Rust + 13 frontend = 56 local tests passed**. Formatting, Clippy with warnings denied, TypeScript/Vite build and documentation checks passed.
+- New backend tests reload each completed step, preserve manual mode, retry the same key/proof ID after interruption, require a recovery backup, validate a second replica's recovery kit before saving the key, reject invalid manual input and archive malformed progress on explicit restart.
+- UI tests cover resumed steps, mode switching, restart confirmation, cancelled export, failed proof retry, manual prerequisite gates and stale diagnostic status.
+- macOS debug App built and launched. Native smoke: OAuth file chooser opened and cancelled without advancing; manual mode exposed all settings, survived quit/reopen, and explicit restart returned to guided step 1. Traditional Chinese wizard layout visually checked. No OAuth configuration was imported, no keychain entry was created and no real Google account was contacted by this smoke.
+- The previous M3 preview passed all three OS targets in [run 33955824629](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33955824629). This wizard revision's CI is tracked separately.
+- Real Google consent, native credential-store key/recovery operations on each OS, and physical two-computer setup remain unverified because no product OAuth client/account is configured. Step completion and interruption tests use isolated fixtures. [Setup contract](SETUP_WIZARD.md).
+
 ## M3 cloud preview — 2026-09-05
 
 - Rust: **37 tests passed** (36 on Windows because the existing Unix symlink test is excluded); frontend: **11 tests passed**. HTTP fixtures bind only to loopback and need a test environment that permits local sockets.
