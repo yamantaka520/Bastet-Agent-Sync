@@ -39,9 +39,12 @@ class ReleaseAssetsTests(unittest.TestCase):
         self.fixtures()
         release.prepare()
         manifest = json.loads((self.out / 'latest.json').read_text(encoding='utf-8'))
-        self.assertEqual(set(manifest['platforms']), {'darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'})
+        self.assertEqual(set(manifest['platforms']), {'darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64', 'linux-x86_64-appimage', 'linux-x86_64-deb', 'linux-x86_64-rpm', 'windows-x86_64-nsis', 'windows-x86_64-msi'})
         for entry in manifest['platforms'].values():
             self.assertTrue((self.out / entry['url'].split('/')[-1]).is_file())
+        self.assertTrue(manifest['platforms']['linux-x86_64-deb']['url'].endswith('.deb'))
+        self.assertTrue(manifest['platforms']['linux-x86_64-rpm']['url'].endswith('.rpm'))
+        self.assertTrue(manifest['platforms']['windows-x86_64-msi']['url'].endswith('.msi'))
         notes = (self.out / 'release-notes.md').read_text(encoding='utf-8')
         self.assertNotIn('@DOWNLOADS@', notes)
         self.assertNotIn('@VERSION@', notes)

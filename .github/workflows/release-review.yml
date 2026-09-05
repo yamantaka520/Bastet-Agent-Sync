@@ -1,0 +1,64 @@
+name: Prepare reviewed release metadata
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Desktop release packages run ID
+        required: true
+        type: string
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: release-metadata-review
+  cancel-in-progress: false
+jobs:
+  metadata:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.run_id }}
+          pattern: packages-*
+          path: release-assets
+          merge-multiple: true
+      - run: npm ci
+      - name: Sign native Linux package updates
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: |
+          for package in release-assets/*.deb release-assets/*.rpm; do
+            npx tauri signer sign "$package"
+          done
+      - run: python scripts/test_release_assets.py
+      - run: python scripts/release_assets.py prepare
+      - name: Update only an unpublished draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          tag = 'v' + json.loads(Path('package.json').read_text())['version']
+          result = json.loads(subprocess.check_output(['gh','release','view',tag,'--json','isDraft'],text=True))
+          if not result['isDraft']:
+              raise SystemExit('Refusing to alter a published release')
+          subprocess.run(['gh','release','upload',tag,'--clobber',*[str(p) for p in Path('release-assets').iterdir() if p.name != 'release-notes.md']],check=True)
+          subprocess.run(['gh','release','edit',tag,'--notes-file','release-assets/release-notes.md'],check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-release
+          path: release-assets/*
+          if-no-files-found: error

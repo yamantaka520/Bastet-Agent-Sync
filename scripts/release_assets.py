@@ -12,7 +12,7 @@ VERSION = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['versi
 TAG = 'v' + VERSION
 REPO = 'yamantaka520/Bastet-Agent-Sync'
 OUT = ROOT / 'release-assets'
-TARGETS = {'aarch64-apple-darwin': ('macos-arm64', ['.dmg', '.app.tar.gz', '.app.tar.gz.sig']), 'x86_64-apple-darwin': ('macos-x64', ['.dmg', '.app.tar.gz', '.app.tar.gz.sig']), 'x86_64-pc-windows-msvc': ('windows-x64', ['.exe', '.exe.sig', '.msi', '.msi.sig']), 'x86_64-unknown-linux-gnu': ('linux-x64', ['.deb', '.rpm', '.AppImage', '.AppImage.sig'])}
+TARGETS = {'aarch64-apple-darwin': ('macos-arm64', ['.dmg', '.app.tar.gz', '.app.tar.gz.sig']), 'x86_64-apple-darwin': ('macos-x64', ['.dmg', '.app.tar.gz', '.app.tar.gz.sig']), 'x86_64-pc-windows-msvc': ('windows-x64', ['.exe', '.exe.sig', '.msi', '.msi.sig']), 'x86_64-unknown-linux-gnu': ('linux-x64', ['.deb', '.deb.sig', '.rpm', '.rpm.sig', '.AppImage', '.AppImage.sig'])}
 
 def asset(platform, suffix):
     return f'Bastet-Agent-Sync-{VERSION}-{platform}{suffix}'
@@ -35,7 +35,7 @@ def prepare():
                 raise RuntimeError(f'Missing or empty package: {p.name}')
     base = f'https://github.com/{REPO}/releases/download/{TAG}/'
     platforms = {}
-    for key, platform, suffix in [('darwin-aarch64', 'macos-arm64', '.app.tar.gz'), ('darwin-x86_64', 'macos-x64', '.app.tar.gz'), ('windows-x86_64', 'windows-x64', '.exe'), ('linux-x86_64', 'linux-x64', '.AppImage')]:
+    for key, platform, suffix in [('darwin-aarch64', 'macos-arm64', '.app.tar.gz'), ('darwin-x86_64', 'macos-x64', '.app.tar.gz'), ('windows-x86_64', 'windows-x64', '.exe'), ('linux-x86_64', 'linux-x64', '.AppImage'), ('linux-x86_64-appimage', 'linux-x64', '.AppImage'), ('linux-x86_64-deb', 'linux-x64', '.deb'), ('linux-x86_64-rpm', 'linux-x64', '.rpm'), ('windows-x86_64-nsis', 'windows-x64', '.exe'), ('windows-x86_64-msi', 'windows-x64', '.msi')]:
         name = asset(platform, suffix)
         signature = (OUT / (name + '.sig')).read_text(encoding='utf-8').strip()
         if not signature:
