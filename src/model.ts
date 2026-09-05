@@ -24,6 +24,7 @@ export const names: Record<string, string> = {
   agy: "Google Agy CLI",
   grok: "Grok Build CLI",
   pi: "Pi Agent",
+  "agent-memory-os": "Agent Memory OS",
 };
 export const defaults = (locale: Locale): Settings => ({
   schema: 1,

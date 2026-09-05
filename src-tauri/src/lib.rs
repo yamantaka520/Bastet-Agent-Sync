@@ -1,4 +1,5 @@
 pub mod cloud;
+pub mod memory_adapter;
 mod model;
 pub mod sync;
 use model::{Agent, Settings};
@@ -26,7 +27,7 @@ fn detect(settings: Option<&Settings>) -> Vec<Agent> {
     let home = dirs::home_dir().unwrap_or_default();
     let config = dirs::config_dir().unwrap_or_else(|| home.clone());
     let mut env = HashMap::new();
-    for key in ["CODEX_HOME", "PI_CODING_AGENT_DIR"] {
+    for key in ["CODEX_HOME", "PI_CODING_AGENT_DIR", "AGENT_MEMORY_HOME"] {
         if let Ok(v) = std::env::var(key) {
             if !v.is_empty() {
                 env.insert(key.into(), v);
@@ -164,6 +165,7 @@ pub fn run() {
             cloud::wizard_desktop::wizard_restart,
             cloud::wizard_desktop::wizard_execute,
             cloud::desktop::wizard_cancel_login,
+            memory_adapter::inspect_memory_export,
             cloud::desktop::run_crypto_diagnostic
         ])
         .run(tauri::generate_context!())

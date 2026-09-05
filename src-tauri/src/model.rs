@@ -6,7 +6,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const AGENTS: [&str; 6] = ["claude", "claude-code", "codex", "agy", "grok", "pi"];
+pub const AGENTS: [&str; 7] = [
+    "claude",
+    "claude-code",
+    "codex",
+    "agy",
+    "grok",
+    "pi",
+    "agent-memory-os",
+];
 pub const LOCALES: [&str; 5] = ["en", "zh-Hant", "zh-Hans", "ja", "ko"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,6 +78,9 @@ pub fn discover(
         env.get("PI_CODING_AGENT_DIR")
             .map(PathBuf::from)
             .unwrap_or(home.join(".pi/agent")),
+        env.get("AGENT_MEMORY_HOME")
+            .map(PathBuf::from)
+            .unwrap_or(home.join(".agent-memory")),
     ];
     AGENTS
         .iter()
@@ -229,7 +240,7 @@ mod tests {
         let mut paths = HashMap::new();
         paths.insert("codex".into(), custom.to_string_lossy().into_owned());
         let agents = discover(dir.path(), dir.path(), &paths, &HashMap::new());
-        assert_eq!(agents.len(), 6);
+        assert_eq!(agents.len(), 7);
         assert!(agents[2].detected && agents[2].custom);
         assert!(!agents[1].detected);
     }
@@ -254,6 +265,25 @@ mod tests {
         fs::create_dir(&other).unwrap();
         s.folder = other.to_string_lossy().into();
         assert!(validate_overlap(&s, &agents).is_ok());
+    }
+    #[test]
+    fn memory_os_home_is_discovered_and_selection_persists() {
+        let d = tempfile::tempdir().unwrap();
+        let env = HashMap::from([(
+            "AGENT_MEMORY_HOME".into(),
+            d.path().to_string_lossy().into_owned(),
+        )]);
+        assert!(discover(d.path(), d.path(), &HashMap::new(), &env)[6].detected);
+        let mut s = settings();
+        s.selected_agents = vec!["agent-memory-os".into()];
+        save(&d.path().join("settings.json"), &s).unwrap();
+        assert_eq!(
+            load(&d.path().join("settings.json"))
+                .unwrap()
+                .unwrap()
+                .selected_agents,
+            s.selected_agents
+        );
     }
     #[test]
     fn environment_profile_is_detected() {

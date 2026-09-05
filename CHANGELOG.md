@@ -1,5 +1,12 @@
 # Changelog
 
+## Agent Memory OS adapter preview — 2026-09-05
+
+- Add Agent Memory OS as a seventh selectable source with environment/custom-path discovery.
+- Add bounded official JSONL v1–3 inspection and lossless snapshot capture/restore; test replica transfer plus encryption without touching a live memory store.
+- Add five-language inspection UI and document private-export, deletion/ACL and trusted-import boundaries. Automatic export, Drive orchestration and live import remain gated.
+
+
 ## Browser authorization cancellation — 2026-09-05
 
 - Cancel browser OAuth waiting without resetting setup; retry uses fresh state/PKCE. Five-language UI explains phases that cannot be cancelled.

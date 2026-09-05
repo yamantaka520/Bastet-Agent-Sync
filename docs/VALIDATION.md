@@ -1,5 +1,12 @@
 # Validation
 
+## Agent Memory OS adapter — 2026-09-05
+
+- **51 Rust + 17 frontend = 68 local tests passed**. Clippy with warnings denied, formatting, TypeScript/Vite and documentation checks passed. Fixture tests cover discovery/selection persistence, two-replica transfer, encryption and byte-preserving restore, unsupported formats/versions/records and size limits. UI tests cover metadata-only results, cancellation/failure cleanup and browser isolation.
+- Only public synthetic AMOS fixtures were used; no live memory database, credentials or real memory export/import were accessed. Envelope inspection does not establish semantic import validity.
+- Previous OAuth cancellation CI [33959106850](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33959106850) passed all three OS targets, closing the earlier macOS socket failure. This adapter's CI runs after push.
+- Automatic Drive transport orchestration and trusted AMOS application remain unimplemented. [Adapter contract](AGENT_MEMORY_OS.md).
+
 ## Browser authorization cancellation — 2026-09-05
 
 - 48 Rust + 15 frontend = **63 local tests passed** on the final code. Clippy with warnings denied, TypeScript/Vite build, formatting and documentation checks passed.

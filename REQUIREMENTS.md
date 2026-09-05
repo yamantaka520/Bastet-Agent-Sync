@@ -142,3 +142,7 @@ Grok help 指出對話恢復與程式碼快照恢復為不同操作。所有適�
 使用者詢問新版 ChatGPT 與 Codex 整合後的支援。適配器範圍納入整合版桌面程式中的本機 Codex／Worktree；ChatGPT Work 本機任務列入格式與接續能力驗證。依資料來源與執行環境辨識，不以應用程式名稱或同一側欄推定儲存格式相同。一般 ChatGPT 聊天、ChatGPT Work 雲端與 Codex Cloud 另行研究正式匯出／匯入或連結接續能力，尚不宣稱可透過本機目錄同步原生恢復。
 
 官方依據：[Codex environments](https://learn.chatgpt.com/docs/environments/modes)、[Use ChatGPT](https://learn.chatgpt.com/docs/use-chatgpt)、[Projects and chats](https://learn.chatgpt.com/docs/projects)。截至本次記錄，只有來源路徑偵測與設計範圍，原生對話跨機恢復仍未驗收。
+
+## Agent Memory OS 同步來源（2026-09-05）
+
+使用者明確要求加入自有 Agent Memory OS。將其列為獨立的第七個同步來源，支援預設／環境變數／自訂目錄，使用正式 JSONL 同步封包，保留記憶、關聯、profile 與權限結構。禁止直接搬移執行中的資料庫。受信任匯入、刪除／ACL 預覽與備份須另行驗收；目前實作範圍見 [Agent Memory OS adapter](docs/AGENT_MEMORY_OS.md)。

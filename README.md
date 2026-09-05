@@ -49,3 +49,5 @@ Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) fir
 - [Brand asset provenance](assets/README.md)
 
 Contributions should include tests, keep the five locale dictionaries aligned, and avoid publishing credentials or machine-specific operational information. Never test imports by overwriting a live agent profile.
+
+🐈 [Agent Memory OS](docs/AGENT_MEMORY_OS.md): source discovery and official export-bundle adapter preview; automatic live-store sync remains gated.

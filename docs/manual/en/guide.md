@@ -77,3 +77,9 @@ Integrated ChatGPT desktop local Codex/Worktree tasks are included in the adapte
 ## 🐈 Cancel Google authorization
 
 During Connect, you can cancel the browser authorization wait without losing saved steps, then reconnect. Closing the browser alone waits for the three-minute timeout. Token exchange and account checks must finish; the app explains when cancellation is unavailable.
+
+## 🐈 Agent Memory OS
+
+Now available as a seventh source. Select an existing memory home or use AGENT_MEMORY_HOME. Export with the official AMOS CLI and use the JSONL inspection panel. Versions 1–3 are supported, up to 1 MiB. This preview preserves bundle contents but does not automatically export, publish to Drive or import into the live store. Local exports may contain private memories; tombstones and organization records require import review.
+
+[Adapter contract](../../AGENT_MEMORY_OS.md)
