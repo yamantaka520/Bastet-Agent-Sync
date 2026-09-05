@@ -1,0 +1,5 @@
+# Calico identity
+
+`calico.png` is the original Bastet Agent Sync mascot, generated on 2026-09-05 using the built-in imagegen tool. Platform icon files are deterministic size/format derivatives of this asset. No claim of affiliation with an animation studio is made.
+
+Prompt: “Use case: logo-brand. Create one square application icon for Bastet Agent Sync. A single adorable calico cat HEAD only, front facing, white cream fur with distinct orange and charcoal patches, big warm expressive eyes, tiny pink nose, softly rounded ears and cheeks. Pixar-style polished 3D animated feature-film character rendering, original cat character, friendly intelligent expression, soft cinematic studio lighting, tactile fluffy fur kept simple enough to read at small sizes. Centered symmetrical silhouette, full ears visible, ample padding, isolated on a genuinely transparent background with alpha. No body, no props, no words, no letters, no badges, no watermark. Professional desktop application mascot icon, strong readable shape at small size.”
