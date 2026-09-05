@@ -54,4 +54,10 @@ The wizard reads `about.get` user permission ID, display name and email after au
 
 To recover an account mismatch, remove the local login and reconnect with the original account. To intentionally switch accounts, restart setup; old progress and keys remain preserved. Old progress without identity still loads; use explicit Connect to bind the account after verifying any selected folder. Automatic refresh cannot silently adopt an unbound account. This migration verifies current access, not the historical identity of an older setup.
 
-Official contracts: [about.get and its scopes](https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get), [Drive user identity](https://developers.google.com/workspace/drive/api/reference/rest/v3/User). Google Picker grants and OAuth cancellation remain planned. Pasting a folder URL does not grant access.
+Official contracts: [about.get and its scopes](https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get), [Drive user identity](https://developers.google.com/workspace/drive/api/reference/rest/v3/User). Google Picker grants remain planned. Pasting a folder URL does not grant access.
+
+## Cancel and retry browser authorization
+
+While Connect is running, **Cancel browser authorization wait** requests cancellation of the browser callback phase only. Accepted cancellation closes that listener before code exchange, preserves saved wizard progress and credentials, and enables another explicit Connect with fresh OAuth state and PKCE. Closing the browser alone is not detectable; the user can cancel in the app, or the wait times out after three minutes. The browser tab is not closed automatically.
+
+Refresh, token exchange and account/folder checks are bounded network operations and are not aborted by this button. Outside the callback phase the command returns false and the UI explains that cancellation is unavailable; it never reports success for an already-finished wait. A separate in-memory cancellation channel remains callable while the setup transaction is locked. Completion and cancellation serialize before consuming a received code. Callback sockets explicitly use blocking mode with short read timeouts and a two-second total header-read deadline, so partial requests cannot indefinitely stall cancellation.

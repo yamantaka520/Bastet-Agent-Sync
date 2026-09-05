@@ -73,3 +73,7 @@ Drive 向导分为登录设置、Google 授权、文件夹、加密／恢复和�
 整合版 ChatGPT 桌面的本机 Codex／Worktree 纳入适配器目标；ChatGPT Work 本机任务须验证格式与继续能力。一般 ChatGPT 聊天与云端任务另行研究正式整合方式。目前尚未验证原生对话跨机恢复。
 
 [OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)
+
+## 🐈 取消 Google 授权等待
+
+连接时可取消等待浏览器授权，保留已保存步骤后再次连接。仅关闭浏览器会等待三分钟超时。Token 交换与账号检查须等待完成；无法取消的阶段会明确提示。

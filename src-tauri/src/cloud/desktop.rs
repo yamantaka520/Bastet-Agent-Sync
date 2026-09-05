@@ -3,7 +3,64 @@ use super::{crypto::SpaceKey, drive::Drive, Result};
 use serde::Serialize;
 use std::sync::{Arc, Mutex};
 #[derive(Default, Clone)]
-pub struct CloudState(pub Arc<Mutex<Option<Drive>>>);
+pub struct CloudState(pub Arc<Mutex<Option<Drive>>>, pub BrowserWaits);
+
+#[derive(Default, Clone)]
+pub struct BrowserWaits(Arc<Mutex<Option<Arc<std::sync::atomic::AtomicBool>>>>);
+pub struct BrowserWait {
+    owner: BrowserWaits,
+    pub cancelled: Arc<std::sync::atomic::AtomicBool>,
+}
+impl BrowserWaits {
+    pub fn begin(&self) -> Result<BrowserWait> {
+        let mut slot = self.0.lock().map_err(|_| "cloud_busy")?;
+        if slot.is_some() {
+            return Err("cloud_busy".into());
+        }
+        let cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        *slot = Some(cancelled.clone());
+        Ok(BrowserWait {
+            owner: self.clone(),
+            cancelled,
+        })
+    }
+    pub fn cancel(&self) -> Result<bool> {
+        let slot = self.0.lock().map_err(|_| "cloud_busy")?;
+        if let Some(flag) = slot.as_ref() {
+            flag.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+}
+impl BrowserWait {
+    pub fn complete<T>(self, result: Result<T>) -> Result<T> {
+        let mut slot = self.owner.0.lock().map_err(|_| "cloud_busy")?;
+        *slot = None;
+        if self.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+            Err("oauth_cancelled".into())
+        } else {
+            result
+        }
+    }
+}
+impl Drop for BrowserWait {
+    fn drop(&mut self) {
+        if let Ok(mut slot) = self.owner.0.lock() {
+            if slot
+                .as_ref()
+                .is_some_and(|flag| Arc::ptr_eq(flag, &self.cancelled))
+            {
+                *slot = None;
+            }
+        }
+    }
+}
+#[tauri::command]
+pub fn wizard_cancel_login(state: tauri::State<'_, CloudState>) -> Result<bool> {
+    state.1.cancel()
+}
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CryptoDiagnostic {
@@ -59,4 +116,24 @@ pub async fn run_crypto_diagnostic() -> Result<CryptoDiagnostic> {
     })
     .await
     .map_err(|_| "crypto_check_failed".to_string())?
+}
+
+#[cfg(test)]
+mod cancellation_tests {
+    use super::*;
+    #[test]
+    fn cancel_is_scoped_to_browser_wait_and_retry_gets_fresh_flag() {
+        let waits = BrowserWaits::default();
+        assert!(!waits.cancel().unwrap());
+        let pending = waits.begin().unwrap();
+        assert!(waits.begin().is_err());
+        assert!(waits.cancel().unwrap());
+        assert_eq!(pending.complete(Ok("code")).unwrap_err(), "oauth_cancelled");
+        assert!(!waits.cancel().unwrap());
+        let next = waits.begin().unwrap();
+        assert_eq!(next.complete(Ok("new-code")).unwrap(), "new-code");
+        assert!(!waits.cancel().unwrap());
+        drop(waits.begin().unwrap());
+        assert!(!waits.cancel().unwrap());
+    }
 }

@@ -227,3 +227,33 @@ it("distinguishes saved identity from connected identity and refreshes after acc
     await screen.findByText(t.accountSaved + ": cat@example.test"),
   ).toBeTruthy();
 });
+
+it("cancels a pending browser wait without resetting progress and enables reconnect", async () => {
+  const saved = initial();
+  Object.assign(saved.wizard, {
+    clientId: "fixture.apps.googleusercontent.com",
+    clientSource: "imported",
+    page: 1,
+  });
+  let rejectConnect: ((reason: string) => void) | undefined;
+  vi.mocked(invoke).mockImplementation(async (cmd) => {
+    if (cmd === "wizard_execute")
+      return new Promise((_, reject) => {
+        rejectConnect = reject;
+      });
+    if (cmd === "wizard_cancel_login") {
+      rejectConnect!("oauth_cancelled");
+      return true;
+    }
+    return structuredClone(saved);
+  });
+  render(<CloudPanel native locale="en" />);
+  fireEvent.click(await screen.findByText(t.connect));
+  fireEvent.click(await screen.findByText(t.cancelLogin));
+  expect(await screen.findByText(t.cancelled)).toBeTruthy();
+  expect((screen.getByText(t.connect) as HTMLButtonElement).disabled).toBe(
+    false,
+  );
+  expect(saved.wizard.page).toBe(1);
+  expect(invoke).not.toHaveBeenCalledWith("wizard_restart");
+});

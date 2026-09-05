@@ -73,3 +73,7 @@ Drive 設定はログイン設定、Google 認証、フォルダー、暗号化�
 統合版 ChatGPT デスクトップのローカル Codex／Worktree をアダプター対象に含めます。ローカル ChatGPT Work は形式と再開方法の検証が必要です。通常の ChatGPT チャットとクラウドタスクは別途連携を調査します。別のコンピューターでのネイティブ復元は未検証です。
 
 [OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)
+
+## 🐈 Google 認証待ちのキャンセル
+
+接続時にブラウザー認証待ちをキャンセルして、保存済みの進捗を保持したまま再接続できます。ブラウザーを閉じるだけでは三分間のタイムアウトを待ちます。トークン交換とアカウント確認の完了は待つ必要があり、キャンセルできない段階は画面に表示します。

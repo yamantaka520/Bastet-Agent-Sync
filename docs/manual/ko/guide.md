@@ -73,3 +73,7 @@ Drive 설정은 로그인 설정, Google 권한, 폴더, 암호화 및 복구, �
 통합 ChatGPT 데스크톱의 로컬 Codex/Worktree를 어댑터 대상으로 포함합니다. 로컬 ChatGPT Work는 형식과 이어가기 검증이 필요합니다. 일반 ChatGPT 채팅과 클라우드 작업은 별도 연동을 조사합니다. 다른 컴퓨터에서의 네이티브 복원은 아직 검증되지 않았습니다.
 
 [OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)
+
+## 🐈 Google 인증 대기 취소
+
+연결 중 브라우저 인증 대기를 취소해도 저장된 진행 상태는 유지되며 다시 연결할 수 있습니다. 브라우저만 닫으면 3분 제한 시간이 끝날 때까지 기다립니다. 토큰 교환과 계정 확인은 완료를 기다려야 하며 취소할 수 없는 단계는 화면에 안내됩니다.

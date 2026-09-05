@@ -1,6 +1,13 @@
 import type { Locale } from "./i18n";
 export const wizardMessages = {
   en: {
+    cancelLogin: "Cancel browser authorization wait",
+    cancelHint:
+      "Cancellation is available while waiting for the browser. Token exchange and account checks must finish before retrying.",
+    cancelUnavailable:
+      "Browser authorization is not currently waiting. Retry cancellation once the browser opens, or wait for the connection check to finish.",
+    cancelled:
+      "Authorization wait cancelled. Your saved setup is unchanged; connect again when ready.",
     forgetLogin: "Forget local login",
     forgetHint:
       "This removes the saved login token only. Setup progress and space keys stay on this computer. Google permissions can be revoked in your account.",
@@ -98,6 +105,12 @@ export const wizardMessages = {
     ],
   },
   "zh-Hant": {
+    cancelLogin: "取消等待瀏覽器授權",
+    cancelHint:
+      "等待瀏覽器授權時可以取消。Token 交換與帳號檢查須完成後才能重試。",
+    cancelUnavailable:
+      "目前未在等待瀏覽器授權。瀏覽器開啟後可再取消，或等待連線檢查完成。",
+    cancelled: "已取消等待授權。已儲存的設定保留，可再次連線。",
     forgetLogin: "移除本機登入",
     forgetHint:
       "只移除已保存的登入 token，保留精靈進度與空間金鑰。Google 權限可在帳號中撤銷。",
@@ -186,6 +199,12 @@ export const wizardMessages = {
     ],
   },
   "zh-Hans": {
+    cancelLogin: "取消等待浏览器授权",
+    cancelHint:
+      "等待浏览器授权时可以取消。Token 交换与账号检查须完成后才能重试。",
+    cancelUnavailable:
+      "当前未在等待浏览器授权。浏览器打开后可再取消，或等待连接检查完成。",
+    cancelled: "已取消等待授权。已保存的设置保留，可再次连接。",
     forgetLogin: "移除本机登录",
     forgetHint:
       "仅移除已保存的登录 token，保留向导进度和空间密钥。Google 权限可在账号中撤销。",
@@ -275,6 +294,13 @@ export const wizardMessages = {
     ],
   },
   ja: {
+    cancelLogin: "ブラウザー認証待ちをキャンセル",
+    cancelHint:
+      "ブラウザー待機中にキャンセルできます。トークン交換とアカウント確認は完了するまでお待ちください。",
+    cancelUnavailable:
+      "現在ブラウザー認証を待機していません。ブラウザーが開いた後に再試行するか、接続確認の完了をお待ちください。",
+    cancelled:
+      "認証待ちをキャンセルしました。保存済み設定は保持され、再接続できます。",
     forgetLogin: "ローカルログインを削除",
     forgetHint:
       "保存されたログイントークンのみ削除します。進行状況とスペース鍵は保持します。Google 権限はアカウントで取り消せます。",
@@ -373,6 +399,13 @@ export const wizardMessages = {
     ],
   },
   ko: {
+    cancelLogin: "브라우저 인증 대기 취소",
+    cancelHint:
+      "브라우저 대기 중에 취소할 수 있습니다. 토큰 교환과 계정 확인이 끝나면 다시 시도하세요.",
+    cancelUnavailable:
+      "현재 브라우저 인증 대기 중이 아닙니다. 브라우저가 열리면 취소를 다시 시도하거나 연결 확인 완료를 기다리세요.",
+    cancelled:
+      "인증 대기를 취소했습니다. 저장된 설정이 유지되며 다시 연결할 수 있습니다.",
     forgetLogin: "로컬 로그인 삭제",
     forgetHint:
       "저장된 로그인 토큰만 삭제합니다. 진행 상황과 공간 키는 유지됩니다. Google 권한은 계정에서 취소할 수 있습니다.",

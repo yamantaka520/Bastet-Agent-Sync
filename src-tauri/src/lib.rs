@@ -163,6 +163,7 @@ pub fn run() {
             cloud::wizard_desktop::wizard_navigate,
             cloud::wizard_desktop::wizard_restart,
             cloud::wizard_desktop::wizard_execute,
+            cloud::desktop::wizard_cancel_login,
             cloud::desktop::run_crypto_diagnostic
         ])
         .run(tauri::generate_context!())

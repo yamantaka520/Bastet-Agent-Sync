@@ -73,3 +73,7 @@ The wizard now displays the connected or saved Google account and refuses to res
 Integrated ChatGPT desktop local Codex/Worktree tasks are included in the adapter target; local ChatGPT Work requires format/resume verification. General ChatGPT chats and cloud tasks need separate supported integration. Native cross-computer restoration is not yet verified.
 
 [OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)
+
+## 🐈 Cancel Google authorization
+
+During Connect, you can cancel the browser authorization wait without losing saved steps, then reconnect. Closing the browser alone waits for the three-minute timeout. Token exchange and account checks must finish; the app explains when cancellation is unavailable.

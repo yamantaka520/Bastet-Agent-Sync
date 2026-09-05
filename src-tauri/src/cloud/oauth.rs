@@ -91,8 +91,14 @@ impl Authorization {
         })
     }
     /// Called only after an explicit Connect action. Listener is short lived, never a daemon.
-    pub fn finish(self, config: &ClientConfig, store: &impl SecretStore) -> Result<AccessToken> {
+    pub fn wait_code(
+        &self,
+        cancelled: &std::sync::atomic::AtomicBool,
+    ) -> Result<Zeroizing<String>> {
         loop {
+            if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err("oauth_cancelled".into());
+            }
             if self.started.elapsed() > Duration::from_secs(180) {
                 return Err("oauth_timeout".into());
             }
@@ -102,12 +108,30 @@ impl Authorization {
                         continue;
                     }
                     stream
-                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .set_nonblocking(false)
                         .map_err(|_| "oauth_listener_failed")?;
-                    let mut bytes = Vec::new();
+                    stream
+                        .set_read_timeout(Some(Duration::from_millis(100)))
+                        .map_err(|_| "oauth_listener_failed")?;
+                    let mut bytes = Zeroizing::new(Vec::new());
+                    let read_started = Instant::now();
                     let mut chunk = [0u8; 1024];
                     while bytes.len() < 8192 && !bytes.windows(4).any(|x| x == b"\r\n\r\n") {
+                        if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+                            return Err("oauth_cancelled".into());
+                        }
+                        if read_started.elapsed() >= Duration::from_secs(2) {
+                            break;
+                        }
                         match stream.read(&mut chunk) {
+                            Err(e)
+                                if matches!(
+                                    e.kind(),
+                                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                                ) =>
+                            {
+                                continue
+                            }
                             Ok(0) | Err(_) => break,
                             Ok(n) => bytes.extend_from_slice(&chunk[..n]),
                         }
@@ -122,9 +146,7 @@ impl Authorization {
                     let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
                     let _ = stream.write_all(response.as_bytes());
                     match result {
-                        Ok(code) => {
-                            return exchange(config, &self.redirect, &self.verifier, &code, store)
-                        }
+                        Ok(code) => return Ok(code),
                         Err(e) if e == "oauth_denied" => return Err(e),
                         Err(_) => continue, // unrelated requests cannot consume the valid pending state
                     }
@@ -135,6 +157,14 @@ impl Authorization {
                 Err(_) => return Err("oauth_listener_failed".into()),
             }
         }
+    }
+    pub fn exchange(
+        self,
+        config: &ClientConfig,
+        store: &impl SecretStore,
+        code: &str,
+    ) -> Result<AccessToken> {
+        exchange(config, &self.redirect, &self.verifier, code, store)
     }
 }
 fn parse_callback(bytes: &[u8], state: &str) -> Result<Zeroizing<String>> {
@@ -315,6 +345,38 @@ pub(crate) fn fixture_token() -> AccessToken {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cancelled_browser_wait_closes_listener_and_retry_uses_new_state() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let config = ClientConfig {
+            id: "fixture.apps.googleusercontent.com".into(),
+            secret: None,
+        };
+        let pending = Authorization::begin(&config).unwrap();
+        let old_state = pending.state.to_string();
+        let addr = pending.listener.local_addr().unwrap();
+        let flag = AtomicBool::new(true);
+        assert_eq!(pending.wait_code(&flag).unwrap_err(), "oauth_cancelled");
+        drop(pending);
+        assert!(std::net::TcpStream::connect(addr).is_err());
+        let pending = Authorization::begin(&config).unwrap();
+        assert_ne!(pending.state.as_str(), old_state);
+        flag.store(false, Ordering::SeqCst);
+        // A partial request must not prevent cancellation or hold the setup for three minutes.
+        let mut socket =
+            std::net::TcpStream::connect(pending.listener.local_addr().unwrap()).unwrap();
+        socket.write_all(b"GET /oauth/callback?").unwrap();
+        let flag = std::sync::Arc::new(flag);
+        let cancel = flag.clone();
+        let worker = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            cancel.store(true, Ordering::SeqCst);
+        });
+        let start = Instant::now();
+        assert_eq!(pending.wait_code(&flag).unwrap_err(), "oauth_cancelled");
+        assert!(start.elapsed() < Duration::from_secs(5));
+        worker.join().unwrap();
+    }
     #[test]
     fn callback_requires_state_unique_code_and_exact_path() {
         let request =

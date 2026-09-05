@@ -49,6 +49,8 @@ export default function CloudPanel({
   const t = wizardMessages[locale];
   const [view, setView] = useState<WizardView | null>(null);
   const [busy, setBusy] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [cancelNote, setCancelNote] = useState(false);
   const [error, setError] = useState("");
   const [restart, setRestart] = useState(false);
   const [folderName, setFolderName] = useState("Bastet Agent Sync");
@@ -86,10 +88,24 @@ export default function CloudPanel({
       setBusy(false);
     }
   }
-  function execute(action: string, input = "") {
-    return run(() =>
-      invoke<WizardView>("wizard_execute", { action, input, locale }),
-    );
+  async function execute(action: string, input = "") {
+    setConnecting(action === "connect");
+    setCancelNote(false);
+    try {
+      await run(() =>
+        invoke<WizardView>("wizard_execute", { action, input, locale }),
+      );
+    } finally {
+      setConnecting(false);
+      setCancelNote(false);
+    }
+  }
+  async function cancelLogin() {
+    try {
+      if (!(await invoke<boolean>("wizard_cancel_login"))) setCancelNote(true);
+    } catch {
+      setCancelNote(true);
+    }
   }
   function navigate(mode: "guided" | "manual", page: number) {
     return run(() => invoke<WizardView>("wizard_navigate", { mode, page }));
@@ -108,25 +124,27 @@ export default function CloudPanel({
   const unavailable = !native || busy || !w;
   const errorText = !error
     ? ""
-    : /account_mismatch/.test(error)
-      ? t.accountMismatch
-      : /reauth|oauth_timeout|oauth_denied/.test(error)
-        ? t.authError
-        : /oauth|client/.test(error)
-          ? t.configError
-          : /restart_required/.test(error)
-            ? t.restartError
-            : /step_required|backup_required/.test(error)
-              ? t.stepError
-              : /drive_|folder/.test(error)
-                ? t.folderError
-                : /recovery|decrypt|space_key|proof/.test(error)
-                  ? t.keyError
-                  : /store|credential|wizard_corrupt|unsafe|immutable/.test(
-                        error,
-                      )
-                    ? t.storageError
-                    : t.error;
+    : /oauth_cancelled/.test(error)
+      ? t.cancelled
+      : /account_mismatch/.test(error)
+        ? t.accountMismatch
+        : /reauth|oauth_timeout|oauth_denied/.test(error)
+          ? t.authError
+          : /oauth|client/.test(error)
+            ? t.configError
+            : /restart_required/.test(error)
+              ? t.restartError
+              : /step_required|backup_required/.test(error)
+                ? t.stepError
+                : /drive_|folder/.test(error)
+                  ? t.folderError
+                  : /recovery|decrypt|space_key|proof/.test(error)
+                    ? t.keyError
+                    : /store|credential|wizard_corrupt|unsafe|immutable/.test(
+                          error,
+                        )
+                      ? t.storageError
+                      : t.error;
   return (
     <section className="panel cloud-panel wizard-panel" aria-busy={busy}>
       <div className="section-heading">
@@ -135,6 +153,13 @@ export default function CloudPanel({
           <p>{t.intro}</p>
         </div>
       </div>
+      {connecting && (
+        <div role="status">
+          <button onClick={cancelLogin}>{t.cancelLogin}</button>
+          <p>{t.cancelHint}</p>
+          {cancelNote && <p>{t.cancelUnavailable}</p>}
+        </div>
+      )}
       <div className="wizard-toolbar">
         <div role="group" aria-label={t.title}>
           <button

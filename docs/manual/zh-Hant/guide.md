@@ -73,3 +73,7 @@ Drive 精靈分為登入設定、Google 授權、資料夾、加密／恢復及�
 整合版 ChatGPT 桌面的本機 Codex／Worktree 納入適配器目標；ChatGPT Work 本機任務須驗證格式與接續。一般 ChatGPT 聊天與雲端任務另行研究正式整合方式。目前尚未驗證原生對話跨機恢復。
 
 [OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)
+
+## 🐈 取消 Google 授權等待
+
+連線時可取消等待瀏覽器授權，保留已儲存步驟後再次連線。單純關閉瀏覽器會等待三分鐘逾時。Token 交換與帳號檢查須等待完成；無法取消的階段會明確提示。

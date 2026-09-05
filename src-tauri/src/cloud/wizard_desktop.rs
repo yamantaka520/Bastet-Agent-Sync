@@ -251,9 +251,12 @@ pub async fn wizard_execute(
                     Ok(token) => token,
                     Err(e) if e == "reauth_required" => {
                         let pending = oauth::Authorization::begin(&c)?;
+                        let wait = shared.1.begin()?;
                         webbrowser::open(pending.url.as_str())
                             .map_err(|_| "browser_open_failed")?;
-                        pending.finish(&c, &NativeStore)?
+                        let result = pending.wait_code(&wait.cancelled);
+                        let code = wait.complete(result)?;
+                        pending.exchange(&c, &NativeStore, &code)?
                     }
                     Err(e) => return Err(e),
                 };

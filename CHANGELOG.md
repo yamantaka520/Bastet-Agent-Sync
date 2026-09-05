@@ -1,5 +1,11 @@
 # Changelog
 
+## Browser authorization cancellation — 2026-09-05
+
+- Cancel browser OAuth waiting without resetting setup; retry uses fresh state/PKCE. Five-language UI explains phases that cannot be cancelled.
+- Bound callback header reads and explicitly configure accepted sockets, also fixing a macOS CI fixture race caused by inherited nonblocking mode.
+
+
 ## Account-aware setup — 2026-09-05
 
 - Show saved/connected Google identity in five languages and check the stable Drive permission ID on authorization/refresh before continuing setup.

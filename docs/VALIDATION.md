@@ -1,5 +1,12 @@
 # Validation
 
+## Browser authorization cancellation — 2026-09-05
+
+- 48 Rust + 15 frontend = **63 local tests passed** on the final code. Clippy with warnings denied, TypeScript/Vite build, formatting and documentation checks passed.
+- Cancellation fixtures cover active/inactive waits, cancellation winning before code consumption, fresh retry state, listener closure and partial callback requests. Frontend verifies preserved setup and re-enabled Connect. No Google or native credential-store operations were used.
+- Account-check CI [33958142867](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33958142867) failed on macOS: the test server immediately read an inherited nonblocking socket and received WouldBlock. Accepted HTTP fixture and OAuth sockets now explicitly switch to blocking mode; this is a code fix, not a retry-only workaround.
+- Real Google login, three-platform native credential interaction and physical-device restore remain open.
+
 ## Account-aware setup — 2026-09-05
 
 - **46 Rust + 14 frontend = 60 local tests passed**. Clippy with warnings denied, TypeScript/Vite build and formatting passed.
