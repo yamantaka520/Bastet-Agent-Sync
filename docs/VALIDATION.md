@@ -7,6 +7,8 @@
 - Installed CLI discovery was corrected to include the standard memory virtual environment. The source-checkout CLI on the development host was unusable; the active installed environment passed. AMOS normalizes unset link activation timestamps; fingerprint normalization prevents that from becoming a new edit.
 - Native macOS 0.2.1 (`9d657c5`) launched with seven saved selections and a separate ChatGPT Work card. Start switched to a live worker and Pause; unsupported sources were skipped. First exchange was observed waiting inside macOS `SecKeychainFindGenericPassword`, with zero completed transfer counters. User-side keychain authorization is pending; successful real upload or second-device merge is **not claimed**. Previous 0.2.0 CI passed all three platforms; new run 33965425045 was in progress at capture.
 
+- Follow-up after the user completed macOS keychain authorization: the native worker reported Google connected and a completed cycle with **1 uploaded encrypted AMOS bundle, 0 received and 0 merged**. The completion timestamp advanced from 20:22:56 to 20:24:03 (Asia/Taipei) while the upload count remained 1, confirming no duplicate publication across the observed cycles. The previous keychain blocker is resolved on this host. A physical second-device receive/merge is still unverified. [Implementation CI 33965425045](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33965425045) passed.
+
 ## 0.2.0 status and update interface — 2026-09-05
 
 - **55 Rust + 20 frontend = 75 local tests passed**. Formatting, Clippy with warnings denied and TypeScript/Vite passed; version consistency is now checked with documentation.
