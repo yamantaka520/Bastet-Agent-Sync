@@ -215,7 +215,9 @@ it("start runs native preflight and explains unavailable adapters", async () => 
   expect(await screen.findByText("v0.2.0 · fixture")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: /Start sync/ }));
   expect(
-    await screen.findByText(/Live export\/import is not available/),
+    await screen.findByText(/Live export\/import is not available/, {
+      selector: "li",
+    }),
   ).toBeTruthy();
   expect(api.invoke).toHaveBeenCalledWith("sync_preflight");
 });

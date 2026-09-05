@@ -6,6 +6,8 @@
 - Native preflight prevents Drive completion from bypassing unavailable adapters. Frontend tests show blocking reasons, version/build identity and explicit update checks/install; an unpublished feed is not reported as up-to-date. Update artifact origin is restricted to this repository.
 - Update installation/restart tests use frontend fixtures, not actual installer replacement. The signed draft pipeline and Windows/Linux/macOS self-update remain unverified until real artifacts run. No Agent sync worker was added or simulated.
 
+- Native macOS 0.2.0 smoke: saved seven source selections survived restart; package version/build revision appeared below the logo. Start returned all seven unsupported adapter names. The update panel displayed no valid published feed. No transfer or installer replacement occurred. Blocking feedback is also shown beside Start so page position cannot hide it.
+
 ## Google browser authorization fix — 2026-09-05
 
 - **53 Rust + 17 frontend = 70 local tests passed**; Clippy, formatting, TypeScript/Vite and macOS build/bundle passed. New tests require import readback, bypass stale refresh on first authorization, preserve reconnect, and reject credential errors without bypassing the store.

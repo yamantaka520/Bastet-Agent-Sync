@@ -104,7 +104,7 @@ export default function App() {
     if (blocked)
       document
         .getElementById("runtime-status")
-        ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+        ?.scrollIntoView?.({ behavior: "instant", block: "start" });
   }, [blocked]);
   async function startSync() {
     setBlocked(null);
@@ -505,7 +505,13 @@ export default function App() {
             <footer>
               <div>
                 <strong>{dirty ? t.dirty : t.foundation}</strong>
-                <p id="sync-reason">{t.pending}</p>
+                <p id="sync-reason" role="status">
+                  {checkingStart
+                    ? rt[6]
+                    : blocked
+                      ? `${rt[7]} — ${blocked.map((reason) => (({ settings: rt[8], sources: rt[9], drive: rt[10], adapters: rt[11] + unsupported.map((id) => names[id] ?? id).join(", "), check_failed: t.error }) as Record<string, string>)[reason]).join("；")}`
+                      : rt[24]}
+                </p>
               </div>
               <div className="footer-actions">
                 <button
