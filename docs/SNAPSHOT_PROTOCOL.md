@@ -4,7 +4,7 @@ Status: implemented core, exercised with isolated fixtures. Native agent import 
 
 ## Scope and interfaces
 
-Rust `sync::Replica` owns a separate local replica; `sync::LocalTransport` addresses a shared folder. Neither writes to an agent profile. `export` accepts explicitly prepared UTF-8 text artifacts, `sync` exchanges complete bundles and `resolve` records an explicit reconciliation. The GUI exposes only `run_sync_diagnostic`, with synthetic data in disposable directories. It does not pass saved agent paths or the selected Drive folder to this command.
+Rust `sync::Replica` owns a separate local replica; `sync::LocalTransport` addresses a shared folder. Neither writes to an agent profile. `export_from` accepts explicitly prepared UTF-8 text artifacts with their original base snapshot ID, `sync` exchanges complete bundles and `resolve` records an explicit reconciliation. The GUI exposes only `run_sync_diagnostic`, with synthetic data in disposable directories. It does not pass saved agent paths or the selected Drive folder to this command.
 
 `capture` reads an explicit staging-file list twice and rejects changed content. Both scans must match. Only `.md`, `.txt` and `.jsonl` are allowed; hidden/auth/credential/secret paths and symlinks are rejected. This is a **quiescent staging export**, not a transactionally consistent backup of live files. Content may itself contain secrets: filename exclusions do not sanitize text. Real agent export requires a versioned adapter and the M3 protection model.
 
@@ -35,7 +35,7 @@ Static symlink redirections in managed directories/files are rejected. This does
 
 A verified child with absent parents is stored pending, not advertised as a usable head. Later receipt of parents promotes it. Parents must belong to the same stream. Quarantined ancestry is not re-published. Heads form a DAG frontier per agent/profile/conversation.
 
-Export identical content after receiving one head returns that same ID, avoiding echo loops. Concurrent heads are preserved. An ordinary export refuses to silently merge them. Explicit `resolve` must supply all current observed head IDs; stale or incomplete choices fail. The resulting snapshot references both branches; originals remain intact.
+An adapter records the base ID when local work begins and passes it to `export_from`. Remote reception between local editing and export cannot silently change that base: exporting from the older base creates a preserved branch. Unknown or wrong-stream bases fail. Exporting content identical to its base returns that same ID, avoiding echo loops. The current-head convenience exporter is crate-private and used only by synthetic fixtures. Concurrent heads are preserved. An ordinary export refuses to silently merge them. Explicit `resolve` must supply all current observed head IDs; stale or incomplete choices fail. The resulting snapshot references both branches; originals remain intact.
 
 Upload-only does not receive objects; download-only does not publish. Transport results distinguish published-to-folder, received-into-inbox, pending ancestry, conflicts and rejected inputs. Published-to-folder never means cloud delivery or native agent restoration.
 

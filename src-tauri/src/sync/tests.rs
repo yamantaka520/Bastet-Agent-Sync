@@ -314,3 +314,41 @@ fn invalid_parent_is_not_republished_from_quarantine() {
     assert_eq!(r.published, 0);
     assert_eq!(r.pending, 1);
 }
+
+#[test]
+fn receiving_remote_update_does_not_rebase_existing_local_edits() {
+    let t = tempfile::tempdir().unwrap();
+    let remote = LocalTransport::create(&t.path().join("drive")).unwrap();
+    let a = Replica::open(&t.path().join("a"), &remote.space).unwrap();
+    let b = Replica::open(&t.path().join("b"), &remote.space).unwrap();
+    let base = a.export_from(stream(), files("base"), None).unwrap();
+    a.sync(&remote, Direction::Both).unwrap();
+    b.sync(&remote, Direction::Both).unwrap();
+    let next = a
+        .export_from(stream(), files("remote edit"), Some(&base))
+        .unwrap();
+    a.sync(&remote, Direction::Upload).unwrap();
+    // B's staged edit still depends on base, even though the inbox now knows next.
+    b.sync(&remote, Direction::Download).unwrap();
+    let branch = b
+        .export_from(stream(), files("offline local edit"), Some(&base))
+        .unwrap();
+    let j = b.checkpoint().unwrap();
+    assert_eq!(j.streams[0].ids.len(), 2);
+    assert!(j.streams[0].ids.contains(&next));
+    assert!(j.streams[0].ids.contains(&branch));
+    assert_eq!(
+        b.read_all().unwrap().0[&branch].snapshot.parents,
+        vec![base.clone()]
+    );
+    assert_eq!(
+        b.export_from(stream(), files("base"), Some(&base)).unwrap(),
+        base
+    );
+    assert_eq!(
+        b.export_from(stream(), files("bad"), Some(&"a".repeat(64)))
+            .unwrap_err(),
+        "unknown_baseline"
+    );
+    assert_eq!(b.checkpoint().unwrap().objects.len(), 3);
+}

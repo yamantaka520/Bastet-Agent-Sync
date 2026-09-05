@@ -4,6 +4,7 @@
 
 - Added immutable SHA-256 text snapshots, a space identity and a locked local replica with recoverable checkpoints.
 - Added one-shot upload/download/bidirectional local-folder transport, pending ancestry, preserved branches and explicit conflict resolution.
+- Require an explicit original base for the public export API so newly received remote updates cannot silently rebase offline edits.
 - Added an isolated native GUI diagnostic in five languages, without accessing selected agent profiles or Drive folders.
 - Added interrupted-file, corruption, lineage, direction, recovery and hostile-path tests.
 - Fixed Windows documentation validation by reading Markdown as UTF-8.

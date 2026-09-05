@@ -174,7 +174,8 @@ impl Replica {
         )?;
         Ok(journal)
     }
-    pub fn export(&self, stream: Stream, files: BTreeMap<String, String>) -> Result<String> {
+    // Only synthetic in-process callers may infer a baseline from the current inbox.
+    pub(crate) fn export(&self, stream: Stream, files: BTreeMap<String, String>) -> Result<String> {
         let entries = files
             .into_iter()
             .map(|(p, c)| (p, Entry::new(c)))
@@ -202,6 +203,40 @@ impl Replica {
             }
         }
         self.commit(stream, entries, heads)
+    }
+    /// The caller captures the base ID before editing/exporting local data.
+    /// Receiving a newer remote head must not rebase offline edits implicitly.
+    pub fn export_from(
+        &self,
+        stream: Stream,
+        files: BTreeMap<String, String>,
+        base: Option<&str>,
+    ) -> Result<String> {
+        let entries = files
+            .into_iter()
+            .map(|(p, c)| (p, Entry::new(c)))
+            .collect::<BTreeMap<_, _>>();
+        let (objects, issues) = self.read_all()?;
+        if !issues.is_empty() {
+            return Err("local_store_damaged".into());
+        }
+        let (journal, invalid) = graph(&objects);
+        if !invalid.is_empty() || !journal.pending.is_empty() {
+            return Err("history_pending".into());
+        }
+        let parents = if let Some(id) = base {
+            let original = objects.get(id).ok_or("unknown_baseline")?;
+            if original.snapshot.stream != stream {
+                return Err("invalid_baseline".into());
+            }
+            if original.snapshot.files == entries {
+                return Ok(id.into());
+            }
+            vec![id.into()]
+        } else {
+            vec![]
+        };
+        self.commit(stream, entries, parents)
     }
     pub fn resolve(
         &self,
