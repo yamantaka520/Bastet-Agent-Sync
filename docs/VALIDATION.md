@@ -9,7 +9,7 @@
 - Frontend tests cover all five cloud dictionaries, browser isolation, unconfigured login, explicit connection/creation actions and clearing stale diagnostic success.
 - TypeScript/Vite build, Rust formatting and Clippy with warnings denied were checked. macOS debug app built and launched; the native encryption/recovery button returned success with synthetic data, and Google login was visibly disabled because no product client is configured.
 - This is a **partial M3 preview**, not the M3 acceptance gate. Native keychain round trips, actual browser consent/token exchange, real Drive transfer, Picker/shared-folder grants and two-physical-computer recovery are unverified. Space/key wizard and GUI queue orchestration remain open. [Precise contract](CLOUD_SECURITY.md).
-- Three-platform CI is tracked separately from local macOS evidence.
+- M3 [CI run 33955824629](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33955824629) is in progress at capture. The preceding M2 baseline-preservation patch passed all three OS targets in [run 33953930166](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33953930166).
 
 ## M2 snapshot core — 2026-09-05
 
