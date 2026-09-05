@@ -200,7 +200,7 @@ impl Drive {
                 .query(&[
                     ("q", query),
                     ("spaces", "drive"),
-                    ("pageSize", "100"),
+                    ("pageSize", "1000"),
                     (
                         "fields",
                         "nextPageToken,incompleteSearch,files(id,name,mimeType,parents,trashed,version)",

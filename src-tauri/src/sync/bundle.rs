@@ -6,7 +6,7 @@ pub const MAX_FILE: usize = 32 * 1024 * 1024;
 pub const MAX_CONTENT: usize = 32 * 1024 * 1024;
 pub const MAX_WIRE: u64 = 64 * 1024 * 1024;
 pub const MAX_OBJECTS: usize = 4096;
-pub const MAX_STORE: usize = 1024 * 1024 * 1024;
+pub const MAX_STORE: usize = 2048 * 1024 * 1024;
 pub type Result<T> = std::result::Result<T, String>;
 
 pub fn hash(bytes: &[u8]) -> String {

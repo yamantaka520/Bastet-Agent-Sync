@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.2 — Independent large-source capacity
+
+- Apply the 2 GiB union limit per selected agent, so an unrelated large conversation source does not consume AMOS/Pi/Agy's budget.
+- Avoid retaining duplicate local/remote bundles in the exchange union; move validated transport objects instead of cloning their payloads and reuse the loaded graph when checkpointing receives.
+- Fetch up to 1,000 Drive metadata entries per page while preserving complete-list and revision checks.
+
 ## 0.3.1 — Large-history recovery
 
 - Split large compressed conversations into immutable parts with a hashed manifest. Receive waits for every verified part before adding any native file; unchanged parts keep their object IDs.

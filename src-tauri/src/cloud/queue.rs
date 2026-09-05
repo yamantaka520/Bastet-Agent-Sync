@@ -147,8 +147,19 @@ pub fn exchange_filtered(
     if ids.len() > MAX_OBJECTS + 1 || ids.iter().any(|id| !token(id)) {
         return Err("bundle_limit".into());
     }
+    let local = replica
+        .transport_bundles()?
+        .into_iter()
+        .filter(|(_, b)| agent.is_none_or(|a| a == b.snapshot.stream.agent))
+        .collect::<BTreeMap<_, _>>();
+    let mut total = local
+        .values()
+        .try_fold(0usize, |n, b| b.bytes().map(|v| n + v.len()))?;
+    if total > MAX_STORE || local.len() > MAX_OBJECTS {
+        return Err("bundle_limit".into());
+    }
     let mut other = BTreeMap::new();
-    let mut total = 0usize;
+    let mut remote_hashes = std::collections::BTreeSet::new();
     for id in ids {
         if id == binding.proof {
             continue;
@@ -158,33 +169,23 @@ pub fn exchange_filtered(
         if b.snapshot.space != binding.space {
             return Err("space_mismatch".into());
         }
-        total = total.checked_add(b.bytes()?.len()).ok_or("bundle_limit")?;
-        if total > MAX_STORE {
-            return Err("bundle_limit".into());
+        // Other agents do not consume this adapter's union budget.
+        if agent.is_some_and(|a| a != b.snapshot.stream.agent) {
+            continue;
         }
-        if agent.is_none_or(|a| a == b.snapshot.stream.agent) {
+        remote_hashes.insert(b.id.clone());
+        if !local.contains_key(&b.id) && !other.contains_key(&b.id) {
+            total = total.checked_add(b.bytes()?.len()).ok_or("bundle_limit")?;
+            if total > MAX_STORE || local.len() + other.len() + 1 > MAX_OBJECTS {
+                return Err("bundle_limit".into());
+            }
             other.insert(b.id.clone(), b);
         }
-    }
-    let local = replica
-        .transport_bundles()?
-        .into_iter()
-        .filter(|(_, b)| agent.is_none_or(|a| a == b.snapshot.stream.agent))
-        .collect::<BTreeMap<_, _>>();
-    let mut union = other.clone();
-    union.extend(local.clone());
-    if union.len() > MAX_OBJECTS
-        || union
-            .values()
-            .try_fold(0usize, |n, b| Ok::<_, String>(n + b.bytes()?.len()))?
-            > MAX_STORE
-    {
-        return Err("bundle_limit".into());
     }
     let mut result = Exchange::default();
     if !matches!(direction, Direction::Download) {
         for (hash, b) in &local {
-            if other.contains_key(hash) {
+            if remote_hashes.contains(hash) {
                 result.unchanged += 1;
                 continue;
             }
@@ -218,9 +219,11 @@ pub fn exchange_filtered(
             result.published += 1;
         }
     }
+    drop(local);
     if !matches!(direction, Direction::Upload) {
         result.received = replica.receive_bundles(&other)?;
     }
+    drop(other);
     let checkpoint = replica.checkpoint()?;
     result.conflicts = checkpoint
         .streams
@@ -339,6 +342,75 @@ mod tests {
         let repeated = exchange(&qa, &a, &binding, &key, &remote, Direction::Both).unwrap();
         assert_eq!(repeated.published + repeated.received, 0);
         assert_eq!(remote.objects.borrow().len(), 4);
+    }
+    #[test]
+    fn selected_source_exchange_keeps_other_agents_out_of_the_union() {
+        let (temp, binding, key, remote, a, b) = setup();
+        a.export_from(stream(), files("codex"), None).unwrap();
+        let mut pi = stream();
+        pi.agent = "pi".into();
+        a.export_from(pi, files("pi"), None).unwrap();
+        let qa = temp.path().join("qa");
+        let qb = temp.path().join("qb");
+        assert_eq!(
+            exchange_filtered(
+                &qa,
+                &a,
+                &binding,
+                &key,
+                &remote,
+                Direction::Both,
+                Some("pi")
+            )
+            .unwrap()
+            .published,
+            1
+        );
+        assert_eq!(
+            exchange_filtered(
+                &qa,
+                &a,
+                &binding,
+                &key,
+                &remote,
+                Direction::Both,
+                Some("codex")
+            )
+            .unwrap()
+            .published,
+            1
+        );
+        let r = exchange_filtered(
+            &qb,
+            &b,
+            &binding,
+            &key,
+            &remote,
+            Direction::Download,
+            Some("pi"),
+        )
+        .unwrap();
+        assert_eq!(r.received, 1);
+        assert!(b
+            .transport_bundles()
+            .unwrap()
+            .values()
+            .all(|b| b.snapshot.stream.agent == "pi"));
+        assert_eq!(
+            exchange_filtered(
+                &qb,
+                &b,
+                &binding,
+                &key,
+                &remote,
+                Direction::Both,
+                Some("pi")
+            )
+            .unwrap()
+            .published,
+            0
+        );
+        assert_eq!(remote.objects.borrow().len(), 3);
     }
     #[test]
     fn ambiguous_upload_reuses_id_even_when_listing_lags() {

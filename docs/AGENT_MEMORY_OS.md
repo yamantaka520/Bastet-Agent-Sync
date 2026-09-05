@@ -16,7 +16,7 @@ A persistent device stream, exported-content fingerprint and applied-object ledg
 
 ## Limits and support boundaries
 
-Versions 1–3 and the known record kinds are accepted. Maximum export is 8 MiB and 10,000 records; the replica remains bounded by 1 GiB / 4,096 immutable objects. Larger stores fail explicitly; chunking and history compaction are not implemented. Backups are local and currently require manual retention management. This is not a replica of embeddings, credentials or the running process. Each receiving device needs a working AMOS installation and the same recovered Drive space.
+Versions 1–3 and the known record kinds are accepted. Maximum export is 8 MiB and 10,000 records; the replica remains bounded by 2 GiB / 4,096 immutable objects. Larger stores fail explicitly; chunking and history compaction are not implemented. Backups are local and currently require manual retention management. This is not a replica of embeddings, credentials or the running process. Each receiving device needs a working AMOS installation and the same recovered Drive space.
 
 ChatGPT Work appears separately in the source list. Its local candidate may share CODEX_HOME; detection is not proof of native task migration. Other seven source adapters remain unavailable and are skipped, not marked synchronized. Official Work documentation separates local and cloud execution; no native cross-device import API was established in the reviewed pages: [Work setup](https://learn.chatgpt.com/docs/get-started-with-work), [local execution](https://learn.chatgpt.com/docs/enterprise/chatgpt-work-local-security).
 

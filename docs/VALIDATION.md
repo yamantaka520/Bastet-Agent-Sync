@@ -1,7 +1,17 @@
 # Validation
 
+## 0.3.2 capacity follow-up — 2026-09-05
+
+- Local validation: 66 default Rust tests, 23 frontend tests and one opt-in installed AMOS integration passed (90 total). Clippy with warnings denied, formatting, document/link checks and version parity passed.
+
+- Optimized 0.3.1 passed the credential wait and reported **25 Claude conversations captured, 16 additional bundles uploaded, no size errors**. Claude Code reported the same 25 through the shared profile with zero duplicate uploads. This supersedes the pending observation below and resolves both original large Claude histories.
+- Codex's first capture reached approximately 1,023 MiB: 363 of 373 discovered files had completed capture. The worker was asked to pause, preserving allocated upload IDs. This motivated a per-agent 2 GiB union and eliminating duplicate payload retention during exchange; the mixed-agent filtering regression passes alongside the existing encrypted retry/branch tests.
+- The Mac locked during native follow-up. The UI tool explicitly requires a manual unlock, so no claim is made that the replacement build or all remaining sources completed their real Drive cycle. The user has been asked to unlock; independent build/test/documentation work continues.
+
 ## 0.3.1 segmented histories — 2026-09-05
 
+- Final implementation [CI 33969430955](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33969430955) passed macOS, Windows and Linux. Local checks include 65 default Rust tests, 23 frontend tests and the opt-in installed AMOS integration.
+- Optimized macOS 0.3.1 (`b335f2c`) is open with all eight saved selections. Start visibly reports the system-credential phase; its new large-history transfer has not yet been observed past that wait. The earlier 23 uploads belong to 0.3.0. No physical second-device acceptance or new large-session success is claimed.
 - Segmented-history fixtures pass: missing parts prevent restore without creating its destination; complete parts reconstruct the original native files; repeated publishing reuses all IDs; each part survives authenticated encryption.
 - 0.3.0 real macOS follow-up: system credential access resumed, and the Claude source reported **23 uploaded bundles** and **two size-limit failures**. It was safely paused before the remaining sources. The top-level counter initially remained zero when interrupted mid-cycle; 0.3.1 fixes that accounting and adds a separate credential-wait phase.
 - Profiling located the slow debug pass in repeated snapshot hashing/serialization, not another credential wait. An optimized build is used for continued native testing. Earlier credential-wait and single-packet limits are retained below as historical observations, not the final state.

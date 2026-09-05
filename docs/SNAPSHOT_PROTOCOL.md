@@ -16,7 +16,7 @@ A single UTF-8 JSON file contains `id` and `snapshot`. Snapshot fields are `sche
 - Each entry has a SHA-256 of its UTF-8 content bytes. Full bundle validation is mandatory even when a complete filename is present.
 - Physical filenames are only `<64 lowercase hex>.json`. Incoming logical paths are never used to write files. Snapshot files stay in an isolated inbox until future native import.
 - Portable logical paths are ASCII letters/digits/underscore/dash/dot with `/` separators. Reject absolute paths, `..`, empty segments, backslashes, Windows device names, trailing dots, case-insensitive aliases and file/directory collisions. Unicode **content** is supported; Unicode filenames need adapter mapping.
-- Limits: 32 MiB content/file, 256 files, 32 MiB aggregate content/bundle, 64 MiB serialized input, 4,096 objects and 1 GiB serialized valid objects per replica/transfer union. Counts and bytes are bounded during directory reads. This development ceiling must be revisited for large histories.
+- Limits: 32 MiB content/file, 256 files, 32 MiB aggregate content/bundle, 64 MiB serialized input, 4,096 objects and 2 GiB serialized valid objects per replica/transfer union. Counts and bytes are bounded during directory reads. This development ceiling must be revisited for large histories.
 - Unknown schema or struct fields, malformed JSON, bad hashes, wrong space and invalid paths are rejected. Input limits are enforced before reading unbounded files; structural limits are enforced after bounded JSON decoding.
 
 Hashes detect corruption, **not sender authenticity or confidentiality**. Drive members can create new valid bundles. M3 must add authenticated encryption and device trust before real conversation transport.

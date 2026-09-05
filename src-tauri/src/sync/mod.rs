@@ -178,14 +178,17 @@ impl Replica {
             .pending
             .iter()
             .chain(invalid.iter().map(|i| &i.object))
+            .cloned()
             .collect();
         Ok(all
-            .iter()
+            .into_iter()
             .filter(|(id, _)| !excluded.contains(id))
-            .map(|(id, b)| (id.clone(), b.clone()))
             .collect())
     }
     pub fn receive_bundles(&self, incoming: &BTreeMap<String, Bundle>) -> Result<usize> {
+        if incoming.is_empty() {
+            return Ok(0);
+        }
         let (mut all, issues) = self.read_all()?;
         if !issues.is_empty() {
             return Err("local_store_damaged".into());
@@ -205,7 +208,11 @@ impl Replica {
                 &b.bytes()?,
             )?);
         }
-        self.checkpoint()?;
+        let (journal, _) = graph(&all);
+        storage::replace(
+            &self.root.join("journal.json"),
+            &serde_json::to_vec_pretty(&journal).map_err(|_| "invalid_bundle")?,
+        )?;
         Ok(received)
     }
     pub fn checkpoint(&self) -> Result<Journal> {
