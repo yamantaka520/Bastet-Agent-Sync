@@ -14,7 +14,7 @@
 
 A local-first desktop companion for synchronizing agent settings, skills, memory and conversations through Google Drive. Part of the Bastet family.
 
-> **Development, not a sync release.** Work has started on the desktop foundation. Cloud transfer, bidirectional synchronization and native cross-computer conversation restoration are planned and not yet verified. [Evidence and gaps](docs/VALIDATION.md).
+> **Development, not a sync release.** The desktop foundation now includes five-language setup, candidate agent discovery, local folder selection and saved preferences. The macOS app builds and 11 local tests pass. Cloud transfer, bidirectional synchronization and native cross-computer conversation restoration are planned and not yet verified. [Evidence and gaps](docs/VALIDATION.md).
 
 ## ✨ Planned experience
 

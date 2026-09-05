@@ -1,0 +1,10 @@
+node_modules/
+dist/
+/target/
+/src-tauri/target/
+.DS_Store
+.env
+.env.*
+*.log
+/src-tauri/icons/android/
+/src-tauri/icons/ios/

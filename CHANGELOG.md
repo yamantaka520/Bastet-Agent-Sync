@@ -3,5 +3,6 @@
 ## 0.1.0-dev — 2026-09-05
 
 - Established requirements and a five-milestone implementation roadmap.
-- Started the Tauri desktop foundation and five-language documentation.
+- Added the Tauri/React desktop foundation, five-language UI and guides, native folder picker, candidate agent discovery, validated settings persistence and localized custom tray menu.
+- Added macOS/Windows/Linux CI and 11 automated tests; built and smoke-tested the macOS app.
 - Synchronization and cross-computer session restoration are not released.
