@@ -1,0 +1,89 @@
+name: Installer smoke checks
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Desktop release packages run ID
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.run_id }}
+          name: packages-${{ matrix.target }}
+          path: packages
+      - name: Windows install and launch
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem packages/*.exe)
+          if ($installer.Count -ne 1) { throw 'Expected one NSIS installer' }
+          $destination = Join-Path $env:RUNNER_TEMP 'BastetSmoke'
+          $install = Start-Process -FilePath $installer[0].FullName -ArgumentList '/S', "/D=$destination" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer failed: $($install.ExitCode)" }
+          $binary = Join-Path $destination 'bastet-agent-sync.exe'
+          if (!(Test-Path $binary)) { throw 'Installed executable missing' }
+          (Get-Item $binary).VersionInfo | Select-Object ProductVersion,FileVersion
+          $app = Start-Process -FilePath $binary -PassThru
+          Start-Sleep -Seconds 10
+          $app.Refresh()
+          if ($app.HasExited) { throw 'App exited during launch smoke check' }
+          Stop-Process -Id $app.Id
+          Write-Output 'Installer and native launch passed on hosted Windows'
+      - name: macOS image, signature and launch
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=$(find packages -name '*.dmg' -type f)
+          mount="$RUNNER_TEMP/bastet-dmg"
+          hdiutil attach "$image" -nobrowse -mountpoint "$mount"
+          ditto "$mount/Bastet Agent Sync.app" "$RUNNER_TEMP/Bastet Agent Sync.app"
+          hdiutil detach "$mount"
+          codesign --verify --deep --strict "$RUNNER_TEMP/Bastet Agent Sync.app"
+          file "$RUNNER_TEMP/Bastet Agent Sync.app/Contents/MacOS/bastet-agent-sync"
+          "$RUNNER_TEMP/Bastet Agent Sync.app/Contents/MacOS/bastet-agent-sync" &
+          app_pid=$!
+          sleep 10
+          kill -0 "$app_pid"
+          kill "$app_pid"
+          echo 'DMG, ad-hoc signature and native launch passed on hosted macOS'
+      - name: Minimal Ubuntu dependency installation
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          docker run --rm -v "$PWD/packages:/packages:ro" ubuntu:22.04 bash -euc '
+            apt-get update
+            apt-get install -y /packages/*.deb
+            ldd /usr/bin/bastet-agent-sync > /tmp/libraries
+            cat /tmp/libraries
+            ! grep "not found" /tmp/libraries
+          '
+      - name: Fedora RPM dependency installation
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          docker run --rm -v "$PWD/packages:/packages:ro" fedora:43 bash -euc '
+            dnf install -y /packages/*.rpm
+            ldd /usr/bin/bastet-agent-sync > /tmp/libraries
+            cat /tmp/libraries
+            ! grep "not found" /tmp/libraries
+          '
