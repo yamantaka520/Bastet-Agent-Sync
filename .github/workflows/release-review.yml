@@ -7,7 +7,7 @@ on:
         required: true
         type: string
 permissions:
-  contents: write
+  contents: read
   actions: read
 concurrency:
   group: release-metadata-review
@@ -43,20 +43,6 @@ jobs:
           done
       - run: python scripts/test_release_assets.py
       - run: python scripts/release_assets.py prepare
-      - name: Update only an unpublished draft
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          python - <<'PY'
-          import json, subprocess
-          from pathlib import Path
-          tag = 'v' + json.loads(Path('package.json').read_text())['version']
-          result = json.loads(subprocess.check_output(['gh','release','view',tag,'--json','isDraft'],text=True))
-          if not result['isDraft']:
-              raise SystemExit('Refusing to alter a published release')
-          subprocess.run(['gh','release','upload',tag,'--clobber',*[str(p) for p in Path('release-assets').iterdir() if p.name != 'release-notes.md']],check=True)
-          subprocess.run(['gh','release','edit',tag,'--notes-file','release-assets/release-notes.md'],check=True)
-          PY
       - uses: actions/upload-artifact@v4
         with:
           name: reviewed-release
