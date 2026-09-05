@@ -10,6 +10,11 @@ export type Wizard = {
   clientId: string | null;
   clientSource: string | null;
   authorized: boolean;
+  account?: {
+    permissionId: string;
+    displayName: string | null;
+    emailAddress: string | null;
+  } | null;
   folderId: string | null;
   folderName: string | null;
   binding: { folder: string; space: string; proof: string } | null;
@@ -69,6 +74,14 @@ export default function CloudPanel({
       if (updated) setView(updated);
     } catch (e) {
       setError(String(e));
+      if (native) {
+        try {
+          const latest = await invoke<WizardView>("wizard_get");
+          if (latest) setView(latest);
+        } catch {
+          /* Preserve original failure. */
+        }
+      }
     } finally {
       setBusy(false);
     }
@@ -95,21 +108,25 @@ export default function CloudPanel({
   const unavailable = !native || busy || !w;
   const errorText = !error
     ? ""
-    : /reauth|oauth_timeout|oauth_denied/.test(error)
-      ? t.authError
-      : /oauth|client/.test(error)
-        ? t.configError
-        : /restart_required/.test(error)
-          ? t.restartError
-          : /step_required|backup_required/.test(error)
-            ? t.stepError
-            : /drive_|folder/.test(error)
-              ? t.folderError
-              : /recovery|decrypt|space_key|proof/.test(error)
-                ? t.keyError
-                : /store|credential|wizard_corrupt|unsafe|immutable/.test(error)
-                  ? t.storageError
-                  : t.error;
+    : /account_mismatch/.test(error)
+      ? t.accountMismatch
+      : /reauth|oauth_timeout|oauth_denied/.test(error)
+        ? t.authError
+        : /oauth|client/.test(error)
+          ? t.configError
+          : /restart_required/.test(error)
+            ? t.restartError
+            : /step_required|backup_required/.test(error)
+              ? t.stepError
+              : /drive_|folder/.test(error)
+                ? t.folderError
+                : /recovery|decrypt|space_key|proof/.test(error)
+                  ? t.keyError
+                  : /store|credential|wizard_corrupt|unsafe|immutable/.test(
+                        error,
+                      )
+                    ? t.storageError
+                    : t.error;
   return (
     <section className="panel cloud-panel wizard-panel" aria-busy={busy}>
       <div className="section-heading">
@@ -170,6 +187,14 @@ export default function CloudPanel({
           <div className="wizard-save" role="status">
             {busy ? t.working : t.saved}
           </div>
+          {w.account && (
+            <p className="wizard-note">
+              {view?.connected ? t.accountCurrent : t.accountSaved}:{" "}
+              {w.account.emailAddress ||
+                w.account.displayName ||
+                w.account.permissionId}
+            </p>
+          )}
           {w.authorized && !view?.connected && (
             <p className="wizard-note">{t.connectionPending}</p>
           )}

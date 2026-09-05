@@ -42,3 +42,5 @@ M2 protocol and precise limitations: [SNAPSHOT_PROTOCOL.md](SNAPSHOT_PROTOCOL.md
 M3 implementation boundaries and release gates: [Cloud transport and encryption](CLOUD_SECURITY.md).
 
 Setup wizard, resume/restart and manual configuration: [Setup contract](SETUP_WIZARD.md).
+
+Integrated ChatGPT desktop scope: local Codex/Worktree tasks are in the adapter target; local ChatGPT Work tasks require format and resume validation. Cloud-backed chats remain a separate integration investigation. UI co-location does not establish portable local storage. See the dated addition in [requirements](../REQUIREMENTS.md).

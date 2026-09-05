@@ -44,6 +44,14 @@ On another computer, configure authorization, select the same accessible folder,
 
 Fixture tests cover per-step reload, mode persistence, malformed-record restart, cancelled export, failure/retry, stable key/proof IDs, joining a space, rejected wrong recovery keys and frontend completion gates. These are not Google consent or physical-device tests. Native UI smoke and CI results are recorded in [Validation](VALIDATION.md).
 
-Real-account consent, three-platform credential-store interactions and two-computer recovery still require configured clients/accounts. Google Picker, account identity display, background scheduling and native Agent restore remain pending. The wizard's final check verifies setup; it does not transfer Agent data.
+Real-account consent, three-platform credential-store interactions and two-computer recovery still require configured clients/accounts. Google Picker, background scheduling and native Agent restore remain pending. The wizard's final check verifies setup; it does not transfer Agent data.
 
 Primary setup reference: [Google Drive desktop OAuth setup](https://developers.google.com/workspace/drive/api/quickstart/python). Encryption and API boundaries: [Cloud security contract](CLOUD_SECURITY.md).
+
+## Account identity and reconnect
+
+The wizard reads `about.get` user permission ID, display name and email after authorization or token refresh using the existing `drive.file` scope. Identity is bound to the local wizard; reconnecting with a different permission ID stops before folder listing or mutation. Name/email changes do not change identity. The UI distinguishes saved identity from a connected session; expiry/revocation can still be discovered by the next request. Account metadata is stored locally with wizard progress and archives, never in recovery kits or cloud bundles.
+
+To recover an account mismatch, remove the local login and reconnect with the original account. To intentionally switch accounts, restart setup; old progress and keys remain preserved. Old progress without identity still loads; use explicit Connect to bind the account after verifying any selected folder. Automatic refresh cannot silently adopt an unbound account. This migration verifies current access, not the historical identity of an older setup.
+
+Official contracts: [about.get and its scopes](https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get), [Drive user identity](https://developers.google.com/workspace/drive/api/reference/rest/v3/User). Google Picker grants and OAuth cancellation remain planned. Pasting a folder URL does not grant access.

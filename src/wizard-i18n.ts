@@ -4,6 +4,10 @@ export const wizardMessages = {
     forgetLogin: "Forget local login",
     forgetHint:
       "This removes the saved login token only. Setup progress and space keys stay on this computer. Google permissions can be revoked in your account.",
+    accountCurrent: "Connected Google account",
+    accountSaved: "Saved Google account (not connected)",
+    accountMismatch:
+      "This setup belongs to another Google account. Remove the local login and reconnect with the saved account, or restart setup to use a different account.",
     connectionPending:
       "Google connection has not been checked in this session. Saved steps are preserved; reconnect or run the final check when ready.",
     title: "Google Drive setup",
@@ -97,6 +101,10 @@ export const wizardMessages = {
     forgetLogin: "移除本機登入",
     forgetHint:
       "只移除已保存的登入 token，保留精靈進度與空間金鑰。Google 權限可在帳號中撤銷。",
+    accountCurrent: "目前連線的 Google 帳號",
+    accountSaved: "已儲存的 Google 帳號（未連線）",
+    accountMismatch:
+      "此設定屬於另一個 Google 帳號。請移除本機登入後使用原帳號重新連線；若要更換帳號，請重新開始設定。",
     connectionPending:
       "本次開啟尚未檢查 Google 連線。已完成的步驟仍保留，可重新連接或執行最後檢查。",
     title: "Google Drive 設定",
@@ -181,6 +189,10 @@ export const wizardMessages = {
     forgetLogin: "移除本机登录",
     forgetHint:
       "仅移除已保存的登录 token，保留向导进度和空间密钥。Google 权限可在账号中撤销。",
+    accountCurrent: "当前连接的 Google 账号",
+    accountSaved: "已保存的 Google 账号（未连接）",
+    accountMismatch:
+      "此设置属于另一个 Google 账号。请移除本机登录后使用原账号重新连接；若要更换账号，请重新开始设置。",
     connectionPending:
       "本次打开尚未检查 Google 连接。已完成的步骤仍保留，可以重新连接或执行最后检查。",
     title: "Google Drive 设置",
@@ -266,6 +278,10 @@ export const wizardMessages = {
     forgetLogin: "ローカルログインを削除",
     forgetHint:
       "保存されたログイントークンのみ削除します。進行状況とスペース鍵は保持します。Google 権限はアカウントで取り消せます。",
+    accountCurrent: "接続中の Google アカウント",
+    accountSaved: "保存済み Google アカウント（未接続）",
+    accountMismatch:
+      "別の Google アカウントの設定です。ローカルのログインを削除し元のアカウントで再接続するか、設定を最初からやり直してください。",
     connectionPending:
       "この起動では Google 接続をまだ確認していません。完了した手順は保持されており、再接続または最終確認ができます。",
     title: "Google Drive の設定",
@@ -360,6 +376,10 @@ export const wizardMessages = {
     forgetLogin: "로컬 로그인 삭제",
     forgetHint:
       "저장된 로그인 토큰만 삭제합니다. 진행 상황과 공간 키는 유지됩니다. Google 권한은 계정에서 취소할 수 있습니다.",
+    accountCurrent: "연결된 Google 계정",
+    accountSaved: "저장된 Google 계정 (연결 안 됨)",
+    accountMismatch:
+      "다른 Google 계정의 설정입니다. 로컬 로그인을 제거하고 원래 계정으로 다시 연결하거나 설정을 처음부터 시작하세요.",
     connectionPending:
       "이번 실행에서는 Google 연결을 아직 확인하지 않았습니다. 완료한 단계는 유지되며 다시 연결하거나 마지막 검사를 실행할 수 있습니다.",
     title: "Google Drive 설정",

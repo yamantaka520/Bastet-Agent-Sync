@@ -13,6 +13,26 @@ const FILES: &str = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files";
 const FOLDER: &str = "application/vnd.google-apps.folder";
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Account {
+    pub permission_id: String,
+    pub display_name: Option<String>,
+    pub email_address: Option<String>,
+}
+impl Account {
+    pub fn validate(&self) -> Result<()> {
+        if !token(&self.permission_id)
+            || [&self.display_name, &self.email_address].iter().any(|v| {
+                v.as_ref()
+                    .is_some_and(|s| s.len() > 1024 || s.chars().any(char::is_control))
+            })
+        {
+            return Err("drive_invalid_account".into());
+        }
+        Ok(())
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct File {
@@ -38,6 +58,7 @@ pub struct Drive {
     token: AccessToken,
     files_url: String,
     upload_url: String,
+    about_url: String,
 }
 fn id(id: &str) -> Result<()> {
     if token(id) {
@@ -103,7 +124,26 @@ impl Drive {
             token,
             files_url: FILES.into(),
             upload_url: UPLOAD.into(),
+            about_url: "https://www.googleapis.com/drive/v3/about".into(),
         })
+    }
+    pub fn account(&self) -> Result<Account> {
+        self.check_token()?;
+        let r = self
+            .client
+            .get(&self.about_url)
+            .bearer_auth(self.token.value.as_str())
+            .query(&[("fields", "user(permissionId,displayName,emailAddress)")])
+            .send()
+            .map_err(|_| "network_unavailable")?;
+        #[derive(Deserialize)]
+        struct About {
+            user: Account,
+        }
+        let about: About =
+            serde_json::from_slice(&read(r, 65536)?).map_err(|_| "drive_invalid_account")?;
+        about.user.validate()?;
+        Ok(about.user)
     }
     fn check_token(&self) -> Result<()> {
         if self.token.expired() {
@@ -384,9 +424,27 @@ mod http_tests {
                 token: super::super::oauth::fixture_token(),
                 files_url: format!("{base}/files"),
                 upload_url: format!("{base}/upload"),
+                about_url: format!("{base}/about"),
             },
             worker,
         )
+    }
+    #[test]
+    fn account_uses_bounded_about_user_and_rejects_missing_identity() {
+        let (drive, server) = fixture(vec![(200, br#"{"user":{"permissionId":"123","displayName":"Cat","emailAddress":"cat@example.test"}}"#.to_vec())]);
+        assert_eq!(drive.account().unwrap().permission_id, "123");
+        let requests = server.join().unwrap();
+        let request = String::from_utf8_lossy(&requests[0]);
+        assert!(request.starts_with("GET /about?fields="));
+        assert!(request.contains("permissionId"));
+        for body in [
+            br#"{"user":{"displayName":"Cat"}}"#.as_slice(),
+            br#"{"user":{"permissionId":"","displayName":null}}"#,
+        ] {
+            let (drive, server) = fixture(vec![(200, body.to_vec())]);
+            assert_eq!(drive.account().unwrap_err(), "drive_invalid_account");
+            server.join().unwrap();
+        }
     }
     fn folder() -> Vec<u8> {
         json!({"id":"folder","name":"Bastet","mimeType":FOLDER})

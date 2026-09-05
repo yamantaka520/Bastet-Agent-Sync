@@ -136,3 +136,9 @@ Grok help 指出對話恢復與程式碼快照恢復為不同操作。所有適�
 ## Google Drive 引導補充（2026-09-05）
 
 使用者要求逐步設定精靈；中途中斷自動記錄已完成步驟，重新開啟可接續、重新開始，或改為完全手動設定。引導與手動模式共享已驗證的進度；重新開始保留舊設定紀錄，不刪除 Drive 資料或金鑰。設定完成與啟動 Agent 同步必須分開。實作契約見 [Setup wizard](docs/SETUP_WIZARD.md)。
+
+## ChatGPT／Codex 整合版範圍（2026-09-05）
+
+使用者詢問新版 ChatGPT 與 Codex 整合後的支援。適配器範圍納入整合版桌面程式中的本機 Codex／Worktree；ChatGPT Work 本機任務列入格式與接續能力驗證。依資料來源與執行環境辨識，不以應用程式名稱或同一側欄推定儲存格式相同。一般 ChatGPT 聊天、ChatGPT Work 雲端與 Codex Cloud 另行研究正式匯出／匯入或連結接續能力，尚不宣稱可透過本機目錄同步原生恢復。
+
+官方依據：[Codex environments](https://learn.chatgpt.com/docs/environments/modes)、[Use ChatGPT](https://learn.chatgpt.com/docs/use-chatgpt)、[Projects and chats](https://learn.chatgpt.com/docs/projects)。截至本次記錄，只有來源路徑偵測與設計範圍，原生對話跨機恢復仍未驗收。

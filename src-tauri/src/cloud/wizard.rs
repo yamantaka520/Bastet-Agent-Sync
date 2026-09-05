@@ -23,6 +23,8 @@ pub struct Wizard {
     pub client_id: Option<String>,
     pub client_source: Option<String>,
     pub authorized: bool,
+    #[serde(default)]
+    pub account: Option<super::drive::Account>,
     pub folder_id: Option<String>,
     pub folder_name: Option<String>,
     pub binding: Option<Binding>,
@@ -40,6 +42,7 @@ impl Default for Wizard {
             client_id: None,
             client_source: None,
             authorized: false,
+            account: None,
             folder_id: None,
             folder_name: None,
             binding: None,
@@ -86,6 +89,12 @@ impl Wizard {
             }
             .validate()
             .map_err(|_| "wizard_corrupt")?;
+        }
+        if let Some(account) = &self.account {
+            account.validate().map_err(|_| "wizard_corrupt")?;
+            if !self.authorized {
+                return Err("wizard_corrupt".into());
+            }
         }
         if self.authorized && self.client_id.is_none()
             || self.folder_id.is_some() && !self.authorized
@@ -170,6 +179,26 @@ impl Transaction {
         self.state.client_source = Some(source.into());
         self.state.page = self.state.next();
         self.save()
+    }
+    pub fn check_account(&self, account: &super::drive::Account) -> Result<()> {
+        account.validate()?;
+        if self
+            .state
+            .account
+            .as_ref()
+            .is_some_and(|saved| saved.permission_id != account.permission_id)
+        {
+            return Err("account_mismatch".into());
+        }
+        Ok(())
+    }
+    pub fn accept_account(&mut self, account: super::drive::Account) -> Result<Wizard> {
+        self.check_account(&account)?;
+        if self.state.client_id.is_none() {
+            return Err("wizard_step_required".into());
+        }
+        self.state.account = Some(account);
+        self.authorized()
     }
     pub fn authorized(&mut self) -> Result<Wizard> {
         if self.state.client_id.is_none() {
@@ -384,6 +413,57 @@ mod tests {
         cell::{Cell, RefCell},
         collections::BTreeMap,
     };
+    #[test]
+    fn account_binding_survives_reload_and_rejects_switch_without_changing_progress() {
+        let d = tempfile::tempdir().unwrap();
+        let mut t = Transaction::open(d.path()).unwrap();
+        t.client("fixture.apps.googleusercontent.com".into(), "imported")
+            .unwrap();
+        let mut account = super::super::drive::Account {
+            permission_id: "123".into(),
+            display_name: Some("Cat".into()),
+            email_address: None,
+        };
+        t.accept_account(account.clone()).unwrap();
+        t.folder("folder".into(), "Bastet".into()).unwrap();
+        drop(t);
+        let mut t = Transaction::open(d.path()).unwrap();
+        let before = t.state.clone();
+        account.permission_id = "456".into();
+        assert_eq!(
+            t.accept_account(account.clone()).unwrap_err(),
+            "account_mismatch"
+        );
+        assert_eq!(t.state, before);
+        account.permission_id = "123".into();
+        account.display_name = Some("Renamed".into());
+        t.accept_account(account).unwrap();
+        assert_eq!(t.state.folder_id.as_deref(), Some("folder"));
+        drop(t);
+        assert_eq!(
+            Transaction::open(d.path())
+                .unwrap()
+                .state
+                .account
+                .unwrap()
+                .display_name
+                .as_deref(),
+            Some("Renamed")
+        );
+    }
+    #[test]
+    fn old_wizard_progress_without_account_still_loads() {
+        let d = tempfile::tempdir().unwrap();
+        let state = Wizard::default();
+        let mut raw = serde_json::to_value(state).unwrap();
+        raw.as_object_mut().unwrap().remove("account");
+        storage::replace(
+            &d.path().join("wizard.json"),
+            &serde_json::to_vec(&raw).unwrap(),
+        )
+        .unwrap();
+        assert!(Transaction::open(d.path()).unwrap().state.account.is_none());
+    }
     #[derive(Default)]
     struct Vault(RefCell<BTreeMap<String, String>>);
     impl SecretStore for Vault {

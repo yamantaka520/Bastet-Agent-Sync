@@ -65,3 +65,11 @@ OAuth와 자격 증명 저장소 코드, 암호화 Drive API, 샘플 데이터 �
 Drive 설정은 로그인 설정, Google 권한, 폴더, 암호화 및 복구, 최종 검토의 다섯 단계입니다. 완료한 단계와 모드를 자동 저장하여 다시 실행한 후 계속할 수 있습니다. 다시 시작하면 이전 기록을 보관하며 Drive 데이터나 키는 삭제하지 않습니다. 수동 설정은 모든 항목을 표시하고 같은 검증을 적용합니다. 기본 클라이언트가 없으면 데스크톱 OAuth JSON을 가져올 수 있고 폴더 ID나 링크를 직접 입력할 수 있습니다. 새 공간은 복구 파일을 저장한 후 검증하고, 다른 컴퓨터의 공간에는 해당 복구 파일로 참여합니다. 설정 완료는 Agent 동기화 시작을 의미하지 않습니다.
 
 [Setup contract / 設定文件](../../SETUP_WIZARD.md)
+
+## 🐈 계정 확인 및 ChatGPT 통합 버전
+
+마법사는 연결된 또는 저장된 Google 계정을 표시하고 다른 계정으로 이어서 설정하는 것을 거부합니다. 로컬 로그인을 제거한 후 원래 계정으로 다시 연결하거나 설정을 처음부터 시작하세요. 기존 진행 상태도 읽을 수 있으며 명시적으로 다시 연결하면 계정이 등록됩니다.
+
+통합 ChatGPT 데스크톱의 로컬 Codex/Worktree를 어댑터 대상으로 포함합니다. 로컬 ChatGPT Work는 형식과 이어가기 검증이 필요합니다. 일반 ChatGPT 채팅과 클라우드 작업은 별도 연동을 조사합니다. 다른 컴퓨터에서의 네이티브 복원은 아직 검증되지 않았습니다.
+
+[OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)

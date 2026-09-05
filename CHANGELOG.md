@@ -1,5 +1,12 @@
 # Changelog
 
+## Account-aware setup — 2026-09-05
+
+- Show saved/connected Google identity in five languages and check the stable Drive permission ID on authorization/refresh before continuing setup.
+- Preserve progress on account mismatch; retain compatibility with old wizard files and require explicit connection to adopt their account.
+- Record integrated ChatGPT desktop local-task adapter scope, with cloud chat integration and native restoration still unverified.
+
+
 ## 0.1.0-dev — Resumable setup wizard, 2026-09-05
 
 - Added five-stage guided setup and a manual mode sharing the same saved, validated progress.

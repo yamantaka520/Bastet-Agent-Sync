@@ -195,3 +195,35 @@ it("clears stale diagnostic success when retry fails", async () => {
   await screen.findByRole("alert");
   expect(screen.queryByText(t.diagnosticPassed)).toBeNull();
 });
+
+it("distinguishes saved identity from connected identity and refreshes after account mismatch", async () => {
+  const saved = initial();
+  Object.assign(saved.wizard, {
+    clientId: "fixture.apps.googleusercontent.com",
+    clientSource: "imported",
+    authorized: true,
+    page: 1,
+    account: {
+      permissionId: "123",
+      displayName: "Cat",
+      emailAddress: "cat@example.test",
+    },
+  });
+  saved.connected = true;
+  vi.mocked(invoke).mockImplementation(async (cmd) => {
+    if (cmd === "wizard_execute") {
+      saved.connected = false;
+      throw "account_mismatch";
+    }
+    return structuredClone(saved);
+  });
+  render(<CloudPanel native locale="en" />);
+  expect(
+    await screen.findByText(t.accountCurrent + ": cat@example.test"),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByText(t.reconnect));
+  expect(await screen.findByText(t.accountMismatch)).toBeTruthy();
+  expect(
+    await screen.findByText(t.accountSaved + ": cat@example.test"),
+  ).toBeTruthy();
+});

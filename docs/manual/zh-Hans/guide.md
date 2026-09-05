@@ -65,3 +65,11 @@ Windows／Linux 构建和实际托盘行为需要验证。M1 不进行云端登�
 Drive 向导分为登录设置、Google 授权、文件夹、加密／恢复和最后检查五步。完成的步骤和模式自动保存，重新打开后可继续；重新开始会归档旧进度，不删除 Drive 数据或密钥。完全手动设置展开所有区域，仍使用相同验证。无内置 Client 时可导入自己的桌面 OAuth JSON，也可直接输入文件夹 ID／链接。新空间先保存恢复文件再验证；加入另一台电脑的空间则导入其恢复文件。完成设置不等于启用 Agent 同步。
 
 [Setup contract / 設定文件](../../SETUP_WIZARD.md)
+
+## 🐈 账号核对与 ChatGPT 整合版
+
+向导显示当前连接或已保存的 Google 账号，拒绝以不同账号继续。可移除本机登录后使用原账号重新连接，或重新开始设置以更换账号。旧进度仍可读取，明确重新连接后补上身份。
+
+整合版 ChatGPT 桌面的本机 Codex／Worktree 纳入适配器目标；ChatGPT Work 本机任务须验证格式与继续能力。一般 ChatGPT 聊天与云端任务另行研究正式整合方式。目前尚未验证原生对话跨机恢复。
+
+[OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)

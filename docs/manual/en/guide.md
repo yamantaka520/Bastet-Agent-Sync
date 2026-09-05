@@ -65,3 +65,11 @@ OAuth/credential-store code, encrypted Drive API operations and a synthetic encr
 The Drive wizard has five steps: login configuration, Google authorization, folder, encryption/recovery, and final review. Completed steps and mode are saved automatically. Reopen to resume, or Start again to archive the old progress without deleting Drive data or keys. Manual setup expands every section with the same validation. Import your own Desktop OAuth JSON if the build has no client; a folder ID/link can be entered directly. Save a recovery kit before verifying a new space, or import the other computer’s kit to join. Completion verifies setup only; Agent sync remains gated.
 
 [Setup contract / 設定文件](../../SETUP_WIZARD.md)
+
+## 🐈 Account checks and integrated ChatGPT
+
+The wizard now displays the connected or saved Google account and refuses to resume under a different account. Remove the local login and reconnect with the original account, or restart setup to switch accounts. Old progress remains readable; explicit reconnect binds its identity.
+
+Integrated ChatGPT desktop local Codex/Worktree tasks are included in the adapter target; local ChatGPT Work requires format/resume verification. General ChatGPT chats and cloud tasks need separate supported integration. Native cross-computer restoration is not yet verified.
+
+[OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)

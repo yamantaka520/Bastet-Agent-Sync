@@ -258,9 +258,14 @@ pub async fn wizard_execute(
                     Err(e) => return Err(e),
                 };
                 let drive = super::drive::Drive::new(token)?;
+                let account = drive.account()?;
+                t.check_account(&account)?;
+                if let Some(folder) = &t.state.folder_id {
+                    drive.verify_folder(folder)?;
+                }
                 folders = drive.list_folders()?;
+                t.accept_account(account)?;
                 *guard = Some(drive);
-                t.authorized()?;
             }
             Action::ExportRecovery => {
                 let bytes = t.recovery(&NativeStore)?;
@@ -294,7 +299,16 @@ pub async fn wizard_execute(
                 }
                 if !guard.as_ref().is_some_and(|d| d.is_connected()) {
                     let token = oauth::reconnect(&config(&t.state)?, &NativeStore)?;
-                    *guard = Some(super::drive::Drive::new(token)?);
+                    *guard = None;
+                    let drive = super::drive::Drive::new(token)?;
+                    let account = drive.account()?;
+                    t.check_account(&account)?;
+                    // Legacy progress has no bound identity. Only explicit Connect may adopt one.
+                    if t.state.account.is_none() {
+                        return Err("reauth_required".into());
+                    }
+                    t.accept_account(account)?;
+                    *guard = Some(drive);
                 }
                 let drive = guard.as_ref().ok_or("reauth_required")?;
                 match other {

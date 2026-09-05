@@ -65,3 +65,11 @@ Windows／Linux 建置與實際系統匣行為需驗證。M1 不進行雲端登�
 Drive 精靈分為登入設定、Google 授權、資料夾、加密／恢復及最後檢查五步。完成的步驟與模式會自動保存，重開後可接續；重新開始會封存舊進度，不刪除 Drive 資料或金鑰。完全手動設定展開所有區段，仍使用相同驗證。無內建 Client 時可匯入自己的桌面 OAuth JSON，也可直接輸入資料夾 ID／連結。新空間先保存恢復檔再驗證；加入另一台電腦的空間則匯入其恢復檔。完成設定不等於啟用 Agent 同步。
 
 [Setup contract / 設定文件](../../SETUP_WIZARD.md)
+
+## 🐈 帳號核對與 ChatGPT 整合版
+
+精靈顯示目前連線或已儲存的 Google 帳號，拒絕以不同帳號接續。可移除本機登入後使用原帳號重新連線，或重新開始設定以更換帳號。舊進度仍可讀取，明確重新連線後補上身分。
+
+整合版 ChatGPT 桌面的本機 Codex／Worktree 納入適配器目標；ChatGPT Work 本機任務須驗證格式與接續。一般 ChatGPT 聊天與雲端任務另行研究正式整合方式。目前尚未驗證原生對話跨機恢復。
+
+[OpenAI documentation](https://learn.chatgpt.com/docs/environments/modes) · [ChatGPT / Codex](https://learn.chatgpt.com/docs/use-chatgpt)
