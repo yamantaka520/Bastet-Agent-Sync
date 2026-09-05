@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: M2 snapshot core implemented; M3 OAuth/encryption preview and resumable guided/manual setup implemented with offline tests. Real-account and two-device gates remain open; native agent transport remains gated. This is the implementation roadmap; REQUIREMENTS.md preserves the detailed product requirements. User-facing plan and guide: [English](manual/en/guide.md) · [繁體中文](manual/zh-Hant/guide.md) · [简体中文](manual/zh-Hans/guide.md) · [日本語](manual/ja/guide.md) · [한국어](manual/ko/guide.md).
+Status: 0.2.1 adds automatic Agent Memory OS export/encrypted Drive exchange/backup/merge and scheduling. Other native adapters remain unavailable. M2 snapshot core implemented; M3 OAuth/encryption preview and resumable guided/manual setup implemented with offline tests. Real-account and two-device gates remain open; native agent transport remains gated. This is the implementation roadmap; REQUIREMENTS.md preserves the detailed product requirements. User-facing plan and guide: [English](manual/en/guide.md) · [繁體中文](manual/zh-Hant/guide.md) · [简体中文](manual/zh-Hans/guide.md) · [日本語](manual/ja/guide.md) · [한국어](manual/ko/guide.md).
 
 ## Product
 
@@ -48,3 +48,5 @@ Integrated ChatGPT desktop scope: local Codex/Worktree tasks are in the adapter 
 Agent Memory OS is an additional memory-service source with its own adapter, not a conversation agent. [Adapter contract and remaining gates](AGENT_MEMORY_OS.md).
 
 Version 0.2.0 adds [runtime preflight/status and a signed updater](UPDATES_AND_STATUS.md). This does not satisfy the missing live-store worker, scheduling or two-device gates.
+
+0.2.1 supersedes the blanket Start gate for Agent Memory OS. See [current adapter](AGENT_MEMORY_OS.md). ChatGPT Work is an eighth distinct source with candidate discovery, not a verified native importer.

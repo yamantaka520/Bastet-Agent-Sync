@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Automatic Agent Memory OS export, encrypted Drive exchange and backed-up official merge; manual/interval/15-second scheduling, pause and per-cycle counters.
+- ChatGPT Work listed separately; unsupported sources no longer veto ready memory synchronization.
+- Manual JSONL inspection moved under Advanced. Native conversation adapters remain unavailable.
+
 ## 0.2.0 — Runtime status and signed updater
 
 - Replace permanently disabled Start with explicit native preflight and visible reasons; connect Drive status to wizard state. No automatic Agent worker is claimed.

@@ -1,33 +1,25 @@
-# 🐈 Agent Memory OS transport adapter
+# 🐈 Agent Memory OS automatic synchronization
 
-Status: source discovery, selection, JSONL envelope inspection and byte-preserving snapshot adapter implemented. Automatic export, Drive queue orchestration and application into a running AMOS store are **not enabled**. Selecting this source does not start memory synchronization.
+Version 0.2.1 connects selection and Start to a real background worker. Users do not pick export files: Bastet invokes the installed `agent-memory` CLI automatically, encrypts snapshots for the configured Google Drive space, and invokes the official merge on receiving devices. The manual JSONL inspector is an optional advanced diagnostic.
 
-## Source and protocol
+## Setup and trust
 
-The seventh source is `agent-memory-os`. Discovery honors a manually selected directory, then `AGENT_MEMORY_HOME`, then `~/.agent-memory`. Discovery checks directory existence only. It never opens the live SQLite database, WAL, credentials or embedding store.
+Complete the Drive wizard, select Agent Memory OS, save, then Start. Other selected sources with no adapter are listed as skipped and do not veto this source. Discovery honors the selected memory home or `AGENT_MEMORY_HOME`. CLI lookup uses PATH, the standard memory virtual environment, common user installs and source checkouts; a native executable picker handles custom installs. Credentials, the active database and its WAL are never raw-copied into Drive.
 
-Use the installed AMOS CLI's official file-bundle interface:
+This is full-store synchronization between the user's trusted devices holding the same space recovery key. It includes private memories, tombstones, teams/projects and permissions. The UI states this before Start. AMOS owns transactional merge and conflict/ACL semantics. Backups use its official backup command before each merge; failed backups cannot become completed backup markers. Bastet never replaces the active database. The user requested automatic operation; there is no per-cycle manual import approval.
 
-```sh
-agent-memory --home /absolute/path/to/memory-home sync export /absolute/path/to/export.jsonl
-```
+## Execution and recovery
 
-This is a user-run export command, not a command automatically executed by Bastet. The AMOS local export defaults to including private memories; review the intended recipient and keep the export outside shared folders until encrypted transport is configured. Its `--team` option filters a team export, but is not a guarantee that every metadata record is restricted to that team. Scope filtering and native import trust must be implemented and tested before automatic operation.
+Only an explicit Start creates the worker. It reconnects saved Google authorization, verifies the bound account and space/key proof, then performs encrypted exchange. Manual mode waits for Sync now after a cycle; interval mode honors saved seconds, and near-real-time mode polls every 15 seconds. This version uses polling, not filesystem watching. Failures use bounded backoff in automatic modes. Cycles never overlap. Pause stops scheduling and new network operations at boundaries; an in-flight CLI merge can finish before Paused. Settings and updater installation require pause.
 
-In Bastet, **Agent Memory OS → Choose exported JSONL** performs a read-only envelope check. Only version, record count and an authority-change notice are returned to the UI. Cancelling or failing an inspection clears the previous result. This is not AMOS semantic validation and does not authorize import.
+A persistent device stream, exported-content fingerprint and applied-object ledger avoid repeat export/import. Applied IDs are saved only after successful merge; interrupted or failed merges retry. Parent bundles apply before descendants. AMOS may normalize an unset link activation timestamp from null to empty text; the fingerprint treats these as equivalent while retaining original export bytes. Baselines are local per-device streams, not inferred from an incoming remote head.
 
-## Preservation and limits
+## Limits and support boundaries
 
-- Supported envelope versions: 1, 2 and 3; unknown versions or record kinds fail closed. AMOS itself tolerates unknown kinds, but this first transport adapter refuses to silently transport an unreviewed future record type.
-- Record kinds: memory, link, profile; version 2 adds tombstone; version 3 adds team, project and org_tombstone.
-- The original UTF-8 JSONL is preserved byte-for-byte in `agent-memory-os.jsonl`, under the dedicated `agent-memory-os` stream namespace. Owner, visibility, timestamps, pins, feedback counters, links and organization fields are never rewritten by Bastet.
-- Maximum export size: 1 MiB; maximum records: 10,000. Larger exports are rejected, never truncated. Pagination/chunking remains future work.
-- The adapter can capture a prepared export into the existing immutable replica protocol and restore it from a validated bundle. Fixture tests verify two-replica transfer plus authenticated encryption round trip. The GUI currently exposes inspection only, not publication or application.
+Versions 1–3 and the known record kinds are accepted. Maximum export is 8 MiB and 10,000 records; the replica remains bounded by 64 MiB / 4,096 immutable objects. Larger stores fail explicitly; chunking and history compaction are not implemented. Backups are local and currently require manual retention management. This is not a replica of embeddings, credentials or the running process. Each receiving device needs a working AMOS installation and the same recovered Drive space.
 
-## Import and concurrency gates
+ChatGPT Work appears separately in the source list. Its local candidate may share CODEX_HOME; detection is not proof of native task migration. Other seven source adapters remain unavailable and are skipped, not marked synchronized. Official Work documentation separates local and cloud execution; no native cross-device import API was established in the reviewed pages: [Work setup](https://learn.chatgpt.com/docs/get-started-with-work), [local execution](https://learn.chatgpt.com/docs/enterprise/chatgpt-work-local-security).
 
-AMOS `sync import` is a trusted local/admin merge and may apply tombstones and organization membership changes. Do not automatically invoke it for a downloaded bundle. A future application step must show origin/trust, preview deletions and ACL changes, create an AMOS-supported backup, and use AMOS's transaction/import semantics. Retain Bastet branches when two devices export concurrently; never concatenate JSONL or silently choose the newest file. AMOS's own conflict rules need separate acceptance tests before enabling automatic merge. Do not run both AMOS peer synchronization and a Bastet transport for the same scope without a deduplication/ownership plan.
+## Validation
 
-## Evidence
-
-Contract reviewed at AMOS commit `d190e9e5f0612a2859cd93ed9a0796bded08126f`: [version registry](https://github.com/yamantaka520/Agent-Memory-OS/blob/d190e9e5f0612a2859cd93ed9a0796bded08126f/src/agent_memory_os/sync_bundles/contract.json), [export/import implementation](https://github.com/yamantaka520/Agent-Memory-OS/blob/d190e9e5f0612a2859cd93ed9a0796bded08126f/src/agent_memory_os/sync.py). The synthetic test fixture derives from that repository's v1/v3 contract fixtures. No live memory records were exported or imported during implementation.
+Tests cover automatic queue exchange, failed import retry, unchanged data, cancellation and all-source selection without a global veto. A separately invoked installed-CLI test uses two temporary memory homes to verify export, backup, semantic import and repeat stability. No physical second-device or Windows/Linux interactive acceptance is implied. See [validation](VALIDATION.md).

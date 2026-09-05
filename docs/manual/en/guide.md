@@ -2,6 +2,16 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
+## 🐈 0.2.1
+
+Select Agent Memory OS, save and Start: export, encrypted Drive exchange, backup and merge now run automatically. No manual JSONL handling is needed. Pause / Sync now and per-cycle counters are available. ChatGPT Work is listed separately; native task migration for Work and the other agents remains unavailable, so those sources are skipped. Only share the recovered space with your trusted devices: private memories, deletions and permissions are included. Real two-computer acceptance remains open.
+
+[Current / 目前支援範圍](../../AGENT_MEMORY_OS.md)
+
+---
+
+
+
 A desktop companion for keeping your agents and conversations with you.
 
 > The snapshot core is implemented. Click **Run isolated check** in the desktop app to transfer synthetic text between two temporary replicas and a shared folder, preserve two branches, repeat without extra transfers and recover after reopening. The check does not access selected agents or the Drive folder.
@@ -86,7 +96,7 @@ Now available as a seventh source. Select an existing memory home or use AGENT_M
 
 If authorization fails before the browser opens, the app now distinguishes imported-client access, saved-login access and browser-launch errors. Quit and reopen an updated development app; re-import the JSON if client access fails. Import must pass credential-store readback before step 1 completes.
 
-## 🐈 0.2.0
+## 🐈 0.2.0 · Historical
 
 Version 0.2.0 shows app/Drive/sync status with emoji and a version/build below the logo. Start now checks saved setup and explains why a source cannot run; live Agent workers remain unavailable. The sidebar checks online updates and offers signed download/install and restart. A release must be published before an update feed is available.
 

@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const AGENTS: [&str; 7] = [
+pub const AGENTS: [&str; 8] = [
     "claude",
     "claude-code",
     "codex",
@@ -14,6 +14,7 @@ pub const AGENTS: [&str; 7] = [
     "grok",
     "pi",
     "agent-memory-os",
+    "chatgpt-work",
 ];
 pub const LOCALES: [&str; 5] = ["en", "zh-Hant", "zh-Hans", "ja", "ko"];
 
@@ -81,6 +82,9 @@ pub fn discover(
         env.get("AGENT_MEMORY_HOME")
             .map(PathBuf::from)
             .unwrap_or(home.join(".agent-memory")),
+        env.get("CODEX_HOME")
+            .map(PathBuf::from)
+            .unwrap_or(home.join(".codex")),
     ];
     AGENTS
         .iter()
@@ -240,7 +244,7 @@ mod tests {
         let mut paths = HashMap::new();
         paths.insert("codex".into(), custom.to_string_lossy().into_owned());
         let agents = discover(dir.path(), dir.path(), &paths, &HashMap::new());
-        assert_eq!(agents.len(), 7);
+        assert_eq!(agents.len(), 8);
         assert!(agents[2].detected && agents[2].custom);
         assert!(!agents[1].detected);
     }

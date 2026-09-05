@@ -95,6 +95,17 @@ pub fn exchange(
     remote: &impl Objects,
     direction: Direction,
 ) -> Result<Exchange> {
+    exchange_filtered(root, replica, binding, key, remote, direction, None)
+}
+pub fn exchange_filtered(
+    root: &Path,
+    replica: &Replica,
+    binding: &Binding,
+    key: &SpaceKey,
+    remote: &impl Objects,
+    direction: Direction,
+    agent: Option<&str>,
+) -> Result<Exchange> {
     binding.validate()?;
     if replica.space_id() != binding.space {
         return Err("space_mismatch".into());
@@ -141,9 +152,15 @@ pub fn exchange(
         if total > MAX_STORE {
             return Err("bundle_limit".into());
         }
-        other.insert(b.id.clone(), b);
+        if agent.is_none_or(|a| a == b.snapshot.stream.agent) {
+            other.insert(b.id.clone(), b);
+        }
     }
-    let local = replica.transport_bundles()?;
+    let local = replica
+        .transport_bundles()?
+        .into_iter()
+        .filter(|(_, b)| agent.is_none_or(|a| a == b.snapshot.stream.agent))
+        .collect::<BTreeMap<_, _>>();
     let mut union = other.clone();
     union.extend(local.clone());
     if union.len() > MAX_OBJECTS

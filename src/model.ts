@@ -21,6 +21,7 @@ export const names: Record<string, string> = {
   claude: "Claude",
   "claude-code": "Claude Code",
   codex: "Codex",
+  "chatgpt-work": "ChatGPT Work",
   agy: "Google Agy CLI",
   grok: "Grok Build CLI",
   pi: "Pi Agent",

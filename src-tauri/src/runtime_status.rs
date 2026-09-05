@@ -20,13 +20,16 @@ pub fn evaluate(settings: Option<&crate::model::Settings>, complete: bool) -> Pr
     if !complete {
         reasons.push("drive".into());
     }
-    // No live-store adapter has passed its apply gate yet. Never turn a diagnostic into a sync.
-    if !selected.is_empty() {
+    // Unsupported sources are reported independently from the ready AMOS source.
+    if !selected.is_empty() && !selected.iter().any(|s| s == "agent-memory-os") {
         reasons.push("adapters".into());
     }
     Preflight {
         reasons,
-        unsupported_agents: selected,
+        unsupported_agents: selected
+            .into_iter()
+            .filter(|s| s != "agent-memory-os")
+            .collect(),
     }
 }
 #[tauri::command]

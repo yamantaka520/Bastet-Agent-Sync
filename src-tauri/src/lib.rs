@@ -1,9 +1,11 @@
+mod amos_runtime;
 pub mod cloud;
 pub mod memory_adapter;
 mod model;
 mod runtime_status;
 pub mod sync;
 mod updates;
+mod worker;
 use model::{Agent, Settings};
 use serde::Serialize;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
@@ -93,6 +95,9 @@ fn save_settings(
     state: State<AppState>,
     settings: Settings,
 ) -> Result<(), String> {
+    if app.state::<worker::Worker>().active() {
+        return Err("sync_running".into());
+    }
     let mut current = state.settings.lock().map_err(|_| "save_failed")?;
     // Do not overwrite a corrupted configuration through a stale UI.
     model::load(&state.path)?;
@@ -121,6 +126,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::Updates::default())
+        .manage(worker::Worker::default())
         .manage(cloud::desktop::CloudState::default())
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("settings.json");
@@ -178,6 +184,11 @@ pub fn run() {
             cloud::desktop::wizard_cancel_login,
             memory_adapter::inspect_memory_export,
             runtime_status::sync_preflight,
+            amos_runtime::choose_memory_cli,
+            worker::sync_start,
+            worker::sync_status,
+            worker::sync_pause,
+            worker::sync_now,
             updates::update_status,
             updates::check_update,
             updates::install_update,

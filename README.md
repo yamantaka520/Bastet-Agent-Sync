@@ -14,7 +14,7 @@
 
 A local-first desktop companion for synchronizing agent settings, skills, memory and conversations through Google Drive. Part of the Bastet family.
 
-> **Development, not a sync release.** The desktop includes five-language setup and an isolated snapshot-core check. The M2 core preserves divergent histories, verifies hashes and recovers its index after interruption. Real agent transport is not enabled. Cloud transfer, bidirectional synchronization and native cross-computer conversation restoration are planned and not yet verified. [Evidence and gaps](docs/VALIDATION.md).
+> **0.2.1 — automatic memory sync preview.** Selecting Agent Memory OS and pressing Start runs automatic encrypted Drive exchange and official AMOS backup/merge. Other selected sources are skipped without blocking it. ChatGPT Work is listed separately, but native conversation migration for Work and the other agents is still unavailable. Physical two-device acceptance remains open. [Current support](docs/AGENT_MEMORY_OS.md) · [Evidence](docs/VALIDATION.md).
 
 M3 preview adds a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 

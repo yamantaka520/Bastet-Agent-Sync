@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const MAX_FILE: usize = 1024 * 1024;
+pub const MAX_FILE: usize = 8 * 1024 * 1024;
 pub const MAX_CONTENT: usize = 8 * 1024 * 1024;
 pub const MAX_WIRE: u64 = 16 * 1024 * 1024;
 pub const MAX_OBJECTS: usize = 4096;

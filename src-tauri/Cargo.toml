@@ -1,6 +1,6 @@
 [package]
 name = "bastet-agent-sync"
-version = "0.2.0"
+version = "0.2.1"
 description = "Bastet Agent Sync desktop companion"
 authors = ["Bastet contributors"]
 edition = "2021"

@@ -99,7 +99,7 @@ fn login_token<T>(
         Err(e) => Err(e),
     }
 }
-fn config(state: &Wizard) -> Result<ClientConfig> {
+pub(crate) fn config(state: &Wizard) -> Result<ClientConfig> {
     let id = state.client_id.as_ref().ok_or("oauth_not_configured")?;
     let c = match state.client_source.as_deref() {
         Some("build") => build_config()?,

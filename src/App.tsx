@@ -8,6 +8,12 @@ import {
   type Settings,
   type Diagnostic,
 } from "./model";
+import WorkerStatus, {
+  type SyncStatus,
+  workerMessages,
+  workerError,
+  phaseText,
+} from "./WorkerStatus";
 import MemoryPanel from "./MemoryPanel";
 import CloudPanel, { type WizardView } from "./CloudPanel";
 import UpdatePanel from "./UpdatePanel";
@@ -31,6 +37,9 @@ export default function App() {
   const [cloud, setCloud] = useState<WizardView | null>(null);
   const [version, setVersion] = useState(__APP_VERSION__);
   const [revision, setRevision] = useState("");
+  const [runtime, setRuntime] = useState<SyncStatus | null>(null);
+  const running = runtime?.running ?? false;
+  const wt = workerMessages[settings.locale];
   const [checkingStart, setCheckingStart] = useState(false);
   const [blocked, setBlocked] = useState<string[] | null>(null);
   const [unsupported, setUnsupported] = useState<string[]>([]);
@@ -115,14 +124,10 @@ export default function App() {
     }
     setCheckingStart(true);
     try {
-      const result = await invoke<{
-        reasons: string[];
-        unsupportedAgents: string[];
-      }>("sync_preflight");
-      setBlocked(result.reasons);
-      setUnsupported(result.unsupportedAgents);
-    } catch {
-      setBlocked(["check_failed"]);
+      const result = await invoke<SyncStatus>("sync_start");
+      setRuntime(result);
+    } catch (e) {
+      setBlocked([typeof e === "string" ? e : "check_failed"]);
     } finally {
       setCheckingStart(false);
     }
@@ -167,7 +172,7 @@ export default function App() {
           <label className="lang">
             {t.language}
             <select
-              disabled={busy}
+              disabled={busy || running}
               value={settings.locale}
               onChange={(e) => change("locale", e.target.value as Locale)}
             >
@@ -178,7 +183,11 @@ export default function App() {
               ))}
             </select>
           </label>
-          <UpdatePanel native={native} locale={settings.locale} dirty={dirty} />
+          <UpdatePanel
+            native={native}
+            locale={settings.locale}
+            dirty={dirty || running}
+          />
         </div>
       </aside>
       <main>
@@ -210,23 +219,34 @@ export default function App() {
         >
           {native && <strong>{rt[0]}</strong>}
           <p>{cloud?.connected ? rt[3] : rt[4]}</p>
-          <h2>{checkingStart ? rt[6] : blocked ? rt[7] : rt[5]}</h2>
-          <p>{rt[24]}</p>
+          <h2>
+            {checkingStart
+              ? wt[2]
+              : blocked
+                ? rt[7]
+                : runtime?.phase
+                  ? phaseText(runtime, settings.locale)
+                  : rt[5]}
+          </h2>
+          <WorkerStatus
+            native={native}
+            locale={settings.locale}
+            status={runtime}
+            onStatus={setRuntime}
+          />
           {blocked && (
             <ul>
               {blocked.map((reason) => (
                 <li key={reason}>
-                  {
-                    (
-                      {
-                        settings: rt[8],
-                        sources: rt[9],
-                        drive: rt[10],
-                        adapters: rt[11],
-                        check_failed: t.error,
-                      } as Record<string, string>
-                    )[reason]
-                  }
+                  {(
+                    {
+                      settings: rt[8],
+                      sources: rt[9],
+                      drive: rt[10],
+                      adapters: rt[11],
+                      check_failed: t.error,
+                    } as Record<string, string>
+                  )[reason] ?? workerError(reason, settings.locale)}
                   {reason === "adapters" &&
                     unsupported.map((id) => names[id] ?? id).join(", ")}
                 </li>
@@ -250,7 +270,11 @@ export default function App() {
           locale={settings.locale}
           onChange={setCloud}
         />
-        <MemoryPanel native={native} locale={settings.locale} />
+        <p className="panel">{wt[1]}</p>
+        <details className="panel">
+          <summary>{wt[19]}</summary>
+          <MemoryPanel native={native} locale={settings.locale} />
+        </details>
         <section className="panel diagnostic-panel">
           <div className="section-heading">
             <div>
@@ -258,7 +282,7 @@ export default function App() {
               <p>{t.diagnosticHint}</p>
             </div>
             <button
-              disabled={!native || busy || !loaded}
+              disabled={!native || busy || !loaded || running}
               onClick={() =>
                 action(async () => {
                   setDiagnostic(null);
@@ -315,7 +339,7 @@ export default function App() {
                   <p>{t.sourceHint}</p>
                 </div>
                 <button
-                  disabled={!native || busy || !loaded}
+                  disabled={!native || busy || !loaded || running}
                   onClick={() => action(() => scan())}
                 >
                   {t.scan}
@@ -323,7 +347,7 @@ export default function App() {
               </div>
               <div className="selection">
                 <button
-                  disabled={!native || busy || !loaded}
+                  disabled={!native || busy || !loaded || running}
                   onClick={() =>
                     change(
                       "selectedAgents",
@@ -334,7 +358,7 @@ export default function App() {
                   {t.all}
                 </button>
                 <button
-                  disabled={busy}
+                  disabled={busy || running}
                   onClick={() => change("selectedAgents", [])}
                 >
                   {t.none}
@@ -354,7 +378,9 @@ export default function App() {
                       <input
                         type="checkbox"
                         aria-label={names[a.id]}
-                        disabled={!native || !a.detected || busy || !loaded}
+                        disabled={
+                          !native || !a.detected || busy || !loaded || running
+                        }
                         checked={settings.selectedAgents.includes(a.id)}
                         onChange={(e) =>
                           change(
@@ -375,14 +401,14 @@ export default function App() {
                     <code title={a.path}>{a.path || "—"}</code>
                     <div className="path-actions">
                       <button
-                        disabled={!native || busy || !loaded}
+                        disabled={!native || busy || !loaded || running}
                         onClick={() => choose(a.id)}
                       >
                         {t.custom}
                       </button>
                       {a.custom && (
                         <button
-                          disabled={busy}
+                          disabled={busy || running}
                           onClick={() =>
                             action(async () => {
                               const customPaths = { ...settings.customPaths };
@@ -412,7 +438,7 @@ export default function App() {
                   ▱ <span>{settings.folder || t.noFolder}</span>
                 </div>
                 <button
-                  disabled={!native || busy || !loaded}
+                  disabled={!native || busy || !loaded || running}
                   onClick={() => choose()}
                 >
                   {t.browse}
@@ -433,7 +459,7 @@ export default function App() {
                     value={settings.deviceName}
                     onChange={(e) => change("deviceName", e.target.value)}
                     placeholder={t.device}
-                    disabled={busy}
+                    disabled={busy || running}
                   />
                 </label>
                 <label>
@@ -446,7 +472,7 @@ export default function App() {
                         e.target.value as Settings["direction"],
                       )
                     }
-                    disabled={busy}
+                    disabled={busy || running}
                   >
                     {(["bidirectional", "upload", "download"] as const).map(
                       (v) => (
@@ -464,7 +490,7 @@ export default function App() {
                     onChange={(e) =>
                       change("schedule", e.target.value as Settings["schedule"])
                     }
-                    disabled={busy}
+                    disabled={busy || running}
                   >
                     {(["near-realtime", "interval", "manual"] as const).map(
                       (v) => (
@@ -486,7 +512,7 @@ export default function App() {
                       onChange={(e) =>
                         change("intervalSeconds", Number(e.target.value))
                       }
-                      disabled={busy}
+                      disabled={busy || running}
                     />
                   </label>
                 )}
@@ -495,7 +521,7 @@ export default function App() {
                 <input
                   type="checkbox"
                   checked={settings.closeToTray}
-                  disabled={!native || !tray || busy}
+                  disabled={!native || !tray || busy || running}
                   onChange={(e) => change("closeToTray", e.target.checked)}
                 />
                 {t.tray}
@@ -509,13 +535,15 @@ export default function App() {
                   {checkingStart
                     ? rt[6]
                     : blocked
-                      ? `${rt[7]} — ${blocked.map((reason) => (({ settings: rt[8], sources: rt[9], drive: rt[10], adapters: rt[11] + unsupported.map((id) => names[id] ?? id).join(", "), check_failed: t.error }) as Record<string, string>)[reason]).join("；")}`
-                      : rt[24]}
+                      ? `${rt[7]} — ${blocked.map((reason) => (({ settings: rt[8], sources: rt[9], drive: rt[10], adapters: rt[11] + unsupported.map((id) => names[id] ?? id).join(", "), check_failed: t.error }) as Record<string, string>)[reason] ?? workerError(reason, settings.locale)).join("；")}`
+                      : runtime?.phase
+                        ? phaseText(runtime, settings.locale)
+                        : rt[24]}
                 </p>
               </div>
               <div className="footer-actions">
                 <button
-                  disabled={!native || busy || !loaded}
+                  disabled={!native || busy || !loaded || running}
                   onClick={() =>
                     action(async () => {
                       await invoke("save_settings", { settings });
@@ -529,10 +557,17 @@ export default function App() {
                 <button
                   className="primary"
                   disabled={!native || busy || !loaded || checkingStart}
-                  onClick={startSync}
+                  onClick={
+                    running
+                      ? () =>
+                          void invoke("sync_pause").catch(() =>
+                            setBlocked(["check_failed"]),
+                          )
+                      : startSync
+                  }
                   aria-describedby="sync-reason"
                 >
-                  {t.start} <span>→</span>
+                  {running ? wt[8] : t.start} <span>→</span>
                 </button>
               </div>
             </footer>

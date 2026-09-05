@@ -1,12 +1,12 @@
 # 🐈 Runtime status and signed updates
 
-Version 0.2.0 replaces the hard-coded disconnected label and permanently disabled Start button. Drive setup completion is reported from the native wizard; saved completion is distinct from a token currently held in this process. An idle, read-only status refresh checks token expiry every 15 seconds without contacting Google. It cannot detect remote revocation until a request is made.
+Historical 0.2.0 behavior (superseded by [automatic AMOS sync in 0.2.1](AGENT_MEMORY_OS.md)): version 0.2.0 replaces the hard-coded disconnected label and permanently disabled Start button. Drive setup completion is reported from the native wizard; saved completion is distinct from a token currently held in this process. An idle, read-only status refresh checks token expiry every 15 seconds without contacting Google. It cannot detect remote revocation until a request is made.
 
-## Start and status
+## Historical 0.2.0 Start and status
 
 Start performs a native preflight against saved settings and wizard progress. Unsaved choices must be saved first; source and Drive requirements are listed explicitly. Native live-store adapters remain unavailable, so Start reports each unsupported selected source and **does not start a worker**. The status area scrolls into view and never displays fake transfer counters, “syncing” or “synced”. “App running” indicates this foreground desktop instance, not successful tray/background transfer. Scheduling and active/pause states require a real worker in a later milestone.
 
-## Version identity
+## Current version identity
 
 The version below the logo comes from the native package, with a build Git revision; browser preview uses the package version. Use `python scripts/set_version.py 0.2.1` for the next release. Documentation checks enforce agreement between npm, lockfiles, Cargo and Tauri versions. A commit identifies a clean build; rebuild after committing so local development changes are included in the displayed revision.
 

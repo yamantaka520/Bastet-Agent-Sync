@@ -77,6 +77,9 @@ pub async fn install_update(
     app: tauri::AppHandle,
     state: State<'_, Updates>,
 ) -> Result<Status, String> {
+    if app.state::<crate::worker::Worker>().active() {
+        return Err("sync_running".into());
+    }
     let update = {
         let mut s = state.0.lock().map_err(|_| "update_busy")?;
         if s.0.phase != "available" {
@@ -109,6 +112,9 @@ pub async fn install_update(
 }
 #[tauri::command]
 pub fn restart_after_update(app: tauri::AppHandle, state: State<Updates>) -> Result<(), String> {
+    if app.state::<crate::worker::Worker>().active() {
+        return Err("sync_running".into());
+    }
     if state.0.lock().map_err(|_| "update_busy")?.0.phase != "installed" {
         return Err("update_not_ready".into());
     }

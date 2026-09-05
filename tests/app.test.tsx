@@ -154,7 +154,7 @@ describe("isolated synchronization check", () => {
     expect(api.invoke).toHaveBeenCalledWith("run_sync_diagnostic");
     expect(
       api.invoke.mock.calls.every(([name]) =>
-        ["bootstrap", "run_sync_diagnostic"].includes(name),
+        ["bootstrap", "sync_status", "run_sync_diagnostic"].includes(name),
       ),
     ).toBe(true);
     expect(
@@ -168,6 +168,7 @@ describe("isolated synchronization check", () => {
     api.invoke.mockImplementation(async (command: string) => {
       if (command === "bootstrap")
         return { settings: defaults("en"), agents: [], trayAvailable: false };
+      if (command !== "run_sync_diagnostic") return undefined;
       if (runs++ === 0)
         return {
           verified: true,
@@ -193,7 +194,7 @@ describe("isolated synchronization check", () => {
   });
 });
 
-it("start runs native preflight and explains unavailable adapters", async () => {
+it("starts the real worker and allows pause even with skipped sources", async () => {
   api.native = true;
   api.invoke.mockImplementation(async (command: string) => {
     if (command === "bootstrap")
@@ -201,23 +202,30 @@ it("start runs native preflight and explains unavailable adapters", async () => 
         settings: {
           ...defaults("en"),
           deviceName: "Fixture",
-          selectedAgents: ["codex"],
+          selectedAgents: ["codex", "agent-memory-os"],
         },
         agents: [],
         trayAvailable: true,
-        version: "0.2.0",
+        version: "0.2.1",
         revision: "fixture",
       };
-    if (command === "sync_preflight")
-      return { reasons: ["adapters"], unsupportedAgents: ["codex"] };
+    if (command === "sync_start")
+      return {
+        running: true,
+        phase: "starting",
+        published: 0,
+        received: 0,
+        applied: 0,
+        skipped: ["codex"],
+        lastSuccess: null,
+        error: null,
+      };
   });
   render(<App />);
-  expect(await screen.findByText("v0.2.0 · fixture")).toBeTruthy();
+  await screen.findByText("v0.2.1 · fixture");
   fireEvent.click(screen.getByRole("button", { name: /Start sync/ }));
-  expect(
-    await screen.findByText(/Live export\/import is not available/, {
-      selector: "li",
-    }),
-  ).toBeTruthy();
-  expect(api.invoke).toHaveBeenCalledWith("sync_preflight");
+  await screen.findByText(/Skipped this cycle/);
+  fireEvent.click(screen.getByRole("button", { name: /Pause sync/ }));
+  expect(api.invoke).toHaveBeenCalledWith("sync_start");
+  expect(api.invoke).toHaveBeenCalledWith("sync_pause");
 });

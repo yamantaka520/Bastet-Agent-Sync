@@ -79,7 +79,7 @@ export const wizardMessages = {
     finish: "Verify and finish setup",
     complete: "Setup completed",
     completeHint:
-      "This wizard configures Drive only. Agent synchronization remains unavailable until adapters are ready.",
+      "Drive setup is complete. Select Agent Memory OS and press Start to synchronize memory; other sources have separate support limits.",
     back: "Back",
     next: "Next",
     done: "Completed",
@@ -184,7 +184,7 @@ export const wizardMessages = {
     finish: "驗證並完成設定",
     complete: "設定已完成",
     completeHint:
-      "精靈僅負責 Drive 設定；Agent 同步仍須等待適配器完成後才能啟用。",
+      "Drive 設定已完成。勾選 Agent Memory OS 後按啟動可同步記憶；其他來源依各自支援程度處理。",
     back: "上一步",
     next: "下一步",
     done: "已完成",
@@ -284,7 +284,7 @@ export const wizardMessages = {
     finish: "验证并完成设置",
     complete: "设置已完成",
     completeHint:
-      "向导仅负责 Drive 设置；Agent 同步仍须等待适配器完成后才能启用。",
+      "Drive 设置已完成。勾选 Agent Memory OS 后按启动可同步记忆；其他来源依各自支持程度处理。",
     back: "上一步",
     next: "下一步",
     done: "已完成",
@@ -388,7 +388,7 @@ export const wizardMessages = {
     finish: "検証して設定を完了",
     complete: "設定が完了しました",
     completeHint:
-      "このウィザードは Drive を設定します。Agent 同期はアダプターの完成後に利用可能になります。",
+      "Drive 設定が完了しました。Agent Memory OS を選択して同期を開始できます。他のソースには個別の制限があります。",
     back: "戻る",
     next: "次へ",
     done: "完了",
@@ -499,7 +499,7 @@ export const wizardMessages = {
     finish: "검증 후 설정 완료",
     complete: "설정 완료",
     completeHint:
-      "이 마법사는 Drive만 설정합니다. Agent 동기화는 어댑터가 준비된 후 사용할 수 있습니다.",
+      "Drive 설정이 완료되었습니다. Agent Memory OS를 선택하고 시작하세요. 다른 소스에는 개별 지원 제한이 있습니다.",
     back: "이전",
     next: "다음",
     done: "완료",
