@@ -26,6 +26,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: python scripts/check_docs.py
+      - run: python scripts/test_release_assets.py
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
