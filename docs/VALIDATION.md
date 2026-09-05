@@ -1,5 +1,13 @@
 # Validation
 
+## 0.3.0 local conversation adapters — 2026-09-05
+
+- 64 default Rust tests and 23 frontend tests pass. Tests cover all seven local selections, two isolated homes, automatic add-only receive, repeat stability, safe separate-folder recovery, conflict protection, malformed records, credential-path rejection, symlinks, SQLite committed WAL and revision-aware cache invalidation.
+- Installed Codex app-server `thread/read` discovered a synthetic rollout in an isolated CODEX_HOME and reconstructed its user message without a model request. This checks native read compatibility, not UI resume on a physical second computer.
+- Clippy with warnings denied, formatting and TypeScript/Vite production build pass. Native macOS debug build succeeds. Final native launch/Drive observation is recorded below when available.
+- Limits changed for compressed conversations: 32 MiB content, 64 MiB wire, 512 MiB replica/union. Tests use small synthetic histories; large-history performance and cross-platform interactive recovery remain separate gates.
+- Scope is additive native conversation transport, not complete settings/skills, external attachments, project path mapping, Claude cloud/Cowork or cloud Work. Agy/Grok native continuation remains unverified. See [adapter boundaries](NATIVE_SESSIONS.md).
+
 ## 0.2.1 automatic AMOS worker — 2026-09-05
 
 - 58 default Rust tests plus 20 frontend tests pass. One installed-CLI integration test is opt-in and separately passed against two isolated temporary memory homes (79 total executed checks). It verifies official export, backup, merge and repeat stability.

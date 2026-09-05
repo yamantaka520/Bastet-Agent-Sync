@@ -70,12 +70,16 @@ pub fn discover(
     };
     let defaults = [
         desktop,
-        home.join(".claude"),
+        env.get("CLAUDE_CONFIG_DIR")
+            .map(PathBuf::from)
+            .unwrap_or(home.join(".claude")),
         env.get("CODEX_HOME")
             .map(PathBuf::from)
             .unwrap_or(home.join(".codex")),
         home.join(".gemini/antigravity-cli"),
-        home.join(".grok"),
+        env.get("GROK_HOME")
+            .map(PathBuf::from)
+            .unwrap_or(home.join(".grok")),
         env.get("PI_CODING_AGENT_DIR")
             .map(PathBuf::from)
             .unwrap_or(home.join(".pi/agent")),

@@ -14,7 +14,7 @@
 
 A local-first desktop companion for synchronizing agent settings, skills, memory and conversations through Google Drive. Part of the Bastet family.
 
-> **0.2.1 — automatic memory sync preview.** Selecting Agent Memory OS and pressing Start runs automatic encrypted Drive exchange and official AMOS backup/merge. Other selected sources are skipped without blocking it. ChatGPT Work is listed separately, but native conversation migration for Work and the other agents is still unavailable. Physical two-device acceptance remains open. [Current support](docs/AGENT_MEMORY_OS.md) · [Evidence](docs/VALIDATION.md).
+> **0.3.0 — local conversation sync preview.** Selected local sources now capture compressed native history and exchange it through encrypted Drive objects. Missing sessions are added automatically; existing different versions remain conflicts. AMOS retains its official backup/merge. Cloud chats, cloud Work, full settings/skills, external attachments and physical two-device acceptance remain open. [Current support](docs/NATIVE_SESSIONS.md) · [Evidence](docs/VALIDATION.md).
 
 M3 preview adds a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 
@@ -26,7 +26,7 @@ M3 preview adds a five-language resumable setup wizard, manual configuration, re
 4. Pick an interval or near-real-time sync, then press Start.
 5. Continue on another computer, with conflicts and conversation branches preserved.
 
-Five interface languages, a menu-bar/system-tray companion, explicit pause and recovery controls. Linux will use the planned Drive API transport without requiring Google's desktop client.
+Five interface languages, a menu-bar/system-tray companion, explicit pause and recovery controls. Linux uses the Drive API transport without requiring Google's desktop client.
 
 ## 🧭 Build and contribute
 
@@ -38,7 +38,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run tauri dev
 ```
 
-Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) first. `npm run dev` is a browser preview with native operations unavailable. No real agent data is uploaded by the foundation.
+Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) first. `npm run dev` is a browser preview with native operations unavailable. Native Start uploads selected local data after Drive setup.
 
 ## 📖 Project documents
 
@@ -50,4 +50,4 @@ Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) fir
 
 Contributions should include tests, keep the five locale dictionaries aligned, and avoid publishing credentials or machine-specific operational information. Never test imports by overwriting a live agent profile.
 
-🐈 [Agent Memory OS](docs/AGENT_MEMORY_OS.md): source discovery and official export-bundle adapter preview; automatic live-store sync remains gated.
+🐈 [Agent Memory OS](docs/AGENT_MEMORY_OS.md): automatic official export, encrypted exchange, backup and merge.

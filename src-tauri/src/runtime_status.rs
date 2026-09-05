@@ -20,16 +20,9 @@ pub fn evaluate(settings: Option<&crate::model::Settings>, complete: bool) -> Pr
     if !complete {
         reasons.push("drive".into());
     }
-    // Unsupported sources are reported independently from the ready AMOS source.
-    if !selected.is_empty() && !selected.iter().any(|s| s == "agent-memory-os") {
-        reasons.push("adapters".into());
-    }
     Preflight {
         reasons,
-        unsupported_agents: selected
-            .into_iter()
-            .filter(|s| s != "agent-memory-os")
-            .collect(),
+        unsupported_agents: vec![],
     }
 }
 #[tauri::command]
@@ -60,7 +53,7 @@ mod tests {
             selected_agents: vec!["codex".into()],
             ..Default::default()
         };
-        assert_eq!(evaluate(Some(&s), true).reasons, vec!["adapters"]);
+        assert_eq!(evaluate(Some(&s), true).reasons, Vec::<String>::new());
         assert_eq!(
             evaluate(None, false).reasons,
             vec!["settings", "sources", "drive"]

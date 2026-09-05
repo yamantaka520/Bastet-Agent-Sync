@@ -32,6 +32,7 @@ pub struct Status {
     pub last_success: Option<u64>,
     pub error: Option<String>,
     pub skipped: Vec<String>,
+    pub sources: Vec<crate::native_sessions::SourceStatus>,
 }
 #[derive(Default)]
 struct Control {
@@ -231,7 +232,7 @@ fn run_once(
     worker: &Worker,
     settings: &Settings,
     binding: &Binding,
-    memory: &Installed,
+    memory: Option<&Installed>,
 ) -> Result<(queue::Exchange, usize)> {
     let mut guard = cloud.0.try_lock().map_err(|_| "cloud_busy")?;
     let root = app
@@ -258,15 +259,117 @@ fn run_once(
         "download" => Direction::Download,
         _ => Direction::Both,
     };
-    cycle(
-        &root.join(format!("memory-sync-{}", binding.space)),
-        binding,
-        &key,
-        guard.as_ref().ok_or("reauth_required")?,
-        memory,
-        direction,
-        || worker.stopped(),
-    )
+    let cache_root = root.join(format!("drive-cache-{}", binding.space));
+    let cached = queue::CachedObjects::new(guard.as_ref().ok_or("reauth_required")?, &cache_root)?;
+    let mut total = queue::Exchange::default();
+    let mut merged = 0;
+    let agents = crate::detect(Some(settings));
+    let mut statuses = Vec::new();
+    let mut processed: std::collections::BTreeMap<
+        (String, String),
+        crate::native_sessions::SourceStatus,
+    > = Default::default();
+    for agent in &settings.selected_agents {
+        if worker.stopped() {
+            return Err("sync_paused".into());
+        }
+        worker.update(|s| {
+            s.sources = statuses.clone();
+            s.sources.push(crate::native_sessions::SourceStatus {
+                agent: agent.clone(),
+                state: "syncing".into(),
+                ..Default::default()
+            });
+        });
+        let result = if agent == "agent-memory-os" {
+            match memory {
+                Some(memory) => cycle(
+                    &root.join(format!("memory-sync-{}", binding.space)),
+                    binding,
+                    &key,
+                    &cached,
+                    memory,
+                    direction,
+                    || worker.stopped(),
+                )
+                .map(|(r, applied)| {
+                    merged += applied;
+                    crate::native_sessions::SourceStatus {
+                        agent: agent.clone(),
+                        state: "complete".into(),
+                        published: r.published,
+                        received: r.received,
+                        ..Default::default()
+                    }
+                }),
+                None => Err("memory_cli_missing".into()),
+            }
+        } else {
+            let source = agents
+                .iter()
+                .find(|a| &a.id == agent)
+                .ok_or("source_missing")?;
+            // Claude Desktop's local coding sessions use Claude Code's native profile.
+            // Its account-hosted chats are not stored in this profile.
+            let source_path = if agent == "claude" {
+                agents
+                    .iter()
+                    .find(|a| a.id == "claude-code")
+                    .map(|a| a.path.as_str())
+                    .unwrap_or(&source.path)
+            } else {
+                &source.path
+            };
+            let canonical = match agent.as_str() {
+                "claude" => "claude-code",
+                "chatgpt-work" => "codex",
+                a => a,
+            };
+            let source_key = (canonical.to_string(), source_path.to_string());
+            if let Some(previous) = processed.get(&source_key) {
+                let mut s = previous.clone();
+                s.agent = agent.clone();
+                s.published = 0;
+                s.received = 0;
+                s.restored = 0;
+                Ok(s)
+            } else {
+                crate::native_sessions::cycle(
+                    &root.join(format!("sessions-{canonical}-{}", binding.space)),
+                    binding,
+                    &key,
+                    &Cancellable {
+                        remote: &cached,
+                        stop: &|| worker.stopped(),
+                    },
+                    canonical,
+                    Path::new(source_path),
+                    direction,
+                    || worker.stopped(),
+                )
+                .map(|mut s| {
+                    processed.insert(source_key, s.clone());
+                    s.agent = agent.clone();
+                    s
+                })
+            }
+        };
+        let status = match result {
+            Ok(s) => s,
+            Err(e) if e == "sync_paused" => return Err(e),
+            Err(e) => crate::native_sessions::SourceStatus {
+                agent: agent.clone(),
+                state: "error".into(),
+                issues: std::collections::BTreeMap::from([(e, 1)]),
+                ..Default::default()
+            },
+        };
+        total.published += status.published;
+        total.received += status.received;
+        statuses.push(status);
+        worker.update(|s| s.sources = statuses.clone());
+    }
+    Ok((total, merged))
 }
 #[tauri::command]
 pub fn sync_status(worker: State<'_, Worker>) -> Result<Status> {
@@ -313,33 +416,22 @@ pub async fn sync_start(
             return Err("wizard_step_required".into());
         }
         let binding = t.state.binding.clone().ok_or("wizard_step_required")?;
-        if !settings
-            .selected_agents
-            .iter()
-            .any(|s| s == "agent-memory-os")
-        {
+        if settings.selected_agents.is_empty() {
             return Err("no_ready_sources".into());
         }
-        let agent = crate::detect(Some(&settings))
+        let memory = crate::detect(Some(&settings))
             .into_iter()
             .find(|a| a.id == "agent-memory-os")
-            .ok_or("memory_store_missing")?;
-        let memory = Installed {
-            cli: amos_runtime::configured(&root)?,
-            home: PathBuf::from(agent.path),
-        };
-        if !memory.home.join("memories.db").is_file() {
-            return Err("memory_store_missing".into());
-        }
+            .and_then(|a| {
+                amos_runtime::configured(&root).ok().map(|cli| Installed {
+                    cli,
+                    home: PathBuf::from(a.path),
+                })
+            });
         let status = Status {
             running: true,
             phase: "starting".into(),
-            skipped: settings
-                .selected_agents
-                .iter()
-                .filter(|s| *s != "agent-memory-os")
-                .cloned()
-                .collect(),
+            skipped: Vec::new(),
             ..Default::default()
         };
         {
@@ -365,13 +457,23 @@ pub async fn sync_start(
                         s.phase = "syncing".into();
                         s.error = None;
                     });
-                    let result = run_once(&app, &cloud, &worker, &settings, &binding, &memory);
+                    let result =
+                        run_once(&app, &cloud, &worker, &settings, &binding, memory.as_ref());
                     let success = result.is_ok();
                     match result {
                         Ok((report, applied)) => {
                             failures = 0;
                             worker.update(|s| {
-                                s.phase = "waiting".into();
+                                s.phase = if s
+                                    .sources
+                                    .iter()
+                                    .any(|a| a.state == "error" || a.state == "partial")
+                                {
+                                    "partial"
+                                } else {
+                                    "waiting"
+                                }
+                                .into();
                                 s.published += report.published;
                                 s.received += report.received;
                                 s.applied += applied;
@@ -590,6 +692,6 @@ mod tests {
         };
         let p = crate::runtime_status::evaluate(Some(&settings), true);
         assert!(p.reasons.is_empty());
-        assert_eq!(p.unsupported_agents.len(), 7);
+        assert!(p.unsupported_agents.is_empty());
     }
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — Local conversation sync preview
+
+- Connect selected local conversation sources to compressed native snapshots and encrypted Drive exchange, independently of Agent Memory OS.
+- Automatically add missing receiving sessions; preserve existing different versions and offer separate-folder recovery in a five-language snapshot library.
+- Show per-source empty, syncing, complete, partial and failure results. Deduplicate shared Claude/Claude Code and Codex/Work profiles.
+- Use SQLite online backup for Agy, retain Claude subagent files, batch large captures and cache Drive downloads by provider revision.
+- Keep cloud chats, full settings/skills, external attachments and unverified native continuation explicitly outside this milestone; see the native adapter contract.
+
 ## 0.2.1
 
 - Automatic Agent Memory OS export, encrypted Drive exchange and backed-up official merge; manual/interval/15-second scheduling, pause and per-cycle counters.

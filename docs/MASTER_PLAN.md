@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: 0.2.1 adds automatic Agent Memory OS export/encrypted Drive exchange/backup/merge and scheduling. Other native adapters remain unavailable. M2 snapshot core implemented; M3 OAuth/encryption preview and resumable guided/manual setup implemented with offline tests. Real-account and two-device gates remain open; native agent transport remains gated. This is the implementation roadmap; REQUIREMENTS.md preserves the detailed product requirements. User-facing plan and guide: [English](manual/en/guide.md) · [繁體中文](manual/zh-Hant/guide.md) · [简体中文](manual/zh-Hans/guide.md) · [日本語](manual/ja/guide.md) · [한국어](manual/ko/guide.md).
+Status: 0.3.0 adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
 
 ## Product
 

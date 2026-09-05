@@ -43,6 +43,8 @@ pub struct File {
     pub parents: Vec<String>,
     #[serde(default)]
     pub trashed: bool,
+    #[serde(default)]
+    pub version: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -201,7 +203,7 @@ impl Drive {
                     ("pageSize", "100"),
                     (
                         "fields",
-                        "nextPageToken,incompleteSearch,files(id,name,mimeType,parents,trashed)",
+                        "nextPageToken,incompleteSearch,files(id,name,mimeType,parents,trashed,version)",
                     ),
                     ("pageToken", next.as_str()),
                     ("supportsAllDrives", "true"),

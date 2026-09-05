@@ -27,6 +27,9 @@ impl Binding {
 }
 pub trait Objects {
     fn ids(&self, folder: &str) -> Result<Vec<String>>;
+    fn revisions(&self, folder: &str) -> Result<Vec<(String, Option<String>)>> {
+        Ok(self.ids(folder)?.into_iter().map(|id| (id, None)).collect())
+    }
     fn allocate(&self) -> Result<String>;
     fn put(&self, folder: &str, id: &str, key: &SpaceKey, bundle: &Bundle) -> Result<()>;
     fn get(&self, folder: &str, id: &str, space: &str, key: &SpaceKey) -> Result<Bundle>;
@@ -37,6 +40,13 @@ impl Objects for Drive {
             .list_objects(folder)?
             .into_iter()
             .map(|f| f.id)
+            .collect())
+    }
+    fn revisions(&self, folder: &str) -> Result<Vec<(String, Option<String>)>> {
+        Ok(self
+            .list_objects(folder)?
+            .into_iter()
+            .map(|f| (f.id, f.version))
             .collect())
     }
     fn allocate(&self) -> Result<String> {
@@ -363,5 +373,135 @@ mod tests {
         remote.objects.borrow_mut().remove("proof");
         assert!(exchange(&q, &a, &binding, &key, &remote, Direction::Both).is_err());
         assert_eq!(remote.next.get(), 0);
+    }
+}
+
+/// Revision-aware cache shared by selected adapters. Missing revisions always fetch.
+/// Proof is deliberately fetched before listing; cached history never substitutes for key/account validation.
+pub struct CachedObjects<'a, R> {
+    pub remote: &'a R,
+    pub root: &'a Path,
+    revisions: std::cell::RefCell<BTreeMap<String, Option<String>>>,
+}
+#[derive(Serialize, Deserialize)]
+struct Cached {
+    revision: String,
+    bundle: Bundle,
+}
+impl<'a, R: Objects> CachedObjects<'a, R> {
+    pub fn new(remote: &'a R, root: &'a Path) -> Result<Self> {
+        storage::directory(root)?;
+        Ok(Self {
+            remote,
+            root,
+            revisions: Default::default(),
+        })
+    }
+}
+impl<R: Objects> Objects for CachedObjects<'_, R> {
+    fn ids(&self, folder: &str) -> Result<Vec<String>> {
+        let revisions = self.remote.revisions(folder)?;
+        *self.revisions.borrow_mut() = revisions.iter().cloned().collect();
+        Ok(revisions.into_iter().map(|(id, _)| id).collect())
+    }
+    fn allocate(&self) -> Result<String> {
+        self.remote.allocate()
+    }
+    fn put(&self, folder: &str, id: &str, key: &SpaceKey, bundle: &Bundle) -> Result<()> {
+        self.remote.put(folder, id, key, bundle)
+    }
+    fn get(&self, folder: &str, id: &str, space: &str, key: &SpaceKey) -> Result<Bundle> {
+        let rev = self.revisions.borrow().get(id).cloned().flatten();
+        let path = self.root.join(format!(
+            "{}.json",
+            crate::sync::bundle::hash(format!("{folder}:{space}:{id}").as_bytes())
+        ));
+        if let Some(revision) = rev.as_ref() {
+            if path.exists() {
+                let cached: Cached = serde_json::from_slice(&storage::read(
+                    &path,
+                    crate::sync::bundle::MAX_WIRE + 4096,
+                )?)
+                .map_err(|_| "local_store_damaged")?;
+                if &cached.revision == revision {
+                    cached.bundle.validate()?;
+                    if cached.bundle.snapshot.space != space {
+                        return Err("space_mismatch".into());
+                    }
+                    return Ok(cached.bundle);
+                }
+            }
+        }
+        let bundle = self.remote.get(folder, id, space, key)?;
+        if let Some(revision) = rev {
+            storage::replace(
+                &path,
+                &serde_json::to_vec(&Cached {
+                    revision,
+                    bundle: bundle.clone(),
+                })
+                .map_err(|_| "invalid_bundle")?,
+            )?;
+        }
+        Ok(bundle)
+    }
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+    use std::cell::Cell;
+    struct Remote {
+        revision: Cell<u32>,
+        gets: Cell<u32>,
+    }
+    impl Objects for Remote {
+        fn ids(&self, _: &str) -> Result<Vec<String>> {
+            Ok(vec!["object".into()])
+        }
+        fn revisions(&self, _: &str) -> Result<Vec<(String, Option<String>)>> {
+            Ok(vec![(
+                "object".into(),
+                Some(self.revision.get().to_string()),
+            )])
+        }
+        fn allocate(&self) -> Result<String> {
+            unreachable!()
+        }
+        fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+            unreachable!()
+        }
+        fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+            self.gets.set(self.gets.get() + 1);
+            proof_bundle(space)
+        }
+    }
+    #[test]
+    fn changed_drive_revision_refetches_and_cache_survives_restart() {
+        let t = tempfile::tempdir().unwrap();
+        let key = SpaceKey::generate().unwrap();
+        let remote = Remote {
+            revision: Cell::new(1),
+            gets: Cell::new(0),
+        };
+        let cache = CachedObjects::new(&remote, t.path()).unwrap();
+        cache.ids("folder").unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        assert_eq!(remote.gets.get(), 1);
+        drop(cache);
+        let cache = CachedObjects::new(&remote, t.path()).unwrap();
+        cache.ids("folder").unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        assert_eq!(remote.gets.get(), 1);
+        remote.revision.set(2);
+        cache.ids("folder").unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        assert_eq!(remote.gets.get(), 2);
+        // Before a new listing (e.g. space-key proof), fetch rather than trust the disk cache.
+        drop(cache);
+        let cache = CachedObjects::new(&remote, t.path()).unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        assert_eq!(remote.gets.get(), 3);
     }
 }

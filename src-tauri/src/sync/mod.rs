@@ -620,3 +620,81 @@ fn capacity(objects: &BTreeMap<String, Bundle>) -> Result<()> {
     }
     Ok(())
 }
+
+/// Holds the already validated local history under the Replica's exclusive lock.
+/// Large native profile scans need not reread every previous object for every session.
+pub(crate) struct ExportBatch<'a> {
+    replica: &'a Replica,
+    objects: BTreeMap<String, Bundle>,
+    bytes: usize,
+}
+impl Replica {
+    pub(crate) fn export_batch(&self) -> Result<ExportBatch<'_>> {
+        let (objects, issues) = self.read_all()?;
+        if !issues.is_empty() {
+            return Err("local_store_damaged".into());
+        }
+        let (journal, invalid) = graph(&objects);
+        if !invalid.is_empty() || !journal.pending.is_empty() {
+            return Err("history_pending".into());
+        }
+        let bytes = objects
+            .values()
+            .try_fold(0usize, |n, b| b.bytes().map(|v| n + v.len()))?;
+        Ok(ExportBatch {
+            replica: self,
+            objects,
+            bytes,
+        })
+    }
+}
+impl ExportBatch<'_> {
+    pub(crate) fn export_from(
+        &mut self,
+        stream: Stream,
+        files: BTreeMap<String, String>,
+        base: Option<&str>,
+    ) -> Result<String> {
+        let entries = files
+            .into_iter()
+            .map(|(p, c)| (p, Entry::new(c)))
+            .collect::<BTreeMap<_, _>>();
+        let parents = if let Some(id) = base {
+            let old = self.objects.get(id).ok_or("unknown_baseline")?;
+            if old.snapshot.stream != stream {
+                return Err("invalid_baseline".into());
+            }
+            if old.snapshot.files == entries {
+                return Ok(id.into());
+            }
+            vec![id.into()]
+        } else {
+            vec![]
+        };
+        let b = Bundle::new(Snapshot {
+            schema: 1,
+            space: self.replica.identity.space.clone(),
+            device: self.replica.identity.device.clone(),
+            stream,
+            parents,
+            files: entries,
+        })?;
+        if self.objects.contains_key(&b.id) {
+            return Ok(b.id);
+        }
+        let wire = b.bytes()?;
+        if self.objects.len() + 1 > bundle::MAX_OBJECTS
+            || self.bytes + wire.len() > bundle::MAX_STORE
+        {
+            return Err("bundle_limit".into());
+        }
+        storage::immutable(
+            &self.replica.objects().join(format!("{}.json", b.id)),
+            &wire,
+        )?;
+        self.bytes += wire.len();
+        let id = b.id.clone();
+        self.objects.insert(id.clone(), b);
+        Ok(id)
+    }
+}

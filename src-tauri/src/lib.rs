@@ -2,6 +2,7 @@ mod amos_runtime;
 pub mod cloud;
 pub mod memory_adapter;
 mod model;
+mod native_sessions;
 mod runtime_status;
 pub mod sync;
 mod updates;
@@ -36,7 +37,13 @@ fn detect(settings: Option<&Settings>) -> Vec<Agent> {
     let home = dirs::home_dir().unwrap_or_default();
     let config = dirs::config_dir().unwrap_or_else(|| home.clone());
     let mut env = HashMap::new();
-    for key in ["CODEX_HOME", "PI_CODING_AGENT_DIR", "AGENT_MEMORY_HOME"] {
+    for key in [
+        "CODEX_HOME",
+        "CLAUDE_CONFIG_DIR",
+        "GROK_HOME",
+        "PI_CODING_AGENT_DIR",
+        "AGENT_MEMORY_HOME",
+    ] {
         if let Ok(v) = std::env::var(key) {
             if !v.is_empty() {
                 env.insert(key.into(), v);
@@ -189,6 +196,8 @@ pub fn run() {
             worker::sync_status,
             worker::sync_pause,
             worker::sync_now,
+            native_sessions::list_received_sessions,
+            native_sessions::restore_received_session,
             updates::update_status,
             updates::check_update,
             updates::install_update,

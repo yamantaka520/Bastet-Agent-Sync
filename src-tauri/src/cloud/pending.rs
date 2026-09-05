@@ -110,6 +110,7 @@ mod tests {
                 mime_type: "application/vnd.google-apps.folder".into(),
                 parents: vec![],
                 trashed: false,
+                version: None,
             })
         }
     }

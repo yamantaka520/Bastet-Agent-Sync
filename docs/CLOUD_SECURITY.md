@@ -24,7 +24,7 @@ XChaCha20-Poly1305 from RustCrypto encrypts the entire validated M2 Bundle with 
 
 Only envelope version, opaque space ID, nonce, ciphertext length and Drive metadata are visible to the cloud. Agent/profile/conversation names and logical content hashes are inside ciphertext. Random Drive object IDs name objects. Cloud operators can still observe sizes, counts and timing. Shared-key authentication does not identify individual authors: anyone holding the space key can forge another device's snapshot. This is not a signed per-device protocol or an independently audited product.
 
-The encoded envelope is bounded to 32 MiB and decrypted wire data to 16 MiB. Plaintext temporary crypto buffers and recovery/token wrapper values use zeroizing containers where practical; this does not promise erasure of every allocator, OS or library copy. M2's local replica remains plaintext. No claim of whole-disk encryption or encrypted local cache is made.
+The encoded envelope is bounded to 128 MiB and decrypted wire data to 64 MiB. Plaintext temporary crypto buffers and recovery/token wrapper values use zeroizing containers where practical; this does not promise erasure of every allocator, OS or library copy. M2's local replica remains plaintext. No claim of whole-disk encryption or encrypted local cache is made.
 
 ## API behavior and remaining integration
 
