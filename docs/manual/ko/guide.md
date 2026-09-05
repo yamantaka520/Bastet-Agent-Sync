@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.3.2
+## 0.4.0
 
-0.3.2은 로컬 대화와 Agent Memory OS를 동기화합니다. 소스를 선택하고 저장한 뒤 시작하세요. 수동 JSONL 내보내기는 필요 없습니다. Claude／Claude Code는 로컬 코딩 대화를, Codex／Work는 로컬 기록을 공유합니다. Agy는 SQLite를, Grok과 Pi는 기본 대화 파일을 사용합니다.
+0.4.0은 로컬 대화와 Agent Memory OS를 동기화합니다. 소스를 선택하고 저장한 뒤 시작하세요. 수동 JSONL 내보내기는 필요 없습니다. Claude／Claude Code는 로컬 코딩 대화를, Codex／Work는 로컬 기록을 공유합니다. Agy는 SQLite를, Grok과 Pi는 기본 대화 파일을 사용합니다.
 
 ## 설정
 
@@ -33,3 +33,7 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run tauri dev
 ```
+
+## 🐈 다운로드 및 설치
+
+[버전 및 다운로드](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)의 버전 번호를 누르면 OS별 직접 다운로드 링크가 표시됩니다. Windows는 누락된 WebView2를 내장 설치기로 설치하며 macOS는 시스템 WebKit을 사용합니다. Linux는 다운로드한 `sh install-linux.sh`로 apt/dnf 감지, 검증 및 의존성 설치를 수행합니다. Node.js와 Rust는 필요하지 않습니다. AMOS CLI와 Agent 로그인은 별도 설정이 필요합니다. macOS 공증 및 Windows Authenticode 서명이 없어 OS 확인이 표시될 수 있습니다.

@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.3.2
+## 0.4.0
 
-0.3.2 はローカル会話と Agent Memory OS を同期します。ソースを選択、保存して開始します。手動 JSONL 出力は不要です。Claude／Claude Code はローカル開発会話、Codex／Work はローカル記録を共有します。Agy は SQLite、Grok と Pi はネイティブ会話ファイルを使用します。
+0.4.0 はローカル会話と Agent Memory OS を同期します。ソースを選択、保存して開始します。手動 JSONL 出力は不要です。Claude／Claude Code はローカル開発会話、Codex／Work はローカル記録を共有します。Agy は SQLite、Grok と Pi はネイティブ会話ファイルを使用します。
 
 ## 設定
 
@@ -33,3 +33,7 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run tauri dev
 ```
+
+## 🐈 ダウンロードとインストール
+
+[バージョンとダウンロード](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)のバージョン番号から各OSの直接リンクを開けます。Windowsは同梱WebView2を必要に応じて補い、macOSはシステムWebKitを使用します。Linuxはダウンロードした `sh install-linux.sh` でapt/dnf判定・検証・依存パッケージの導入を行います。Node.jsとRustは不要です。AMOS CLIとAgentログインは別途設定してください。macOS未公証・Windows Authenticode未署名のためOSの確認が表示される場合があります。

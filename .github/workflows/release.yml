@@ -1,27 +1,30 @@
-name: Signed update draft
+name: Desktop release packages
 on:
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: signed-release
+  group: desktop-release
   cancel-in-progress: false
 jobs:
   build:
     if: github.ref == 'refs/heads/main'
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
+            bundles: app,dmg
           - os: macos-latest
             target: x86_64-apple-darwin
+            bundles: app,dmg
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-          - os: ubuntu-24.04
+            bundles: nsis,msi
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            bundles: deb,rpm,appimage
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -33,24 +36,51 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: Linux dependencies
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: release-${{ matrix.target }}
+      - name: Linux build dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils rpm
       - run: npm ci
       - run: npm test
       - run: python scripts/check_docs.py
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
-      - name: Build signed draft assets
-        uses: tauri-apps/tauri-action@v1
+      - name: Build installers and signed updater archives
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config src-tauri/tauri.release.conf.json
+      - name: Collect packages
+        run: python scripts/release_assets.py collect --target ${{ matrix.target }}
+      - name: Check Linux package dependencies
+        if: runner.os == 'Linux'
+        run: |
+          dpkg-deb -I release-assets/*.deb
+          sudo apt-get install -y ./release-assets/*.deb
+          ldd /usr/bin/bastet-agent-sync | tee /tmp/bastet-libraries.txt
+          ! grep 'not found' /tmp/bastet-libraries.txt
+          rpm -qp --requires release-assets/*.rpm
+      - uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: Bastet Agent Sync v__VERSION__
-          releaseBody: Desktop preview. Check the versioned validation and limitations before installation. Agent auto-sync remains gated.
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: true
-          args: --target ${{ matrix.target }} --config src-tauri/tauri.release.conf.json
+          name: packages-${{ matrix.target }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+  draft:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: release-assets
+          merge-multiple: true
+      - name: Validate all platforms and create release metadata
+        run: python3 scripts/release_assets.py prepare
+      - name: Upload complete draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/release_assets.py draft

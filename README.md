@@ -5,6 +5,8 @@
 
 **Your agents. Your conversations. Across your computers.**
 
+[![Release](https://img.shields.io/github/v/release/yamantaka520/Bastet-Agent-Sync)](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)
+
 ![Stage](https://img.shields.io/badge/stage-M3%20preview-orange)
 ![Platforms](https://img.shields.io/badge/targets-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
@@ -14,7 +16,7 @@
 
 A local-first desktop companion for synchronizing agent settings, skills, memory and conversations through Google Drive. Part of the Bastet family.
 
-> **0.3.2 — local conversation sync preview.** Selected local sources now capture compressed native history and exchange it through encrypted Drive objects. Missing sessions are added automatically; existing different versions remain conflicts. AMOS retains its official backup/merge. Cloud chats, cloud Work, full settings/skills, external attachments and physical two-device acceptance remain open. [Current support](docs/NATIVE_SESSIONS.md) · [Evidence](docs/VALIDATION.md).
+> **0.4.0 — local conversation sync preview.** Selected local sources now capture compressed native history and exchange it through encrypted Drive objects. Missing sessions are added automatically; existing different versions remain conflicts. AMOS retains its official backup/merge. Cloud chats, cloud Work, full settings/skills, external attachments and physical two-device acceptance remain open. [Current support](docs/NATIVE_SESSIONS.md) · [Evidence](docs/VALIDATION.md).
 
 M3 preview adds a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 

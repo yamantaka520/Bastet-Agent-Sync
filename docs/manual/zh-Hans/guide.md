@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.3.2
+## 0.4.0
 
-0.3.2 支持本地对话与 Agent Memory OS 同步。勾选来源、保存后启动，无需手动导出 JSONL。Claude／Claude Code 共用本地编程对话；Codex／Work 共用本地记录。Agy 使用 SQLite 快照；Grok、Pi 使用原生对话文件。
+0.4.0 支持本地对话与 Agent Memory OS 同步。勾选来源、保存后启动，无需手动导出 JSONL。Claude／Claude Code 共用本地编程对话；Codex／Work 共用本地记录。Agy 使用 SQLite 快照；Grok、Pi 使用原生对话文件。
 
 ## 设置
 
@@ -33,3 +33,7 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run tauri dev
 ```
+
+## 🐈 下载与安装
+
+[版本与下载](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)：点击版本号，在 Release notes 下载对应系统安装包。Windows 内置 WebView2 并检测补装；macOS 使用系统 WebKit；Linux 运行下载的 `sh install-linux.sh` 自动选择 apt/dnf、校验并补齐依赖。无需 Node.js 或 Rust。AMOS CLI 和 Agent 账号需另行设置。macOS 未公证、Windows 无 Authenticode，可能显示系统信任提示。

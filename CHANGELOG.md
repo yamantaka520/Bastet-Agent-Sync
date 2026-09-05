@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 — first public installers
+
+- Four architecture targets across macOS, Windows and Linux; release notes link directly to every installer.
+- Embedded offline WebView2, static Windows CRT, declared Linux dependencies and checksum-verified apt/dnf installer.
+- Complete-platform draft gate, signed updater manifest and SHA256SUMS; five-language installation guidance.
+
+
 ## 0.3.2 — Independent large-source capacity
 
 - Apply the 2 GiB union limit per selected agent, so an unrelated large conversation source does not consume AMOS/Pi/Agy's budget.

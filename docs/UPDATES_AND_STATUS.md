@@ -18,7 +18,7 @@ The fixed feed is `https://github.com/yamantaka520/Bastet-Agent-Sync/releases/la
 
 ## Release operations
 
-`.github/workflows/release.yml` is a manual, main-branch-only signed draft workflow. It builds macOS arm64/x64, Windows x64 and Linux x64 serially to avoid concurrent update-manifest overwrites. It uses `tauri.release.conf.json` to produce updater archives/signatures and a merged `latest.json`, then leaves the release **draft** for artifact review. Normal pushes do not publish or install anything. After verifying all platform packages and signatures, publish that draft to make the feed available. Do not publish a partially completed matrix.
+[Release notes template](RELEASE_NOTES.md) documents installation and support boundaries. `.github/workflows/release.yml` is a manual, main-branch-only signed draft workflow. It builds macOS arm64/x64, Windows x64 and Linux x64 independently, then validates all packages in one final job. It uses `tauri.release.conf.json` to produce updater archives/signatures and a merged `latest.json`, then leaves the release **draft** for artifact review. Normal pushes do not publish or install anything. After verifying all platform packages and signatures, publish that draft to make the feed available. Do not publish a partially completed matrix.
 
 The updater public key is checked in. The private key is excluded from Git and stored in the repository's encrypted `TAURI_SIGNING_PRIVATE_KEY` Actions secret; keep its local backup protected. Never put it into Markdown, logs or the notebook. Update signatures are separate from Apple notarization and Windows Authenticode. The draft pipeline currently uses macOS ad-hoc signing; production OS signing/notarization is not claimed.
 

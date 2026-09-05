@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.3.2
+## 0.4.0
 
-0.3.2 syncs local conversations and Agent Memory OS. Select sources, save and Start; manual JSONL export is unnecessary. Claude/Claude Code share local coding history; Codex/Work share local rollout storage. Agy uses SQLite snapshots; Grok and Pi use native session files.
+0.4.0 syncs local conversations and Agent Memory OS. Select sources, save and Start; manual JSONL export is unnecessary. Claude/Claude Code share local coding history; Codex/Work share local rollout storage. Agy uses SQLite snapshots; Grok and Pi use native session files.
 
 ## Setup
 
@@ -33,3 +33,7 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --locked
 npm run tauri dev
 ```
+
+## 🐈 Download and install
+
+[Versions and downloads](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest): click the version for direct installer links in its release notes. Windows detects and installs missing embedded WebView2; macOS uses system WebKit; Linux users can run the downloaded `sh install-linux.sh` for apt/dnf detection, checksums and dependency installation. Node.js and Rust are unnecessary. Configure AMOS CLI and agent accounts separately. macOS is not notarized and Windows has no Authenticode certificate; OS trust prompts may appear.

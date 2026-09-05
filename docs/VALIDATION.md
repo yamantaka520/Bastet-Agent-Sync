@@ -1,5 +1,10 @@
 # Validation
 
+## 0.4.0 release packaging — 2026-09-06
+
+- Release packaging is under validation. Four target builds must complete before a draft is created; publication follows artifact review. Windows embeds WebView2 and a static CRT; Linux install tests verify declared dependencies and linked libraries.
+- Packaging does not establish all-agent physical two-device continuation or OS signing/notarization. Previous native sync evidence remains below.
+
 ## 0.3.2 capacity follow-up — 2026-09-05
 
 - Optimized macOS build `e9e3268` and a separate staged `.app` bundle passed; bundle version and executable equality were checked. The running 0.3.1 bundle was not replaced. [0.3.2 CI 33971964621](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33971964621) is in progress at capture.

@@ -1,6 +1,50 @@
 {
   "bundle": {
     "createUpdaterArtifacts": true,
-    "macOS": { "signingIdentity": "-" }
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "12.0"
+    },
+    "windows": {
+      "webviewInstallMode": {
+        "type": "offlineInstaller",
+        "silent": true
+      },
+      "allowDowngrades": false,
+      "nsis": {
+        "languages": [
+          "English",
+          "TradChinese",
+          "SimpChinese",
+          "Japanese",
+          "Korean"
+        ],
+        "displayLanguageSelector": true
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1",
+          "libsecret-1-0",
+          "gnome-keyring",
+          "ca-certificates",
+          "xdg-utils"
+        ]
+      },
+      "rpm": {
+        "depends": [
+          "webkit2gtk4.1",
+          "gtk3",
+          "libayatana-appindicator-gtk3",
+          "libsecret",
+          "gnome-keyring",
+          "ca-certificates",
+          "xdg-utils"
+        ]
+      }
+    }
   }
 }
