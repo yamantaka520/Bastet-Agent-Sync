@@ -6,8 +6,8 @@ import unittest
 from unittest.mock import patch
 import release_assets as release
 
-
 class ReleaseAssetsTests(unittest.TestCase):
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -19,7 +19,7 @@ class ReleaseAssetsTests(unittest.TestCase):
     def fixtures(self):
         for platform, suffixes in release.TARGETS.values():
             for suffix in suffixes:
-                (self.out / release.asset(platform, suffix)).write_text('synthetic fixture')
+                (self.out / release.asset(platform, suffix)).write_text('synthetic fixture', encoding='utf-8', newline='\n')
 
     def test_missing_target_prevents_manifest(self):
         self.fixtures()
@@ -30,7 +30,7 @@ class ReleaseAssetsTests(unittest.TestCase):
 
     def test_empty_signature_prevents_manifest(self):
         self.fixtures()
-        (self.out / release.asset('windows-x64', '.exe.sig')).write_text('')
+        (self.out / release.asset('windows-x64', '.exe.sig')).write_text('', encoding='utf-8', newline='\n')
         with self.assertRaises(RuntimeError):
             release.prepare()
         self.assertFalse((self.out / 'latest.json').exists())
@@ -38,22 +38,19 @@ class ReleaseAssetsTests(unittest.TestCase):
     def test_complete_release_links_to_existing_assets(self):
         self.fixtures()
         release.prepare()
-        manifest = json.loads((self.out / 'latest.json').read_text())
+        manifest = json.loads((self.out / 'latest.json').read_text(encoding='utf-8'))
         self.assertEqual(set(manifest['platforms']), {'darwin-aarch64', 'darwin-x86_64', 'windows-x86_64', 'linux-x86_64'})
         for entry in manifest['platforms'].values():
             self.assertTrue((self.out / entry['url'].split('/')[-1]).is_file())
-        notes = (self.out / 'release-notes.md').read_text()
+        notes = (self.out / 'release-notes.md').read_text(encoding='utf-8')
         self.assertNotIn('@DOWNLOADS@', notes)
         self.assertNotIn('@VERSION@', notes)
         for language in ['繁體中文', '简体中文', 'English', '日本語', '한국어']:
             self.assertIn(language, notes)
-        checksums = (self.out / 'SHA256SUMS').read_text()
+        checksums = (self.out / 'SHA256SUMS').read_text(encoding='utf-8')
         release.prepare()
-        # Every package is listed exactly once; manifests may carry a new timestamp.
         for platform, suffixes in release.TARGETS.values():
             for suffix in suffixes:
                 self.assertEqual(checksums.count('  ' + release.asset(platform, suffix) + '\n'), 1)
-
-
 if __name__ == '__main__':
     unittest.main()
