@@ -46,5 +46,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: reviewed-release
-          path: release-assets/*
+          path: |
+            release-assets/*.sig
+            release-assets/latest.json
+            release-assets/SHA256SUMS
+            release-assets/release-notes.md
+            release-assets/install-linux.sh
           if-no-files-found: error

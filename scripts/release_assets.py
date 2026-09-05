@@ -62,7 +62,11 @@ def draft():
     if existing.returncode == 0:
         raise RuntimeError('Release already exists; inspect it instead of overwriting')
     sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
-    subprocess.run(['gh', 'release', 'create', TAG, '--repo', REPO, '--target', sha, '--title', f'🐈 Bastet Agent Sync {TAG}', '--draft', '--notes-file', str(OUT / 'release-notes.md'), *[str(p) for p in sorted(OUT.iterdir()) if p.name != 'release-notes.md']], check=True)
+    subprocess.run(['git', 'fetch', 'origin', 'tag', TAG, '--depth=1'], check=True)
+    tagged = subprocess.check_output(['git', 'rev-parse', TAG + '^{commit}'], text=True).strip()
+    if tagged != sha:
+        raise RuntimeError('Release tag must identify the built commit')
+    subprocess.run(['gh', 'release', 'create', TAG, '--repo', REPO, '--verify-tag', '--title', f'🐈 Bastet Agent Sync {TAG}', '--draft', '--notes-file', str(OUT / 'release-notes.md'), *[str(p) for p in sorted(OUT.iterdir()) if p.name != 'release-notes.md']], check=True)
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('command', choices=['collect', 'prepare', 'draft'])
