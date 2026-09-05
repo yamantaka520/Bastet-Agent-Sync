@@ -1,7 +1,9 @@
 pub mod cloud;
 pub mod memory_adapter;
 mod model;
+mod runtime_status;
 pub mod sync;
+mod updates;
 use model::{Agent, Settings};
 use serde::Serialize;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
@@ -22,6 +24,11 @@ struct Bootstrap {
     settings: Option<Settings>,
     agents: Vec<Agent>,
     tray_available: bool,
+    version: String,
+    revision: String,
+}
+fn app_version() -> String {
+    env!("CARGO_PKG_VERSION").into()
 }
 fn detect(settings: Option<&Settings>) -> Vec<Agent> {
     let home = dirs::home_dir().unwrap_or_default();
@@ -49,6 +56,8 @@ fn bootstrap(state: State<AppState>) -> Result<Bootstrap, String> {
         settings,
         agents,
         tray_available: state.tray_available,
+        version: app_version(),
+        revision: env!("BASTET_BUILD_REVISION").into(),
     })
 }
 #[tauri::command]
@@ -110,6 +119,8 @@ async fn run_sync_diagnostic() -> Result<sync::diagnostic::Diagnostic, String> {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::Updates::default())
         .manage(cloud::desktop::CloudState::default())
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("settings.json");
@@ -166,6 +177,11 @@ pub fn run() {
             cloud::wizard_desktop::wizard_execute,
             cloud::desktop::wizard_cancel_login,
             memory_adapter::inspect_memory_export,
+            runtime_status::sync_preflight,
+            updates::update_status,
+            updates::check_update,
+            updates::install_update,
+            updates::restart_after_update,
             cloud::desktop::run_crypto_diagnostic
         ])
         .run(tauri::generate_context!())

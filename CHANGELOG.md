@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0 — Runtime status and signed updater
+
+- Replace permanently disabled Start with explicit native preflight and visible reasons; connect Drive status to wizard state. No automatic Agent worker is claimed.
+- Add emoji status, native version/build below the logo, and a version-setting/checking workflow.
+- Add signed online update checks, download/install progress and restart, with a protected signing key and manual four-platform draft release workflow. Published-feed and self-update acceptance remain pending.
+
+
 ## Imported Google authorization recovery — 2026-09-05
 
 - Verify imported OAuth configuration by reading it back before marking setup complete.

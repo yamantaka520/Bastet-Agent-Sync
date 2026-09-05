@@ -1,6 +1,6 @@
 [package]
 name = "bastet-agent-sync"
-version = "0.1.0"
+version = "0.2.0"
 description = "Bastet Agent Sync desktop companion"
 authors = ["Bastet contributors"]
 edition = "2021"
@@ -33,3 +33,4 @@ url = "2"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 webbrowser = "1"
 keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
+tauri-plugin-updater = "2"

@@ -1,5 +1,11 @@
 # Validation
 
+## 0.2.0 status and update interface — 2026-09-05
+
+- **55 Rust + 20 frontend = 75 local tests passed**. Formatting, Clippy with warnings denied and TypeScript/Vite passed; version consistency is now checked with documentation.
+- Native preflight prevents Drive completion from bypassing unavailable adapters. Frontend tests show blocking reasons, version/build identity and explicit update checks/install; an unpublished feed is not reported as up-to-date. Update artifact origin is restricted to this repository.
+- Update installation/restart tests use frontend fixtures, not actual installer replacement. The signed draft pipeline and Windows/Linux/macOS self-update remain unverified until real artifacts run. No Agent sync worker was added or simulated.
+
 ## Google browser authorization fix — 2026-09-05
 
 - **53 Rust + 17 frontend = 70 local tests passed**; Clippy, formatting, TypeScript/Vite and macOS build/bundle passed. New tests require import readback, bypass stale refresh on first authorization, preserve reconnect, and reject credential errors without bypassing the store.

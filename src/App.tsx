@@ -9,7 +9,9 @@ import {
   type Diagnostic,
 } from "./model";
 import MemoryPanel from "./MemoryPanel";
-import CloudPanel from "./CloudPanel";
+import CloudPanel, { type WizardView } from "./CloudPanel";
+import UpdatePanel from "./UpdatePanel";
+import { runtimeMessages } from "./runtime-i18n";
 import cat from "../assets/calico.png";
 
 export default function App() {
@@ -26,6 +28,12 @@ export default function App() {
     })),
   );
   const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
+  const [cloud, setCloud] = useState<WizardView | null>(null);
+  const [version, setVersion] = useState(__APP_VERSION__);
+  const [revision, setRevision] = useState("");
+  const [checkingStart, setCheckingStart] = useState(false);
+  const [blocked, setBlocked] = useState<string[] | null>(null);
+  const [unsupported, setUnsupported] = useState<string[]>([]);
   const [tray, setTray] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(!native);
@@ -34,6 +42,7 @@ export default function App() {
   const [dirty, setDirty] = useState(false);
   const [page, setPage] = useState<"setup" | "roadmap">("setup");
   const t = messages[settings.locale];
+  const rt = runtimeMessages[settings.locale];
   useEffect(() => {
     document.documentElement.lang = settings.locale;
   }, [settings.locale]);
@@ -43,11 +52,15 @@ export default function App() {
       settings: Settings | null;
       agents: Agent[];
       trayAvailable: boolean;
+      version?: string;
+      revision?: string;
     }>("bootstrap")
       .then((b) => {
         if (b.settings) setSettings(b.settings);
         setAgents(b.agents);
         setTray(b.trayAvailable);
+        setVersion(b.version ?? __APP_VERSION__);
+        setRevision(b.revision ?? "");
         setLoaded(true);
       })
       .catch((e) => setError(String(e)));
@@ -87,6 +100,33 @@ export default function App() {
       } else change("folder", path);
     });
   }
+  useEffect(() => {
+    if (blocked)
+      document
+        .getElementById("runtime-status")
+        ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [blocked]);
+  async function startSync() {
+    setBlocked(null);
+    setUnsupported([]);
+    if (dirty) {
+      setBlocked(["settings"]);
+      return;
+    }
+    setCheckingStart(true);
+    try {
+      const result = await invoke<{
+        reasons: string[];
+        unsupportedAgents: string[];
+      }>("sync_preflight");
+      setBlocked(result.reasons);
+      setUnsupported(result.unsupportedAgents);
+    } catch {
+      setBlocked(["check_failed"]);
+    } finally {
+      setCheckingStart(false);
+    }
+  }
   const errorText = error ? (t[error as keyof typeof t] ?? t.error) : "";
   return (
     <div className="shell">
@@ -97,6 +137,10 @@ export default function App() {
             BASTET<span className="brand-sub">AGENT SYNC</span>
           </span>
         </div>
+        <small className="build-version">
+          v{version}
+          {revision && ` · ${revision}`}
+        </small>
         <p className="tagline">{t.tagline}</p>
         <nav>
           <button
@@ -134,7 +178,7 @@ export default function App() {
               ))}
             </select>
           </label>
-          <small>0.1.0-dev</small>
+          <UpdatePanel native={native} locale={settings.locale} dirty={dirty} />
         </div>
       </aside>
       <main>
@@ -156,9 +200,40 @@ export default function App() {
             <b>{settings.selectedAgents.length.toString().padStart(2, "0")}</b>
           </span>
           <span>
-            {t.transport} <b>{t.notConnected}</b>
+            {t.transport} <b>{cloud?.wizard.complete ? rt[1] : rt[2]}</b>
           </span>
         </div>
+        <section
+          id="runtime-status"
+          className="panel runtime-panel"
+          aria-live="polite"
+        >
+          {native && <strong>{rt[0]}</strong>}
+          <p>{cloud?.connected ? rt[3] : rt[4]}</p>
+          <h2>{checkingStart ? rt[6] : blocked ? rt[7] : rt[5]}</h2>
+          <p>{rt[24]}</p>
+          {blocked && (
+            <ul>
+              {blocked.map((reason) => (
+                <li key={reason}>
+                  {
+                    (
+                      {
+                        settings: rt[8],
+                        sources: rt[9],
+                        drive: rt[10],
+                        adapters: rt[11],
+                        check_failed: t.error,
+                      } as Record<string, string>
+                    )[reason]
+                  }
+                  {reason === "adapters" &&
+                    unsupported.map((id) => names[id] ?? id).join(", ")}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
         {!native && <p className="notice">{t.preview}</p>}
         {error && (
           <p role="alert" className="error">
@@ -170,7 +245,11 @@ export default function App() {
             {t.saved}
           </p>
         )}
-        <CloudPanel native={native} locale={settings.locale} />
+        <CloudPanel
+          native={native}
+          locale={settings.locale}
+          onChange={setCloud}
+        />
         <MemoryPanel native={native} locale={settings.locale} />
         <section className="panel diagnostic-panel">
           <div className="section-heading">
@@ -443,7 +522,8 @@ export default function App() {
                 </button>
                 <button
                   className="primary"
-                  disabled
+                  disabled={!native || busy || !loaded || checkingStart}
+                  onClick={startSync}
                   aria-describedby="sync-reason"
                 >
                   {t.start} <span>→</span>

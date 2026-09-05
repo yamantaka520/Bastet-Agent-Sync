@@ -85,3 +85,9 @@ Now available as a seventh source. Select an existing memory home or use AGENT_M
 [Adapter contract](../../AGENT_MEMORY_OS.md)
 
 If authorization fails before the browser opens, the app now distinguishes imported-client access, saved-login access and browser-launch errors. Quit and reopen an updated development app; re-import the JSON if client access fails. Import must pass credential-store readback before step 1 completes.
+
+## 🐈 0.2.0
+
+Version 0.2.0 shows app/Drive/sync status with emoji and a version/build below the logo. Start now checks saved setup and explains why a source cannot run; live Agent workers remain unavailable. The sidebar checks online updates and offers signed download/install and restart. A release must be published before an update feed is available.
+
+[Status / Updates](../../UPDATES_AND_STATUS.md)

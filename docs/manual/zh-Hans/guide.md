@@ -85,3 +85,9 @@ Drive 向导分为登录设置、Google 授权、文件夹、加密／恢复和�
 [Adapter contract](../../AGENT_MEMORY_OS.md)
 
 授权时若浏览器尚未打开就失败，现在会区分导入设置、已保存登录与浏览器启动错误。更新开发版后请退出旧进程再打开；若无法读取 OAuth 设置，请重新导入 JSON。导入须通过凭据库读回检查才完成第一步。
+
+## 🐈 0.2.0
+
+0.2.0 加入 emoji 程序／Drive／同步状态，Logo 下显示版本及构建标识。启动按钮会检查已保存设置并说明阻挡原因；正式 Agent worker 仍未提供。侧栏可检查在线更新、下载验签安装及重新启动；需先发布 Release 才有可用更新列表。
+
+[Status / Updates](../../UPDATES_AND_STATUS.md)

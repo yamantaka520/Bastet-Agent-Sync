@@ -160,7 +160,7 @@ describe("isolated synchronization check", () => {
     expect(
       (screen.getByRole("button", { name: /Start sync/ }) as HTMLButtonElement)
         .disabled,
-    ).toBe(true);
+    ).toBe(false);
   });
   it("clears previous success before a failed retry", async () => {
     api.native = true;
@@ -191,4 +191,31 @@ describe("isolated synchronization check", () => {
     await screen.findByRole("alert");
     expect(screen.queryByText(messages.en.diagnosticPassed)).toBeNull();
   });
+});
+
+it("start runs native preflight and explains unavailable adapters", async () => {
+  api.native = true;
+  api.invoke.mockImplementation(async (command: string) => {
+    if (command === "bootstrap")
+      return {
+        settings: {
+          ...defaults("en"),
+          deviceName: "Fixture",
+          selectedAgents: ["codex"],
+        },
+        agents: [],
+        trayAvailable: true,
+        version: "0.2.0",
+        revision: "fixture",
+      };
+    if (command === "sync_preflight")
+      return { reasons: ["adapters"], unsupportedAgents: ["codex"] };
+  });
+  render(<App />);
+  expect(await screen.findByText("v0.2.0 · fixture")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Start sync/ }));
+  expect(
+    await screen.findByText(/Live export\/import is not available/),
+  ).toBeTruthy();
+  expect(api.invoke).toHaveBeenCalledWith("sync_preflight");
 });

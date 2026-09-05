@@ -85,3 +85,9 @@ Drive 精靈分為登入設定、Google 授權、資料夾、加密／恢復及�
 [Adapter contract](../../AGENT_MEMORY_OS.md)
 
 授權時若瀏覽器尚未開啟就失敗，現在會區分匯入設定、已保存登入與瀏覽器啟動錯誤。更新開發版後請結束舊程序再開啟；若無法讀取 OAuth 設定，請重新匯入 JSON。匯入須通過憑證庫讀回檢查才完成第一步。
+
+## 🐈 0.2.0
+
+0.2.0 加入 emoji 程式／Drive／同步狀態，Logo 下顯示版本及建置識別。啟動按鈕會檢查已儲存設定並說明阻擋原因；正式 Agent worker 仍未提供。側欄可檢查線上更新、下載驗簽安裝及重新啟動；需先發布 Release 才有可用更新清單。
+
+[Status / Updates](../../UPDATES_AND_STATUS.md)

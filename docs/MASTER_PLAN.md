@@ -46,3 +46,5 @@ Setup wizard, resume/restart and manual configuration: [Setup contract](SETUP_WI
 Integrated ChatGPT desktop scope: local Codex/Worktree tasks are in the adapter target; local ChatGPT Work tasks require format and resume validation. Cloud-backed chats remain a separate integration investigation. UI co-location does not establish portable local storage. See the dated addition in [requirements](../REQUIREMENTS.md).
 
 Agent Memory OS is an additional memory-service source with its own adapter, not a conversation agent. [Adapter contract and remaining gates](AGENT_MEMORY_OS.md).
+
+Version 0.2.0 adds [runtime preflight/status and a signed updater](UPDATES_AND_STATUS.md). This does not satisfy the missing live-store worker, scheduling or two-device gates.

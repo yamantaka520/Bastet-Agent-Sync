@@ -713,3 +713,11 @@ footer p {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+.build-version { display: block; margin: .75rem 0 0; color: var(--muted, #76665a); font-size: .72rem; overflow-wrap: anywhere; }
+.runtime-panel { border-left: 4px solid #cf9259; }
+.runtime-panel h2 { font-size: 1.15rem; margin: .5rem 0; }
+.runtime-panel li { margin: .35rem 0; }
+.update-panel { margin-top: 1rem; font-size: .78rem; }
+.update-panel button { display: block; margin-top: .5rem; width: 100%; }
+.update-panel p { overflow-wrap: anywhere; }

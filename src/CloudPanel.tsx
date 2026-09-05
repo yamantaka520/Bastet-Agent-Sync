@@ -42,12 +42,17 @@ export function nextStep(w: Wizard) {
 export default function CloudPanel({
   native,
   locale,
+  onChange,
 }: {
   native: boolean;
   locale: Locale;
+  onChange?: (view: WizardView | null) => void;
 }) {
   const t = wizardMessages[locale];
   const [view, setView] = useState<WizardView | null>(null);
+  useEffect(() => {
+    onChange?.(view);
+  }, [view, onChange]);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [cancelNote, setCancelNote] = useState(false);
@@ -67,6 +72,25 @@ export default function CloudPanel({
         })
         .catch((e) => setError(String(e)));
   }, [native]);
+  useEffect(() => {
+    if (!native || busy) return;
+    let active = true;
+    const timer = setInterval(() => {
+      void invoke<WizardView>("wizard_get")
+        .then((next) => {
+          if (active && next)
+            setView((previous) => ({
+              ...next,
+              folders: previous?.folders ?? [],
+            }));
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [native, busy]);
   async function run(work: () => Promise<WizardView | void>) {
     setBusy(true);
     setError("");

@@ -146,3 +146,7 @@ Grok help 指出對話恢復與程式碼快照恢復為不同操作。所有適�
 ## Agent Memory OS 同步來源（2026-09-05）
 
 使用者明確要求加入自有 Agent Memory OS。將其列為獨立的第七個同步來源，支援預設／環境變數／自訂目錄，使用正式 JSONL 同步封包，保留記憶、關聯、profile 與權限結構。禁止直接搬移執行中的資料庫。受信任匯入、刪除／ACL 預覽與備份須另行驗收；目前實作範圍見 [Agent Memory OS adapter](docs/AGENT_MEMORY_OS.md)。
+
+## 運行狀態、版本與更新（2026-09-05）
+
+使用者要求啟動同步有明確反應、emoji 運行／同步狀態、Logo 下方隨建置更新的版本號，以及可執行線上更新的按鈕。目前以 native 啟動前檢查呈現真實阻擋，正式 Agent worker 尚未啟用；更新使用簽章驗證流程。詳見 [Status and updates](docs/UPDATES_AND_STATUS.md)。
