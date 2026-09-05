@@ -4,7 +4,7 @@
 
 A desktop companion for keeping your agents and conversations with you.
 
-> Development has started. M1 provides the desktop foundation; actual synchronization and cross-computer resume are not available yet.
+> The snapshot core is implemented. Click **Run isolated check** in the desktop app to transfer synthetic text between two temporary replicas and a shared folder, preserve two branches, repeat without extra transfers and recover after reopening. The check does not access selected agents or the Drive folder.
 
 ## Planned setup
 
@@ -16,7 +16,7 @@ A desktop companion for keeping your agents and conversations with you.
 
 ## Current foundation
 
-Discover candidate data directories without reading conversations. Choose a local folder and save preferences. The sync action remains unavailable until the engine is implemented. Browser preview cannot access native functionality.
+Discover candidate data directories without reading conversations. Choose a local folder and save preferences. Native agent sync remains unavailable until the cloud connection and adapters are verified. Browser preview cannot access native functionality.
 
 ## Conversation continuity
 
@@ -45,3 +45,11 @@ Windows/Linux builds and actual tray behavior require verification. No cloud log
 ## References
 
 [Master plan](../../MASTER_PLAN.md) · [Validation](../../VALIDATION.md) · [Requirements](../../../REQUIREMENTS.md) · [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)
+
+## M2: isolated core check
+
+The snapshot core is implemented. Click **Run isolated check** in the desktop app to transfer synthetic text between two temporary replicas and a shared folder, preserve two branches, repeat without extra transfers and recover after reopening. The check does not access selected agents or the Drive folder.
+
+This is not native agent synchronization. Google Drive login, encrypted transport, native session restoration and scheduling remain pending. The v1 core accepts prepared text files only, preserves all versions and does not propagate deletions.
+
+[M2 details](../../SNAPSHOT_PROTOCOL.md)

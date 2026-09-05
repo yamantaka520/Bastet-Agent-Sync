@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { detectLocale, languages, messages, type Locale } from "./i18n";
-import { defaults, names, type Agent, type Settings } from "./model";
+import {
+  defaults,
+  names,
+  type Agent,
+  type Settings,
+  type Diagnostic,
+} from "./model";
 import cat from "../assets/calico.png";
 
 export default function App() {
@@ -17,6 +23,7 @@ export default function App() {
       custom: false,
     })),
   );
+  const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
   const [tray, setTray] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(!native);
@@ -161,6 +168,52 @@ export default function App() {
             {t.saved}
           </p>
         )}
+        <section className="panel diagnostic-panel">
+          <div className="section-heading">
+            <div>
+              <h2>{t.diagnostic}</h2>
+              <p>{t.diagnosticHint}</p>
+            </div>
+            <button
+              disabled={!native || busy || !loaded}
+              onClick={() =>
+                action(async () => {
+                  setDiagnostic(null);
+                  const result = await invoke<Diagnostic>(
+                    "run_sync_diagnostic",
+                  );
+                  if (!result?.verified) throw "diagnostic_failed";
+                  setDiagnostic(result);
+                })
+              }
+            >
+              {busy ? t.busy : t.runDiagnostic}
+            </button>
+          </div>
+          {diagnostic && (
+            <div role="status">
+              <strong>{t.diagnosticPassed}</strong>
+              <dl className="diagnostic-results">
+                <div>
+                  <dt>{t.transferred}</dt>
+                  <dd>{diagnostic.transferred}</dd>
+                </div>
+                <div>
+                  <dt>{t.branches}</dt>
+                  <dd>{diagnostic.preservedBranches}</dd>
+                </div>
+                <div>
+                  <dt>{t.repeated}</dt>
+                  <dd>{diagnostic.repeatTransfers}</dd>
+                </div>
+                <div>
+                  <dt>{t.recovered}</dt>
+                  <dd>{diagnostic.recoveredObjects}</dd>
+                </div>
+              </dl>
+            </div>
+          )}
+        </section>
         {page === "roadmap" ? (
           <section className="panel">
             <h2>{t.roadmap}</h2>

@@ -1,4 +1,5 @@
 mod model;
+pub mod sync;
 use model::{Agent, Settings};
 use serde::Serialize;
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
@@ -98,6 +99,13 @@ fn save_settings(
     *current = Some(settings);
     Ok(())
 }
+#[tauri::command]
+async fn run_sync_diagnostic() -> Result<sync::diagnostic::Diagnostic, String> {
+    tauri::async_runtime::spawn_blocking(sync::diagnostic::run)
+        .await
+        .map_err(|_| "diagnostic_failed".to_string())?
+}
+
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
@@ -147,7 +155,8 @@ pub fn run() {
             bootstrap,
             scan_agents,
             choose_folder,
-            save_settings
+            save_settings,
+            run_sync_diagnostic
         ])
         .run(tauri::generate_context!())
         .expect("desktop runtime failed");

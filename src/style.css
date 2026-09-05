@@ -550,3 +550,30 @@ footer p {
     gap: 0;
   }
 }
+
+.diagnostic-panel {
+  background: #f5f7ef;
+}
+.diagnostic-panel .section-heading p {
+  max-width: 620px;
+  margin-bottom: 0;
+}
+.diagnostic-panel [role="status"] {
+  margin-top: 18px;
+  font-size: 12px;
+  color: #657348;
+}
+.diagnostic-results {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 0;
+}
+.diagnostic-results dt {
+  font-size: 11px;
+  color: #7c816d;
+}
+.diagnostic-results dd {
+  margin: 6px 0 0;
+  font-size: 22px;
+}

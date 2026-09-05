@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: development started. This is the implementation roadmap; REQUIREMENTS.md preserves the detailed product requirements. User-facing plan and guide: [English](manual/en/guide.md) · [繁體中文](manual/zh-Hant/guide.md) · [简体中文](manual/zh-Hans/guide.md) · [日本語](manual/ja/guide.md) · [한국어](manual/ko/guide.md).
+Status: M2 snapshot core implemented; native agent transport remains gated. This is the implementation roadmap; REQUIREMENTS.md preserves the detailed product requirements. User-facing plan and guide: [English](manual/en/guide.md) · [繁體中文](manual/zh-Hant/guide.md) · [简体中文](manual/zh-Hans/guide.md) · [日本語](manual/ja/guide.md) · [한국어](manual/ko/guide.md).
 
 ## Product
 
@@ -23,7 +23,7 @@ Use immutable, content-verified snapshots and a persistent local journal in the 
 | M4 | Versioned adapters and native conversation restore | Each agent tested independently across computers; attachments/project paths verified |
 | M5 | Scheduler, near-real-time, bidirectional UX, packaging and autostart | Three-platform install/tray/restart tests, signed distribution plan, locale QA |
 
-M1 can save setup choices but must not enable a pretend sync button. Start remains explicitly unavailable until a transport and snapshot adapter have passed their gates. CLI executables are not run automatically during discovery; presence does not establish version or compatibility.
+M1 saves setup choices. M2 adds a real filesystem diagnostic using isolated synthetic data; it never uses selected agent paths or the selected Drive folder. Neither enables a pretend agent sync button. Start remains explicitly unavailable until a transport and snapshot adapter have passed their gates. CLI executables are not run automatically during discovery; presence does not establish version or compatibility.
 
 ## Data boundaries
 
@@ -36,3 +36,5 @@ Root README follows Bastet's cat identity, badges, honest status and language na
 ## Open questions
 
 Exact Claude desktop import API; Codex desktop versus CLI session parity; Agy persistence; agent version compatibility; supported OS minimums; Google OAuth distribution credentials and shared-folder scopes; encryption recovery and release signing. These are validation work, not assumed capabilities.
+
+M2 protocol and precise limitations: [SNAPSHOT_PROTOCOL.md](SNAPSHOT_PROTOCOL.md). The journal is a rebuildable checkpoint backed by immutable objects. No deletion propagation, native import, encryption or background scheduling is included in the M2 core.

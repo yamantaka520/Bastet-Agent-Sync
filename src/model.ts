@@ -37,3 +37,11 @@ export const defaults = (locale: Locale): Settings => ({
   intervalSeconds: 60,
   closeToTray: false,
 });
+
+export type Diagnostic = {
+  verified: boolean;
+  transferred: number;
+  preservedBranches: number;
+  repeatTransfers: number;
+  recoveredObjects: number;
+};

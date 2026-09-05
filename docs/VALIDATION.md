@@ -1,4 +1,16 @@
-# Validation — M1 desktop foundation
+# Validation
+
+## M2 snapshot core — 2026-09-05
+
+- Local Rust: **23 tests passed** (6 foundation + 17 snapshot/transport tests; the Unix symlink case is not run on Windows).
+- Frontend: **7 tests passed**, including invoking only the isolated native diagnostic and clearing stale success on a failed retry.
+- TypeScript/Vite build, rustfmt, Clippy with warnings denied, and documentation checks passed.
+- macOS debug `.app` built and launched. Pressing the native **Run isolated check** produced: 2 publication/reception operations, 2 preserved branches, 0 additional transfers on repeat, and 3 objects recovered on reopen. The UI explicitly labels this as a core check, not cloud sync.
+- Test coverage includes child-before-parent arrival, partial/corrupt bundles and retries, checkpoint loss, stale conflict resolution, opposite-direction traffic prevention, Unicode text, oversized files, invalid paths, hash mismatch, wrong space, cross-stream parents, symlinks, no deletion propagation and exclusive replica locks.
+- M1 Windows CI failed while decoding five-language Markdown with the host's default cp1252 encoding. `check_docs.py` now reads UTF-8 explicitly. Three-platform results for M2 will be recorded after the pushed run completes.
+- No native agent profile, selected Drive folder, login or real conversation was used by the diagnostic. No power-loss or separate-physical-computer test is claimed. [Protocol and remaining gates](SNAPSHOT_PROTOCOL.md).
+
+## Historical M1 desktop foundation
 
 Verified locally on macOS, 2026-09-05. This is a development build, not a synchronization release.
 

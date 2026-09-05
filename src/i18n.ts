@@ -7,10 +7,22 @@ export const languages = {
 };
 export type Locale = keyof typeof languages;
 const en = {
+  diagnostic: "Check the sync core",
+  diagnosticHint:
+    "Run a real folder round trip with synthetic data in temporary, isolated stores. Your selected agents and Drive folder are not accessed.",
+  runDiagnostic: "Run isolated check",
+  diagnosticPassed: "Core check passed — not a cloud sync.",
+  transferred: "Published + received",
+  branches: "Preserved branches",
+  repeated: "Repeat transfers",
+  recovered: "Recovered objects",
+  diagnostic_failed:
+    "The isolated core check failed. No agent data was accessed.",
+
   tagline: "A little closer. On every computer.",
   setup: "Your sync space",
   intro: "Bring your agents along. Start by choosing what belongs here.",
-  foundation: "Desktop foundation · M1",
+  foundation: "Snapshot core · M2",
   preview: "Browser preview — open the desktop app for local features.",
   source: "Choose your agents",
   sourceHint:
@@ -47,7 +59,7 @@ const en = {
   dirty: "Unsaved changes",
   start: "Start sync",
   pending:
-    "Sync engine comes next. No agent data is transferred in this version.",
+    "The snapshot core is testable. Agent adapters and cloud connection are still pending; no agent data is transferred.",
   overview: "Setup",
   roadmap: "What comes next",
   ready: "Selected agents",
@@ -74,10 +86,21 @@ const en = {
 } as const;
 type Messages = { [K in keyof typeof en]: string };
 const zhHant: Messages = {
+  diagnostic: "檢查同步核心",
+  diagnosticHint:
+    "在隔離的暫存目錄中，以合成資料執行真正的檔案傳輸。不會存取你選擇的 Agent 與 Drive 目錄。",
+  runDiagnostic: "執行隔離檢查",
+  diagnosticPassed: "核心檢查通過 — 這不是雲端同步。",
+  transferred: "發布＋接收",
+  branches: "保留分支",
+  repeated: "重複傳輸",
+  recovered: "重建物件",
+  diagnostic_failed: "隔離檢查失敗，未存取 Agent 資料。",
+
   tagline: "每次換電腦，都更靠近熟悉的工作。",
   setup: "你的同步空間",
   intro: "帶著 Agent 一起走。先選擇要同步的夥伴。",
-  foundation: "桌面基礎 · M1",
+  foundation: "同步核心 · M2",
   preview: "瀏覽器預覽 — 請開啟桌面程式使用本機功能。",
   source: "選擇你的 Agent",
   sourceHint: "目前只偵測候選資料夾，對話相容性尚未驗證。",
@@ -111,7 +134,8 @@ const zhHant: Messages = {
   saved: "設定已儲存在這台電腦。",
   dirty: "尚未儲存的變更",
   start: "啟動同步",
-  pending: "同步引擎將於下一階段加入。本版本不傳輸 Agent 資料。",
+  pending:
+    "快照核心已可驗證；Agent 適配器與雲端連線尚未完成，本版本不傳輸 Agent 資料。",
   overview: "設定",
   roadmap: "接下來",
   ready: "已選 Agent",
@@ -135,10 +159,21 @@ const zhHant: Messages = {
   tray_unavailable: "系統匣無法使用。",
 };
 const zhHans: Messages = {
+  diagnostic: "检查同步核心",
+  diagnosticHint:
+    "在隔离的临时目录中，用合成数据执行真实文件传输。不會访问所选的 Agent 和 Drive 目录。",
+  runDiagnostic: "运行隔离检查",
+  diagnosticPassed: "核心检查通过 — 这不是云端同步。",
+  transferred: "发布＋接收",
+  branches: "保留分支",
+  repeated: "重复传输",
+  recovered: "恢复对象",
+  diagnostic_failed: "隔离检查失败，未访问 Agent 数据。",
+
   tagline: "每次换电脑，都更贴近熟悉的工作。",
   setup: "你的同步空间",
   intro: "带着 Agent 一起走。先选择要同步的伙伴。",
-  foundation: "桌面基础 · M1",
+  foundation: "同步核心 · M2",
   preview: "浏览器预览 — 请打开桌面应用使用本地功能。",
   source: "选择你的 Agent",
   sourceHint: "目前仅检测候选数据文件夹，尚未验证对话兼容性。",
@@ -172,7 +207,8 @@ const zhHans: Messages = {
   saved: "设置已保存在这台电脑。",
   dirty: "未保存的更改",
   start: "启动同步",
-  pending: "同步引擎将在下一阶段加入。本版本不传输 Agent 数据。",
+  pending:
+    "快照核心已可验证；Agent 适配器和云端连接尚未完成，本版本不传输 Agent 数据。",
   overview: "设置",
   roadmap: "接下来",
   ready: "已选 Agent",
@@ -196,10 +232,22 @@ const zhHans: Messages = {
   tray_unavailable: "系统托盘不可用。",
 };
 const ja: Messages = {
+  diagnostic: "同期コアの検証",
+  diagnosticHint:
+    "隔離した一時フォルダーでサンプルデータを実際に転送します。選択したエージェントや Drive フォルダーにはアクセスしません。",
+  runDiagnostic: "隔離テストを実行",
+  diagnosticPassed: "コアの検証に成功しました。クラウド同期ではありません。",
+  transferred: "公開＋受信",
+  branches: "保持した分岐",
+  repeated: "重複転送",
+  recovered: "復元したオブジェクト",
+  diagnostic_failed:
+    "隔離テストに失敗しました。エージェントのデータにはアクセスしていません。",
+
   tagline: "いつもの仕事を、どのコンピューターでも。",
   setup: "同期スペース",
   intro: "エージェントと一緒に。まず同期する相手を選びましょう。",
-  foundation: "デスクトップ基盤 · M1",
+  foundation: "同期コア · M2",
   preview:
     "ブラウザープレビュー — ローカル機能にはデスクトップアプリが必要です。",
   source: "エージェントを選択",
@@ -236,7 +284,7 @@ const ja: Messages = {
   dirty: "未保存の変更",
   start: "同期を開始",
   pending:
-    "同期エンジンは次の段階で追加します。この版ではデータを転送しません。",
+    "スナップショットのコアを検証できます。アダプターとクラウド接続は未実装で、エージェントのデータは転送しません。",
   overview: "設定",
   roadmap: "今後の予定",
   ready: "選択済み",
@@ -261,10 +309,22 @@ const ja: Messages = {
   tray_unavailable: "トレイを利用できません。",
 };
 const ko: Messages = {
+  diagnostic: "동기화 코어 확인",
+  diagnosticHint:
+    "격리된 임시 폴더에서 합성 데이터로 실제 파일 전송을 실행합니다. 선택한 에이전트와 Drive 폴더에는 접근하지 않습니다.",
+  runDiagnostic: "격리 테스트 실행",
+  diagnosticPassed: "코어 검증 통과 — 클라우드 동기화가 아닙니다.",
+  transferred: "게시＋수신",
+  branches: "보존된 분기",
+  repeated: "반복 전송",
+  recovered: "복구된 개체",
+  diagnostic_failed:
+    "격리 테스트에 실패했습니다. 에이전트 데이터에는 접근하지 않았습니다.",
+
   tagline: "어느 컴퓨터에서나 익숙한 작업을.",
   setup: "동기화 공간",
   intro: "에이전트와 함께하세요. 먼저 동기화할 대상을 선택하세요.",
-  foundation: "데스크톱 기반 · M1",
+  foundation: "동기화 코어 · M2",
   preview: "브라우저 미리 보기 — 로컬 기능은 데스크톱 앱에서 사용하세요.",
   source: "에이전트 선택",
   sourceHint: "후보 폴더만 감지합니다. 대화 호환성은 아직 검증하지 않았습니다.",
@@ -301,7 +361,7 @@ const ko: Messages = {
   dirty: "저장하지 않은 변경 사항",
   start: "동기화 시작",
   pending:
-    "동기화 엔진은 다음 단계에 추가됩니다. 이 버전은 데이터를 전송하지 않습니다.",
+    "스냅샷 코어를 검증할 수 있습니다. 어댑터와 클라우드 연결은 아직 구현되지 않아 에이전트 데이터는 전송하지 않습니다.",
   overview: "설정",
   roadmap: "다음 단계",
   ready: "선택한 Agent",

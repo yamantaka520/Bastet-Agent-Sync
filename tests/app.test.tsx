@@ -115,3 +115,77 @@ describe("locale and native setup contracts", () => {
     expect(screen.queryByText(messages.en.saved)).toBeNull();
   });
 });
+
+describe("isolated synchronization check", () => {
+  it("uses only the native synthetic diagnostic command and shows its results", async () => {
+    api.native = true;
+    api.invoke.mockImplementation(async (command: string) =>
+      command === "bootstrap"
+        ? {
+            settings: { ...defaults("en"), deviceName: "Test" },
+            agents: [],
+            trayAvailable: false,
+          }
+        : {
+            verified: true,
+            transferred: 2,
+            preservedBranches: 2,
+            repeatTransfers: 0,
+            recoveredObjects: 3,
+          },
+    );
+    render(<App />);
+    await waitFor(() =>
+      expect(
+        (
+          screen.getByRole("button", {
+            name: messages.en.runDiagnostic,
+          }) as HTMLButtonElement
+        ).disabled,
+      ).toBe(false),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: messages.en.runDiagnostic }),
+    );
+    expect(await screen.findByText(messages.en.diagnosticPassed)).toBeTruthy();
+    expect(api.invoke).toHaveBeenCalledWith("run_sync_diagnostic");
+    expect(
+      api.invoke.mock.calls.every(([name]) =>
+        ["bootstrap", "run_sync_diagnostic"].includes(name),
+      ),
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: /Start sync/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+  it("clears previous success before a failed retry", async () => {
+    api.native = true;
+    let runs = 0;
+    api.invoke.mockImplementation(async (command: string) => {
+      if (command === "bootstrap")
+        return { settings: defaults("en"), agents: [], trayAvailable: false };
+      if (runs++ === 0)
+        return {
+          verified: true,
+          transferred: 2,
+          preservedBranches: 2,
+          repeatTransfers: 0,
+          recoveredObjects: 3,
+        };
+      throw "diagnostic_failed";
+    });
+    render(<App />);
+    const button = screen.getByRole("button", {
+      name: messages.en.runDiagnostic,
+    });
+    await waitFor(() =>
+      expect((button as HTMLButtonElement).disabled).toBe(false),
+    );
+    fireEvent.click(button);
+    await screen.findByText(messages.en.diagnosticPassed);
+    fireEvent.click(button);
+    await screen.findByRole("alert");
+    expect(screen.queryByText(messages.en.diagnosticPassed)).toBeNull();
+  });
+});

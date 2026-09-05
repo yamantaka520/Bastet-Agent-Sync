@@ -5,7 +5,7 @@ root = Path(__file__).resolve().parents[1]
 files = [p for p in root.rglob('*.md') if not any(x in p.parts for x in ('node_modules', 'target', '.git'))]
 errors=[]
 for path in files:
-    text=path.read_text()
+    text=path.read_text(encoding="utf-8")
     if re.search(r'/Users/[^/\s`]+/|/home/(?!user[/\s])[^/\s`]+/',text): errors.append(f'{path.relative_to(root)}: personal path')
     for link in re.findall(r'\]\(([^)]+)\)',text):
         if '://' in link or link.startswith('#'): continue

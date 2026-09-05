@@ -5,7 +5,7 @@
 
 **Your agents. Your conversations. Across your computers.**
 
-![Stage](https://img.shields.io/badge/stage-M1%20development-orange)
+![Stage](https://img.shields.io/badge/stage-M2%20development-orange)
 ![Platforms](https://img.shields.io/badge/targets-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
@@ -14,7 +14,7 @@
 
 A local-first desktop companion for synchronizing agent settings, skills, memory and conversations through Google Drive. Part of the Bastet family.
 
-> **Development, not a sync release.** The desktop foundation now includes five-language setup, candidate agent discovery, local folder selection and saved preferences. The macOS app builds and 11 local tests pass. Cloud transfer, bidirectional synchronization and native cross-computer conversation restoration are planned and not yet verified. [Evidence and gaps](docs/VALIDATION.md).
+> **Development, not a sync release.** The desktop includes five-language setup and an isolated snapshot-core check. The M2 core preserves divergent histories, verifies hashes and recovers its index after interruption. Real agent transport is not enabled. Cloud transfer, bidirectional synchronization and native cross-computer conversation restoration are planned and not yet verified. [Evidence and gaps](docs/VALIDATION.md).
 
 ## ✨ Planned experience
 
@@ -42,6 +42,7 @@ Install the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) fir
 
 - [Master plan](docs/MASTER_PLAN.md) and [detailed requirements (繁體中文)](REQUIREMENTS.md)
 - [Architecture decision](docs/adr/0001-desktop-foundation.md)
+- [Snapshot protocol](docs/SNAPSHOT_PROTOCOL.md)
 - [Validation](docs/VALIDATION.md) and [changelog](CHANGELOG.md)
 - [Brand asset provenance](assets/README.md)
 
