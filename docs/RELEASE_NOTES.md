@@ -48,4 +48,4 @@ macOS 공증과 Windows Authenticode 서명은 없어 OS 신뢰 확인이 표시
 
 macOS에서 첫 실행이 차단되면 다운로드 출처를 확인하고 시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기에서 이 앱을 승인하세요. [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 
-[Support boundaries](https://github.com/yamantaka520/Bastet-Agent-Sync/blob/v@VERSION@/docs/NATIVE_SESSIONS.md) · [Validation](https://github.com/yamantaka520/Bastet-Agent-Sync/blob/v@VERSION@/docs/VALIDATION.md)
+[Support boundaries](https://github.com/yamantaka520/Bastet-Agent-Sync/blob/v@VERSION@/docs/NATIVE_SESSIONS.md) · [Validation](https://github.com/yamantaka520/Bastet-Agent-Sync/blob/main/docs/VALIDATION.md)

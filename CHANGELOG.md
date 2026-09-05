@@ -2,6 +2,8 @@
 
 ## 0.4.0 — first public installers
 
+Published 2026-09-06: [installers and five-language release notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.0). Nineteen assets, native installer smoke checks, seven update signatures and public download links verified.
+
 - Four architecture targets across macOS, Windows and Linux; release notes link directly to every installer.
 - Embedded offline WebView2, static Windows CRT, declared Linux dependencies and checksum-verified apt/dnf installer.
 - Complete-platform draft gate, signed updater manifest and SHA256SUMS; five-language installation guidance.

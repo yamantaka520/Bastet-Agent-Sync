@@ -8,7 +8,7 @@ Start validates saved settings and Drive wizard progress, then runs selected loc
 
 ## Current version identity
 
-The version below the logo comes from the native package, with a build Git revision; browser preview uses the package version. Use `python scripts/set_version.py 0.2.1` for the next release. Documentation checks enforce agreement between npm, lockfiles, Cargo and Tauri versions. A commit identifies a clean build; rebuild after committing so local development changes are included in the displayed revision.
+The version below the logo comes from the native package, with a build Git revision; browser preview uses the package version. Use `python scripts/set_version.py <version>` for the next release. Documentation checks enforce agreement between npm, lockfiles, Cargo and Tauri versions. A commit identifies a clean build; rebuild after committing so local development changes are included in the displayed revision.
 
 ## Online update
 
@@ -17,6 +17,8 @@ The sidebar provides Check for updates, Download and install, and Restart. Check
 The fixed feed is `https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest/download/latest.json`. Without a valid published release, the UI reports that no valid feed is available, not that the installed app is necessarily current. No release package has yet been installed through this new updater; install/restart UI tests use fixtures. Cross-platform self-update acceptance remains open.
 
 ## Release operations
+
+The first public [v0.4.0 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.0) includes all installer targets and a live update feed. Direct installer smoke tests passed; a real in-app upgrade between two released versions remains a separate acceptance check.
 
 [Release notes template](RELEASE_NOTES.md) documents installation and support boundaries. `.github/workflows/release.yml` is a manual, main-branch-only signed draft workflow. It builds macOS arm64/x64, Windows x64 and Linux x64 independently, then validates all packages in one final job. It uses `tauri.release.conf.json` to produce updater archives/signatures and a merged `latest.json`, then leaves the release **draft** for artifact review. Normal pushes do not publish or install anything. Before dispatch, push the version tag at the exact main commit through an authorized Git identity; draft creation verifies that tag instead of asking the Actions token to create a workflow-bearing reference. If the platform denies release API access, the signed workflow artifacts remain available for authorized CLI publication. After verifying all platform packages and signatures, publish that draft to make the feed available. Do not publish a partially completed matrix.
 
