@@ -1,5 +1,12 @@
 # Changelog
 
+## Imported Google authorization recovery — 2026-09-05
+
+- Verify imported OAuth configuration by reading it back before marking setup complete.
+- First authorization opens browser consent directly; reconnect retains the saved-login refresh route. Distinguish client, login-store and browser-launch failures in five languages.
+- macOS real-account smoke reached the Google callback and all five wizard steps completed; cross-platform and two-device acceptance remain open.
+
+
 ## Agent Memory OS adapter preview — 2026-09-05
 
 - Add Agent Memory OS as a seventh selectable source with environment/custom-path discovery.

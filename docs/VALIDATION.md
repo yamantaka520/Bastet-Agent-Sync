@@ -1,5 +1,11 @@
 # Validation
 
+## Google browser authorization fix — 2026-09-05
+
+- **53 Rust + 17 frontend = 70 local tests passed**; Clippy, formatting, TypeScript/Vite and macOS build/bundle passed. New tests require import readback, bypass stale refresh on first authorization, preserve reconnect, and reject credential errors without bypassing the store.
+- Native macOS smoke: the old UI showed a credential-store error before browser launch. The fixed app was built, launched, and its authorization button invoked. Browser callback success was observed, then the app showed a connected account and all five setup steps complete after the user's interaction. No account IDs, folder IDs, authorization codes or keys are reproduced in this record.
+- This confirms browser authorization and completed setup on one macOS host, not Windows/Linux keychain or two-device sync. The original OS-level credential error was not captured; an old running development image is a plausible contributing cause, not a proven root cause. Native tests were not repeated by rebuilding the running app.
+
 ## Agent Memory OS adapter — 2026-09-05
 
 - **51 Rust + 17 frontend = 68 local tests passed**. Clippy with warnings denied, formatting, TypeScript/Vite and documentation checks passed. Fixture tests cover discovery/selection persistence, two-replica transfer, encryption and byte-preserving restore, unsupported formats/versions/records and size limits. UI tests cover metadata-only results, cancellation/failure cleanup and browser isolation.

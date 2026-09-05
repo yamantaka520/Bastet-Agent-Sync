@@ -83,3 +83,5 @@ During Connect, you can cancel the browser authorization wait without losing sav
 Now available as a seventh source. Select an existing memory home or use AGENT_MEMORY_HOME. Export with the official AMOS CLI and use the JSONL inspection panel. Versions 1–3 are supported, up to 1 MiB. This preview preserves bundle contents but does not automatically export, publish to Drive or import into the live store. Local exports may contain private memories; tombstones and organization records require import review.
 
 [Adapter contract](../../AGENT_MEMORY_OS.md)
+
+If authorization fails before the browser opens, the app now distinguishes imported-client access, saved-login access and browser-launch errors. Quit and reopen an updated development app; re-import the JSON if client access fails. Import must pass credential-store readback before step 1 completes.

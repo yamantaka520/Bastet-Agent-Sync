@@ -68,14 +68,46 @@ fn parse_client(bytes: &[u8]) -> Result<ClientConfig> {
     config.validate().map_err(|_| "invalid_oauth_client")?;
     Ok(config)
 }
+fn save_client(bytes: &[u8], store: &impl SecretStore) -> Result<ClientConfig> {
+    let c = parse_client(bytes)?;
+    let raw = std::str::from_utf8(bytes).map_err(|_| "invalid_oauth_client")?;
+    let id = format!("wizard-client:{}", hash(c.id.as_bytes()));
+    store
+        .write(&id, raw)
+        .map_err(|_| "client_credentials_unavailable")?;
+    let saved = store
+        .read(&id)
+        .map_err(|_| "client_credentials_unavailable")?
+        .ok_or("client_credentials_unavailable")?;
+    if saved.as_str() != raw {
+        return Err("client_credentials_unavailable".into());
+    }
+    Ok(c)
+}
+// An explicit first authorization must not depend on reading a stale refresh token.
+fn login_token<T>(
+    authorized: bool,
+    refresh: impl FnOnce() -> Result<T>,
+    authorize: impl FnOnce() -> Result<T>,
+) -> Result<T> {
+    if !authorized {
+        return authorize();
+    }
+    match refresh() {
+        Ok(token) => Ok(token),
+        Err(e) if e == "reauth_required" => authorize(),
+        Err(e) => Err(e),
+    }
+}
 fn config(state: &Wizard) -> Result<ClientConfig> {
     let id = state.client_id.as_ref().ok_or("oauth_not_configured")?;
     let c = match state.client_source.as_deref() {
         Some("build") => build_config()?,
         Some("imported") => {
             let value = NativeStore
-                .read(&format!("wizard-client:{}", hash(id.as_bytes())))?
-                .ok_or("oauth_not_configured")?;
+                .read(&format!("wizard-client:{}", hash(id.as_bytes())))
+                .map_err(|_| "client_credentials_unavailable")?
+                .ok_or("client_credentials_unavailable")?;
             parse_client(value.as_bytes())?
         }
         _ => return Err("oauth_not_configured".into()),
@@ -237,9 +269,7 @@ pub async fn wizard_execute(
                     .pick_file();
                 if let Some(path) = chosen {
                     let bytes = Zeroizing::new(storage::read(&path, 65536)?);
-                    let c = parse_client(&bytes)?;
-                    let raw = std::str::from_utf8(&bytes).map_err(|_| "invalid_oauth_client")?;
-                    NativeStore.write(&format!("wizard-client:{}", hash(c.id.as_bytes())), raw)?;
+                    let c = save_client(&bytes, &NativeStore)?;
                     t.client(c.id, "imported")?;
                     *guard = None;
                 }
@@ -247,19 +277,27 @@ pub async fn wizard_execute(
             Action::Connect => {
                 let c = config(&t.state)?;
                 *guard = None;
-                let token = match oauth::reconnect(&c, &NativeStore) {
-                    Ok(token) => token,
-                    Err(e) if e == "reauth_required" => {
+                let token = login_token(
+                    t.state.authorized,
+                    || {
+                        oauth::reconnect(&c, &NativeStore).map_err(|e| {
+                            if e == "credential_store_unavailable" {
+                                "login_credentials_unavailable".into()
+                            } else {
+                                e
+                            }
+                        })
+                    },
+                    || {
                         let pending = oauth::Authorization::begin(&c)?;
                         let wait = shared.1.begin()?;
                         webbrowser::open(pending.url.as_str())
                             .map_err(|_| "browser_open_failed")?;
                         let result = pending.wait_code(&wait.cancelled);
                         let code = wait.complete(result)?;
-                        pending.exchange(&c, &NativeStore, &code)?
-                    }
-                    Err(e) => return Err(e),
-                };
+                        pending.exchange(&c, &NativeStore, &code)
+                    },
+                )?;
                 let drive = super::drive::Drive::new(token)?;
                 let account = drive.account()?;
                 t.check_account(&account)?;
@@ -384,6 +422,55 @@ pub async fn wizard_execute(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn first_authorization_bypasses_saved_login_but_reconnect_preserves_store_errors() {
+        assert_eq!(
+            login_token(
+                false,
+                || panic!("must not read refresh token"),
+                || Ok("browser")
+            )
+            .unwrap(),
+            "browser"
+        );
+        assert_eq!(
+            login_token(true, || Ok("refresh"), || panic!("must reuse login")).unwrap(),
+            "refresh"
+        );
+        assert_eq!(
+            login_token(true, || Err("reauth_required".into()), || Ok("browser")).unwrap(),
+            "browser"
+        );
+        assert_eq!(
+            login_token::<()>(
+                true,
+                || Err("login_credentials_unavailable".into()),
+                || panic!("do not bypass locked store")
+            )
+            .unwrap_err(),
+            "login_credentials_unavailable"
+        );
+    }
+    #[test]
+    fn import_must_read_back_before_advancing() {
+        struct Broken;
+        impl SecretStore for Broken {
+            fn write(&self, _: &str, _: &str) -> Result<()> {
+                Ok(())
+            }
+            fn read(&self, _: &str) -> Result<Option<Zeroizing<String>>> {
+                Ok(None)
+            }
+            fn remove(&self, _: &str) -> Result<()> {
+                Ok(())
+            }
+        }
+        let result = save_client(
+            br#"{"installed":{"client_id":"fixture.apps.googleusercontent.com"}}"#,
+            &Broken,
+        );
+        assert!(matches!(result, Err(e) if e == "client_credentials_unavailable"));
+    }
     #[test]
     fn manual_folder_input_only_accepts_id_or_google_folder_link() {
         assert_eq!(parse_folder(" folder-id ").unwrap(), "folder-id");

@@ -8,6 +8,12 @@ export const wizardMessages = {
       "Browser authorization is not currently waiting. Retry cancellation once the browser opens, or wait for the connection check to finish.",
     cancelled:
       "Authorization wait cancelled. Your saved setup is unchanged; connect again when ready.",
+    clientStoreError:
+      "Cannot read back the imported OAuth configuration from the credential store. Quit and reopen Bastet, allow its credential-store access if prompted, then import the JSON again.",
+    loginStoreError:
+      "Cannot read the saved Google login. Unlock or allow access to your system credential store, then reconnect.",
+    browserError:
+      "The default browser could not be opened. Check your default browser setting and retry authorization.",
     forgetLogin: "Forget local login",
     forgetHint:
       "This removes the saved login token only. Setup progress and space keys stay on this computer. Google permissions can be revoked in your account.",
@@ -111,6 +117,11 @@ export const wizardMessages = {
     cancelUnavailable:
       "目前未在等待瀏覽器授權。瀏覽器開啟後可再取消，或等待連線檢查完成。",
     cancelled: "已取消等待授權。已儲存的設定保留，可再次連線。",
+    clientStoreError:
+      "無法從憑證庫讀回匯入的 OAuth 設定。請結束並重開 Bastet，若系統詢問請允許鑰匙圈存取，再重新匯入 JSON。",
+    loginStoreError:
+      "無法讀取已儲存的 Google 登入。請解鎖或允許系統憑證庫存取後再重新連線。",
+    browserError: "無法開啟預設瀏覽器。請確認系統的預設瀏覽器設定後重試授權。",
     forgetLogin: "移除本機登入",
     forgetHint:
       "只移除已保存的登入 token，保留精靈進度與空間金鑰。Google 權限可在帳號中撤銷。",
@@ -205,6 +216,11 @@ export const wizardMessages = {
     cancelUnavailable:
       "当前未在等待浏览器授权。浏览器打开后可再取消，或等待连接检查完成。",
     cancelled: "已取消等待授权。已保存的设置保留，可再次连接。",
+    clientStoreError:
+      "无法从凭据库读回导入的 OAuth 设置。请退出并重开 Bastet，按系统提示允许凭据访问，再重新导入 JSON。",
+    loginStoreError:
+      "无法读取已保存的 Google 登录。请解锁或允许系统凭据库访问后重新连接。",
+    browserError: "无法打开默认浏览器。请确认系统默认浏览器设置后重试授权。",
     forgetLogin: "移除本机登录",
     forgetHint:
       "仅移除已保存的登录 token，保留向导进度和空间密钥。Google 权限可在账号中撤销。",
@@ -301,6 +317,12 @@ export const wizardMessages = {
       "現在ブラウザー認証を待機していません。ブラウザーが開いた後に再試行するか、接続確認の完了をお待ちください。",
     cancelled:
       "認証待ちをキャンセルしました。保存済み設定は保持され、再接続できます。",
+    clientStoreError:
+      "インポートした OAuth 設定を資格情報ストアから読み戻せません。Bastet を終了して再起動し、アクセスを許可して JSON を再インポートしてください。",
+    loginStoreError:
+      "保存済み Google ログインを読み取れません。資格情報ストアを解除またはアクセスを許可して再接続してください。",
+    browserError:
+      "既定のブラウザーを開けません。システム設定を確認して認証を再試行してください。",
     forgetLogin: "ローカルログインを削除",
     forgetHint:
       "保存されたログイントークンのみ削除します。進行状況とスペース鍵は保持します。Google 権限はアカウントで取り消せます。",
@@ -406,6 +428,12 @@ export const wizardMessages = {
       "현재 브라우저 인증 대기 중이 아닙니다. 브라우저가 열리면 취소를 다시 시도하거나 연결 확인 완료를 기다리세요.",
     cancelled:
       "인증 대기를 취소했습니다. 저장된 설정이 유지되며 다시 연결할 수 있습니다.",
+    clientStoreError:
+      "가져온 OAuth 설정을 자격 증명 저장소에서 다시 읽을 수 없습니다. Bastet을 종료하고 다시 열어 접근을 허용한 후 JSON을 다시 가져오세요.",
+    loginStoreError:
+      "저장된 Google 로그인을 읽을 수 없습니다. 시스템 자격 증명 저장소의 잠금을 해제하거나 접근을 허용하고 다시 연결하세요.",
+    browserError:
+      "기본 브라우저를 열 수 없습니다. 시스템 기본 브라우저 설정을 확인하고 인증을 다시 시도하세요.",
     forgetLogin: "로컬 로그인 삭제",
     forgetHint:
       "저장된 로그인 토큰만 삭제합니다. 진행 상황과 공간 키는 유지됩니다. Google 권한은 계정에서 취소할 수 있습니다.",

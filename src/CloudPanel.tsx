@@ -124,27 +124,33 @@ export default function CloudPanel({
   const unavailable = !native || busy || !w;
   const errorText = !error
     ? ""
-    : /oauth_cancelled/.test(error)
-      ? t.cancelled
-      : /account_mismatch/.test(error)
-        ? t.accountMismatch
-        : /reauth|oauth_timeout|oauth_denied/.test(error)
-          ? t.authError
-          : /oauth|client/.test(error)
-            ? t.configError
-            : /restart_required/.test(error)
-              ? t.restartError
-              : /step_required|backup_required/.test(error)
-                ? t.stepError
-                : /drive_|folder/.test(error)
-                  ? t.folderError
-                  : /recovery|decrypt|space_key|proof/.test(error)
-                    ? t.keyError
-                    : /store|credential|wizard_corrupt|unsafe|immutable/.test(
-                          error,
-                        )
-                      ? t.storageError
-                      : t.error;
+    : /client_credentials_unavailable/.test(error)
+      ? t.clientStoreError
+      : /login_credentials_unavailable/.test(error)
+        ? t.loginStoreError
+        : /browser_open_failed/.test(error)
+          ? t.browserError
+          : /oauth_cancelled/.test(error)
+            ? t.cancelled
+            : /account_mismatch/.test(error)
+              ? t.accountMismatch
+              : /reauth|oauth_timeout|oauth_denied/.test(error)
+                ? t.authError
+                : /oauth|client/.test(error)
+                  ? t.configError
+                  : /restart_required/.test(error)
+                    ? t.restartError
+                    : /step_required|backup_required/.test(error)
+                      ? t.stepError
+                      : /drive_|folder/.test(error)
+                        ? t.folderError
+                        : /recovery|decrypt|space_key|proof/.test(error)
+                          ? t.keyError
+                          : /store|credential|wizard_corrupt|unsafe|immutable/.test(
+                                error,
+                              )
+                            ? t.storageError
+                            : t.error;
   return (
     <section className="panel cloud-panel wizard-panel" aria-busy={busy}>
       <div className="section-heading">
