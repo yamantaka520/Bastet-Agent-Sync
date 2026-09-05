@@ -7,7 +7,7 @@
 - TypeScript/Vite build, rustfmt, Clippy with warnings denied, and documentation checks passed.
 - macOS debug `.app` built and launched. Pressing the native **Run isolated check** produced: 2 publication/reception operations, 2 preserved branches, 0 additional transfers on repeat, and 3 objects recovered on reopen. The UI explicitly labels this as a core check, not cloud sync.
 - Test coverage includes child-before-parent arrival, partial/corrupt bundles and retries, checkpoint loss, stale conflict resolution, opposite-direction traffic prevention, Unicode text, oversized files, invalid paths, hash mismatch, wrong space, cross-stream parents, symlinks, no deletion propagation and exclusive replica locks.
-- M1 Windows CI failed while decoding five-language Markdown with the host's default cp1252 encoding. `check_docs.py` now reads UTF-8 explicitly. The M2 baseline `387ab35` passed macOS, Windows and Ubuntu in [run 33953575895](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33953575895). An additional explicit-baseline test verifies that receiving a newer remote head does not silently rebase already-staged local edits; its updated run is tracked separately.
+- M1 Windows CI failed while decoding five-language Markdown with the host's default cp1252 encoding. `check_docs.py` now reads UTF-8 explicitly. The M2 baseline `387ab35` passed macOS, Windows and Ubuntu in [run 33953575895](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33953575895). An additional explicit-baseline test verifies that receiving a newer remote head does not silently rebase already-staged local edits; its updated [run 33953930166](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/33953930166) was still in progress when this record was captured.
 - No native agent profile, selected Drive folder, login or real conversation was used by the diagnostic. No power-loss or separate-physical-computer test is claimed. [Protocol and remaining gates](SNAPSHOT_PROTOCOL.md).
 
 ## Historical M1 desktop foundation
@@ -38,6 +38,6 @@ Verified locally on macOS, 2026-09-05. This is a development build, not a synchr
 
 - Windows/Linux native CI is configured; its result is separate from local macOS evidence. Interactive tray visibility and reopen must be verified on each OS/desktop environment.
 - Current discovery identifies candidate folders only. Executable/version detection, multiple profiles per agent and session counts are future adapter work.
-- Local-folder selection does not prove Google Drive is connected or has transmitted data. OAuth, encryption, snapshot transport, scheduling, bidirectional merge and native session restoration remain M2–M5.
+- Local-folder selection does not prove Google Drive is connected or has transmitted data. The M2 local snapshot transport is implemented; OAuth, encryption, scheduling and native session restoration remain M3–M5.
 - Native OS menus and the folder chooser follow OS localization; application labels and custom tray items use the selected language. Native menu localization and assistive-technology coverage need further QA.
 - No signed release or auto-start installer has been published.
