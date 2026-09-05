@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: 0.3.0 adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
+Status: 0.3.1 adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
 
 ## Product
 
@@ -23,7 +23,7 @@ Use immutable, content-verified snapshots and a persistent local journal in the 
 | M4 | Versioned adapters and native conversation restore | Each agent tested independently across computers; attachments/project paths verified |
 | M5 | Scheduler, near-real-time, bidirectional UX, packaging and autostart | Three-platform install/tray/restart tests, signed distribution plan, locale QA |
 
-M1 saves setup choices. M2 adds a real filesystem diagnostic using isolated synthetic data; it never uses selected agent paths or the selected Drive folder. Neither enables a pretend agent sync button. Start remains explicitly unavailable until a transport and snapshot adapter have passed their gates. CLI executables are not run automatically during discovery; presence does not establish version or compatibility.
+M1 saves setup choices. M2 adds a real filesystem diagnostic using isolated synthetic data; it never uses selected agent paths or the selected Drive folder. These foundation milestones did not enable agent sync. In 0.3.1, Start runs the implemented adapters described in the current contract. CLI executables are not run automatically during discovery; presence does not establish version or compatibility.
 
 ## Data boundaries
 

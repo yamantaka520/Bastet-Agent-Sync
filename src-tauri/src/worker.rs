@@ -234,6 +234,7 @@ fn run_once(
     binding: &Binding,
     memory: Option<&Installed>,
 ) -> Result<(queue::Exchange, usize)> {
+    worker.update(|s| s.phase = "credentials".into());
     let mut guard = cloud.0.try_lock().map_err(|_| "cloud_busy")?;
     let root = app
         .path()
@@ -261,6 +262,7 @@ fn run_once(
     };
     let cache_root = root.join(format!("drive-cache-{}", binding.space));
     let cached = queue::CachedObjects::new(guard.as_ref().ok_or("reauth_required")?, &cache_root)?;
+    worker.update(|s| s.phase = "syncing".into());
     let mut total = queue::Exchange::default();
     let mut merged = 0;
     let agents = crate::detect(Some(settings));
@@ -299,6 +301,7 @@ fn run_once(
                         state: "complete".into(),
                         published: r.published,
                         received: r.received,
+                        restored: applied,
                         ..Default::default()
                     }
                 }),
@@ -366,8 +369,19 @@ fn run_once(
         };
         total.published += status.published;
         total.received += status.received;
+        let published = status.published;
+        let received = status.received;
+        let restored = status.restored;
         statuses.push(status);
-        worker.update(|s| s.sources = statuses.clone());
+        worker.update(|s| {
+            s.sources = statuses.clone();
+            s.published += published;
+            s.received += received;
+            s.applied += restored;
+        });
+    }
+    if statuses.iter().all(|s| s.state == "error") {
+        return Err("sources_failed".into());
     }
     Ok((total, merged))
 }
@@ -461,7 +475,7 @@ pub async fn sync_start(
                         run_once(&app, &cloud, &worker, &settings, &binding, memory.as_ref());
                     let success = result.is_ok();
                     match result {
-                        Ok((report, applied)) => {
+                        Ok(_) => {
                             failures = 0;
                             worker.update(|s| {
                                 s.phase = if s
@@ -474,9 +488,6 @@ pub async fn sync_start(
                                     "waiting"
                                 }
                                 .into();
-                                s.published += report.published;
-                                s.received += report.received;
-                                s.applied += applied;
                                 s.last_success = Some(
                                     SystemTime::now()
                                         .duration_since(UNIX_EPOCH)

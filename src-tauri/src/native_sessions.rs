@@ -20,8 +20,9 @@ use std::{
 };
 use tauri::Manager;
 const MAX_RAW: u64 = 512 * 1024 * 1024;
-const MAX_PACKED: u64 = 23 * 1024 * 1024;
-#[derive(Clone, Serialize, Deserialize)]
+const MAX_PACKED: u64 = 384 * 1024 * 1024;
+const PART_SIZE: usize = 23 * 1024 * 1024;
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Manifest {
     pub version: u32,
@@ -125,6 +126,41 @@ fn ensure_directory(path: &Path) -> Result<()> {
 }
 /// Add missing sessions only. Different existing bytes are a conflict, never a replacement.
 fn install_missing(m: &Manifest, home: &Path) -> Result<usize> {
+    // The same session may already have moved to an archive or a mapped project.
+    // Do not introduce a second native file carrying an active session's identity.
+    let dirs = match m.agent.as_str() {
+        "claude" | "claude-code" => vec!["projects"],
+        "agy" => vec!["conversations"],
+        "codex" | "chatgpt-work" => vec!["sessions", "archived_sessions"],
+        _ => vec!["sessions"],
+    };
+    for dir in dirs {
+        let root = home.join(dir);
+        if !root.is_dir() {
+            continue;
+        }
+        let mut existing = vec![];
+        walk(&root, 8, &mut existing)?;
+        for p in existing {
+            let same_id = p
+                .file_name()
+                .and_then(|s| s.to_str())
+                .is_some_and(|s| s.contains(&m.session))
+                || (m.agent == "grok"
+                    && p.components().any(|c| c.as_os_str() == m.session.as_str()));
+            if same_id {
+                let relative = p
+                    .strip_prefix(home)
+                    .map_err(|_| "unsafe_store")?
+                    .to_str()
+                    .ok_or("unsafe_store")?
+                    .replace('\\', "/");
+                if !m.files.contains_key(&relative) {
+                    return Err("session_conflict".into());
+                }
+            }
+        }
+    }
     let mut files = Vec::new();
     for (relative, text) in &m.files {
         if !allowed(&m.agent, relative) {
@@ -253,7 +289,7 @@ fn encode(manifest: &Manifest) -> Result<String> {
     Ok(STANDARD.encode(bytes))
 }
 fn decode(text: &str) -> Result<Manifest> {
-    if text.len() > bundle::MAX_CONTENT {
+    if text.len() as u64 > MAX_PACKED * 4 / 3 + 4 {
         return Err("session_limit".into());
     }
     let bytes = STANDARD.decode(text).map_err(|_| "session_invalid")?;
@@ -277,6 +313,107 @@ fn decode(text: &str) -> Result<Manifest> {
         return Err("session_invalid".into());
     }
     Ok(m)
+}
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Parts {
+    sha256: String,
+    ids: Vec<String>,
+}
+fn publish(
+    m: &Manifest,
+    batch: &mut crate::sync::ExportBatch<'_>,
+    journal: &mut Journal,
+    part_size: usize,
+) -> Result<String> {
+    let conversation = bundle::hash(m.session.as_bytes());
+    let packed = encode(m)?;
+    let mut files = BTreeMap::from([(
+        "session.json".into(),
+        json(&serde_json::json!({"session":m.session,"cwd":m.cwd,"agent":m.agent}))?,
+    )]);
+    if packed.len() <= part_size {
+        files.insert("session.gz.b64".into(), packed);
+    } else {
+        let mut ids = vec![];
+        for (i, chunk) in packed.as_bytes().chunks(part_size).enumerate() {
+            let part_conversation = format!("{conversation}-p{i}");
+            let id = batch.export_from(
+                Stream {
+                    agent: m.agent.clone(),
+                    profile: journal.node.clone(),
+                    conversation: part_conversation.clone(),
+                },
+                BTreeMap::from([(
+                    "session.part.b64".into(),
+                    String::from_utf8(chunk.to_vec()).map_err(|_| "session_invalid")?,
+                )]),
+                journal.bases.get(&part_conversation).map(|s| s.as_str()),
+            )?;
+            journal.bases.insert(part_conversation, id.clone());
+            ids.push(id);
+        }
+        files.insert(
+            "session.parts.json".into(),
+            json(&Parts {
+                sha256: bundle::hash(packed.as_bytes()),
+                ids,
+            })?,
+        );
+    }
+    let id = batch.export_from(
+        Stream {
+            agent: m.agent.clone(),
+            profile: journal.node.clone(),
+            conversation: conversation.clone(),
+        },
+        files,
+        journal.bases.get(&conversation).map(|s| s.as_str()),
+    )?;
+    journal.bases.insert(conversation, id.clone());
+    Ok(id)
+}
+fn unpack(b: &bundle::Bundle, all: &BTreeMap<String, bundle::Bundle>) -> Result<Manifest> {
+    if let Some(entry) = b.snapshot.files.get("session.gz.b64") {
+        return decode(&entry.content);
+    }
+    let parts: Parts = serde_json::from_str(
+        &b.snapshot
+            .files
+            .get("session.parts.json")
+            .ok_or("session_invalid")?
+            .content,
+    )
+    .map_err(|_| "session_invalid")?;
+    if parts.ids.is_empty() || parts.ids.len() > 64 || !bundle::is_hash(&parts.sha256) {
+        return Err("session_invalid".into());
+    }
+    let mut packed = String::new();
+    for (i, id) in parts.ids.iter().enumerate() {
+        let p = all.get(id).ok_or("session_parts_pending")?;
+        if p.id != *id
+            || p.snapshot.stream.agent != b.snapshot.stream.agent
+            || p.snapshot.stream.profile != b.snapshot.stream.profile
+            || p.snapshot.stream.conversation != format!("{}-p{i}", b.snapshot.stream.conversation)
+        {
+            return Err("session_invalid".into());
+        }
+        p.validate()?;
+        let text = &p
+            .snapshot
+            .files
+            .get("session.part.b64")
+            .ok_or("session_invalid")?
+            .content;
+        if packed.len() as u64 + text.len() as u64 > MAX_PACKED * 4 / 3 + 4 {
+            return Err("session_limit".into());
+        }
+        packed.push_str(text);
+    }
+    if bundle::hash(packed.as_bytes()) != parts.sha256 {
+        return Err("session_invalid".into());
+    }
+    decode(&packed)
 }
 fn capture_file(agent: &str, root: &Path, path: &Path, staging: &Path) -> Result<Manifest> {
     let mut files = BTreeMap::new();
@@ -519,27 +656,7 @@ pub fn cycle(
                     } else {
                         capture_file(agent, source, &p, root)?
                     };
-                    let conversation = bundle::hash(m.session.as_bytes());
-                    let packed = encode(&m)?;
-                    let files = BTreeMap::from([
-                        ("session.gz.b64".into(), packed),
-                        (
-                            "session.json".into(),
-                            json(
-                                &serde_json::json!({"session":m.session,"cwd":m.cwd,"agent":agent}),
-                            )?,
-                        ),
-                    ]);
-                    let id = batch.export_from(
-                        Stream {
-                            agent: agent.into(),
-                            profile: journal.node.clone(),
-                            conversation: conversation.clone(),
-                        },
-                        files,
-                        journal.bases.get(&conversation).map(|s| s.as_str()),
-                    )?;
-                    journal.bases.insert(conversation, id);
+                    publish(&m, &mut batch, &mut journal, PART_SIZE)?;
                     journal.stamps.insert(stamp_key, stamp);
                     storage::replace(&jp, json(&journal)?.as_bytes())?;
                     Ok(())
@@ -577,19 +694,14 @@ pub fn cycle(
             b.snapshot.stream.agent == agent
                 && b.snapshot.stream.profile != journal.node
                 && !parents.contains(&b.id)
+                && b.snapshot.files.contains_key("session.json")
         }) {
             if stop() {
                 return Err("sync_paused".into());
             }
             status.available += 1;
             let result = (|| {
-                let m = decode(
-                    &b.snapshot
-                        .files
-                        .get("session.gz.b64")
-                        .ok_or("session_invalid")?
-                        .content,
-                )?;
+                let m = unpack(b, &all)?;
                 if m.agent != agent
                     || bundle::hash(m.session.as_bytes()) != b.snapshot.stream.conversation
                 {
@@ -677,16 +789,13 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
     .map_err(|_| "store_unavailable".to_string())?
 }
 /// Restore into a NEW child profile. Never replace a session in an existing/live store.
-pub fn restore(bundle: &bundle::Bundle, destination: &Path) -> Result<Manifest> {
+pub fn restore(
+    bundle: &bundle::Bundle,
+    all: &BTreeMap<String, bundle::Bundle>,
+    destination: &Path,
+) -> Result<Manifest> {
     bundle.validate()?;
-    let m = decode(
-        &bundle
-            .snapshot
-            .files
-            .get("session.gz.b64")
-            .ok_or("session_invalid")?
-            .content,
-    )?;
+    let m = unpack(bundle, all)?;
     if m.agent != bundle.snapshot.stream.agent
         || bundle::hash(m.session.as_bytes()) != bundle.snapshot.stream.conversation
     {
@@ -739,7 +848,7 @@ pub async fn restore_received_session(
         let all = replica.transport_bundles()?;
         let b = all.get(&id).ok_or("session_invalid")?;
         let target = folder.join(format!("Bastet-{agent}-{}", uuid::Uuid::new_v4()));
-        restore(b, &target)?;
+        restore(b, &all, &target)?;
         Ok(Some(target.to_string_lossy().into()))
     })
     .await
@@ -885,7 +994,7 @@ mod tests {
                 .find(|s| s.snapshot.stream.agent == agent)
                 .unwrap();
             let dest = temp.path().join("restored");
-            let manifest = restore(snapshot, &dest).unwrap();
+            let manifest = restore(snapshot, &all, &dest).unwrap();
             assert!(!dest.join("auth.json").exists());
             for (p, text) in &manifest.files {
                 assert_eq!(
@@ -893,7 +1002,7 @@ mod tests {
                     STANDARD.decode(text).unwrap()
                 );
             }
-            assert!(restore(snapshot, &dest).is_err());
+            assert!(restore(snapshot, &all, &dest).is_err());
             drop(rep);
             assert_eq!(
                 cycle(
@@ -910,6 +1019,51 @@ mod tests {
                 .received,
                 0
             );
+        }
+    }
+    #[test]
+    fn segmented_history_waits_for_every_part_and_reuses_unchanged_parts() {
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().join("source");
+        fixture("pi", &home);
+        let mut paths = vec![];
+        walk(&home.join("sessions"), 4, &mut paths).unwrap();
+        let m = capture_file("pi", &home, &paths[0], t.path()).unwrap();
+        let replica = Replica::open(&t.path().join("replica"), "space").unwrap();
+        let mut journal = Journal {
+            node: "node".into(),
+            ..Default::default()
+        };
+        let mut batch = replica.export_batch().unwrap();
+        let id = publish(&m, &mut batch, &mut journal, 64).unwrap();
+        drop(batch);
+        let all = replica.transport_bundles().unwrap();
+        assert!(all.len() > 2);
+        let root = all[&id].clone();
+        let parts: Parts =
+            serde_json::from_str(&root.snapshot.files["session.parts.json"].content).unwrap();
+        let mut incomplete = all.clone();
+        incomplete.remove(&parts.ids[0]);
+        let target = t.path().join("restored");
+        assert_eq!(
+            restore(&root, &incomplete, &target).unwrap_err(),
+            "session_parts_pending"
+        );
+        assert!(!target.exists());
+        restore(&root, &all, &target).unwrap();
+        for (path, bytes) in &m.files {
+            assert_eq!(
+                fs::read(target.join(path)).unwrap(),
+                STANDARD.decode(bytes).unwrap()
+            );
+        }
+        let mut batch = replica.export_batch().unwrap();
+        assert_eq!(publish(&m, &mut batch, &mut journal, 64).unwrap(), id);
+        drop(batch);
+        assert_eq!(replica.transport_bundles().unwrap().len(), all.len());
+        let key = SpaceKey::generate().unwrap();
+        for b in all.values() {
+            assert_eq!(key.open("space", &key.seal(b).unwrap()).unwrap(), *b);
         }
     }
     #[test]

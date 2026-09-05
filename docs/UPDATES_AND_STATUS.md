@@ -4,7 +4,7 @@ Historical 0.2.0 behavior (superseded by [automatic AMOS sync in 0.2.1](AGENT_ME
 
 ## Historical 0.2.0 Start and status
 
-Start performs a native preflight against saved settings and wizard progress. Unsaved choices must be saved first; source and Drive requirements are listed explicitly. Native live-store adapters remain unavailable, so Start reports each unsupported selected source and **does not start a worker**. The status area scrolls into view and never displays fake transfer counters, “syncing” or “synced”. “App running” indicates this foreground desktop instance, not successful tray/background transfer. Scheduling and active/pause states require a real worker in a later milestone.
+Start validates saved settings and Drive wizard progress, then runs selected local conversation adapters and the AMOS merge independently. Per-source results distinguish empty, syncing, partial and failed work. Credential access has its own visible phase. Missing sessions are added; existing different versions remain conflicts. Pause keeps completed source counters. Settings and updates are blocked while the worker runs. “App running” still indicates this desktop instance, not proof of a completed transfer. See [current adapter scope](NATIVE_SESSIONS.md).
 
 ## Current version identity
 

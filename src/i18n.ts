@@ -25,8 +25,7 @@ const en = {
   foundation: "Local sync preview",
   preview: "Browser preview — open the desktop app for local features.",
   source: "Choose your agents",
-  sourceHint:
-    "Candidate data folders only. Session compatibility is not yet verified.",
+  sourceHint: "Choose local data folders; see the supported scope above.",
   scan: "Scan again",
   all: "Select detected",
   none: "Clear selection",
@@ -103,7 +102,7 @@ const zhHant: Messages = {
   foundation: "本機同步預覽",
   preview: "瀏覽器預覽 — 請開啟桌面程式使用本機功能。",
   source: "選擇你的 Agent",
-  sourceHint: "目前只偵測候選資料夾，對話相容性尚未驗證。",
+  sourceHint: "選擇本機資料目錄；同步支援範圍見上方說明。",
   scan: "重新偵測",
   all: "全選已偵測",
   none: "取消全選",
@@ -177,7 +176,7 @@ const zhHans: Messages = {
   foundation: "本地同步预览",
   preview: "浏览器预览 — 请打开桌面应用使用本地功能。",
   source: "选择你的 Agent",
-  sourceHint: "目前仅检测候选数据文件夹，尚未验证对话兼容性。",
+  sourceHint: "选择本地数据目录；同步支持范围见上方说明。",
   scan: "重新检测",
   all: "全选已检测项",
   none: "取消全选",
@@ -253,7 +252,8 @@ const ja: Messages = {
   preview:
     "ブラウザープレビュー — ローカル機能にはデスクトップアプリが必要です。",
   source: "エージェントを選択",
-  sourceHint: "候補フォルダーのみ検出します。会話の互換性は未検証です。",
+  sourceHint:
+    "ローカルデータを選択してください。同期対象は上の説明をご覧ください。",
   scan: "再検出",
   all: "検出済みを選択",
   none: "選択を解除",
@@ -329,7 +329,8 @@ const ko: Messages = {
   foundation: "로컬 동기화 미리보기",
   preview: "브라우저 미리 보기 — 로컬 기능은 데스크톱 앱에서 사용하세요.",
   source: "에이전트 선택",
-  sourceHint: "후보 폴더만 감지합니다. 대화 호환성은 아직 검증하지 않았습니다.",
+  sourceHint:
+    "로컬 데이터 폴더를 선택하세요. 동기화 범위는 위 설명을 확인하세요.",
   scan: "다시 감지",
   all: "감지된 항목 선택",
   none: "선택 해제",

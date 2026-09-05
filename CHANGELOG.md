@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — Large-history recovery
+
+- Split large compressed conversations into immutable parts with a hashed manifest. Receive waits for every verified part before adding any native file; unchanged parts keep their object IDs.
+- Keep transferred counters when a later source is paused; show system-credential access separately from conversation processing.
+- Detect a session already stored under a different project/archive path instead of introducing a duplicate native identity.
+- Increase the bounded replica/transfer union to 1 GiB and use an optimized macOS build for real histories.
+
 ## 0.3.0 — Local conversation sync preview
 
 - Connect selected local conversation sources to compressed native snapshots and encrypted Drive exchange, independently of Agent Memory OS.

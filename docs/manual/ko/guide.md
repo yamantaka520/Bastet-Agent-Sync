@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.3.0
+## 0.3.1
 
-0.3.0은 로컬 대화와 Agent Memory OS를 동기화합니다. 소스를 선택하고 저장한 뒤 시작하세요. 수동 JSONL 내보내기는 필요 없습니다. Claude／Claude Code는 로컬 코딩 대화를, Codex／Work는 로컬 기록을 공유합니다. Agy는 SQLite를, Grok과 Pi는 기본 대화 파일을 사용합니다.
+0.3.1은 로컬 대화와 Agent Memory OS를 동기화합니다. 소스를 선택하고 저장한 뒤 시작하세요. 수동 JSONL 내보내기는 필요 없습니다. Claude／Claude Code는 로컬 코딩 대화를, Codex／Work는 로컬 기록을 공유합니다. Agy는 SQLite를, Grok과 Pi는 기본 대화 파일을 사용합니다.
 
 ## 설정
 

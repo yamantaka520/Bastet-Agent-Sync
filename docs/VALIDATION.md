@@ -1,5 +1,11 @@
 # Validation
 
+## 0.3.1 segmented histories — 2026-09-05
+
+- Segmented-history fixtures pass: missing parts prevent restore without creating its destination; complete parts reconstruct the original native files; repeated publishing reuses all IDs; each part survives authenticated encryption.
+- 0.3.0 real macOS follow-up: system credential access resumed, and the Claude source reported **23 uploaded bundles** and **two size-limit failures**. It was safely paused before the remaining sources. The top-level counter initially remained zero when interrupted mid-cycle; 0.3.1 fixes that accounting and adds a separate credential-wait phase.
+- Profiling located the slow debug pass in repeated snapshot hashing/serialization, not another credential wait. An optimized build is used for continued native testing. Earlier credential-wait and single-packet limits are retained below as historical observations, not the final state.
+
 ## 0.3.0 local conversation adapters — 2026-09-05
 
 - 64 default Rust tests and 23 frontend tests pass. Tests cover all seven local selections, two isolated homes, automatic add-only receive, repeat stability, safe separate-folder recovery, conflict protection, malformed records, credential-path rejection, symlinks, SQLite committed WAL and revision-aware cache invalidation.
