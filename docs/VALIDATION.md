@@ -2,6 +2,7 @@
 
 ## 0.4.0 release packaging — 2026-09-06
 
+- The initial Ubuntu 22.04 runner exposed an older Python without `tomllib`; the release workflow now provisions Python 3.12 explicitly. Three release-metadata regression tests pass locally (missing architecture, missing signature, complete direct download links).
 - Release packaging is under validation. Four target builds must complete before a draft is created; publication follows artifact review. Windows embeds WebView2 and a static CRT; Linux install tests verify declared dependencies and linked libraries.
 - Packaging does not establish all-agent physical two-device continuation or OS signing/notarization. Previous native sync evidence remains below.
 
