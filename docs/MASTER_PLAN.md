@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: 0.5.0 implements the [sync control center](SYNC_CONTROL.md), configurable parallel/resource budgets, persistent audit/device reports, conflict comparison, local cache maintenance and opt-in reviewed portable packages. Installed Agy/Grok local acceptance is recorded with its limits. Three-platform release evidence is tracked in [validation](VALIDATION.md); full physical-device continuation, project mapping and attachment completeness remain separate gates.
+Status: 0.5.0 is published with verified three-platform installers and implements the [sync control center](SYNC_CONTROL.md), configurable parallel/resource budgets, persistent audit/device reports, conflict comparison, local cache maintenance and opt-in reviewed portable packages. Installed Agy/Grok local acceptance is recorded with its limits. Three-platform release evidence is tracked in [validation](VALIDATION.md); full physical-device continuation, project mapping and attachment completeness remain separate gates.
 
 ## Product
 

@@ -18,7 +18,7 @@ The fixed feed is `https://github.com/yamantaka520/Bastet-Agent-Sync/releases/la
 
 ## Release operations
 
-Version 0.5.0 packages the control center and resource controls. [Release evidence](VALIDATION.md) records actual build/installer/publication results. macOS in-app upgrade success is user-reported; no new instrumented self-upgrade test is claimed. Apple notarization and Windows Authenticode are explicitly outside this release scope.
+The public [v0.5.0 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.0) packages the control center and resource controls; the verified live update feed serves 0.5.0. [Release evidence](VALIDATION.md) records actual build/installer/publication results. macOS in-app upgrade success is user-reported; no new instrumented self-upgrade test is claimed. Apple notarization and Windows Authenticode are explicitly outside this release scope.
 
 The previous [v0.4.2 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) includes the language fix, all supported installer targets and a verified live feed. See [release evidence](VALIDATION.md).
 

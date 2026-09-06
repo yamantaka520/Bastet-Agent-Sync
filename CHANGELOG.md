@@ -2,6 +2,8 @@
 
 ## 0.5.0 — sync control center
 
+Published 2026-09-07: [three-platform installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.0). Four architecture builds, independent CI and all installer checks passed; seven signatures, 19 digests, 18 checksums and nine public links were verified.
+
 - Run 1–6 independent storage groups concurrently (default 3); aliases sharing a canonical agent and path execute once. Shared journals and overlapping source paths remain sequential.
 - Show all selected sources as queued before dispatch, update each result independently, and count shared work once. Pause stops new dispatch and joins active work before another cycle.
 - Make the Drive revision cache thread-safe and coalesce same-object reads with bounded locks. Always fetch space-key proof from Drive. Existing per-source ordering, retry cadence and conflict rules remain.

@@ -1,5 +1,15 @@
 # Validation
 
+## 0.5.0 published release — 2026-09-07
+
+- [v0.5.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.0) is public/latest with 19 assets and five-language notes containing direct installer links. Tagged source: `297d8c9cbf552effb2721a3facf89ae6dbb22b9c`.
+- [Four architecture builds and draft publication, run 34046845932](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34046845932) passed. [Independent three-platform CI, run 34046836761](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34046836761) also passed.
+- [Installer checks, run 34047325944](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34047325944): Windows installation/native launch, macOS arm64 DMG/ad-hoc signature/native launch, minimal Ubuntu DEB dependencies and Fedora RPM dependencies all passed. Linux graphical interaction and Intel Mac native launch are not included in these checks.
+- All seven updater signatures were verified using the repository public key. All 19 GitHub asset digests and 18 SHA256SUMS entries matched; all nine updater platform/format routes matched the signed artifacts. Both macOS DMGs passed hdiutil verification; archived app version and Mach-O architecture matched arm64/x64.
+- Nine public installer/support links returned HTTP 200; the public latest update feed exactly matched the verified 0.5.0 artifact. Existing running user app was not replaced.
+- Remaining acceptance boundaries are unchanged: browser visual QA was blocked by unavailable admin-policy verification; macOS in-app upgrade success is user-reported; installed Agy/Grok local checks do not establish physical two-device or restored-profile Agy model continuation. Apple notarization and Windows Authenticode were explicitly excluded.
+
+
 ## 0.5.0 control center — local acceptance, 2026-09-07
 
 - New regression coverage includes configured concurrency, timed dispatch pause, aggregate bandwidth/cancellation, progress isolation and ETA, history retention/corruption, identity persistence, safe cache cleanup, reviewed fingerprints, path/symlink rejection, portable sanitization/selection, encrypted idempotent preferences exchange and MIME/stream guards. Local results: 97 Rust tests passed, 2 optional installed-CLI tests excluded from the default suite; the new Agy/Grok installed fixture test was separately run and passed. 39 frontend tests, TypeScript/Vite build, Clippy with warnings denied, documentation checks and 3 release-asset tests passed. CI/package evidence follows after release verification.
