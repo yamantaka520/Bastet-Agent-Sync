@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — compact runtime status and Drive traffic
+## 0.4.3 — compact runtime status and Drive traffic
+
+Release preparation: three-platform signed packages and installer verification pending.
 
 - Move app, Google and sync states into one responsive row immediately below Drive setup status.
 - Show separate upload/download rates and session totals in all five locales, refreshed each second. Rates use approximately three seconds of Drive HTTP payload consumption; no OS-wide traffic or transfer-success inference.

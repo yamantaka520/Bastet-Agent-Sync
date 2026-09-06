@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.4.2
+## 0.4.3
 
-0.4.2 syncs local conversations and Agent Memory OS. Select sources, save and Start; manual JSONL export is unnecessary. Claude/Claude Code share local coding history; Codex/Work share local rollout storage. Agy uses SQLite snapshots; Grok and Pi use native session files.
+0.4.3 syncs local conversations and Agent Memory OS. Select sources, save and Start; manual JSONL export is unnecessary. Claude/Claude Code share local coding history; Codex/Work share local rollout storage. Agy uses SQLite snapshots; Grok and Pi use native session files.
 
 ## Setup
 
@@ -53,4 +53,4 @@ Snapshots now collapse by Agent, with Expand all / Collapse all and local save t
 
 In 0.4.2, language can be changed while syncing and is saved automatically, including tray labels. Other unsaved settings remain unchanged. If saving fails, the previous language is retained. On 0.4.1, pause synchronization before changing language, then save setup.
 
-Unreleased: app, Google and sync states share a row below Drive setup status, wrapping on narrow windows. Upload/download rates and totals since launch refresh each second. Rates average approximately three seconds of Drive HTTP payloads. Excludes system-wide traffic, transport overhead, OAuth and updates; upload counts do not imply server acknowledgement.
+0.4.3: app, Google and sync states share a row below Drive setup status, wrapping on narrow windows. Upload/download rates and totals since launch refresh each second. Rates average approximately three seconds of Drive HTTP payloads. Excludes system-wide traffic, transport overhead, OAuth and updates; upload counts do not imply server acknowledgement.

@@ -6,6 +6,8 @@
 
 ## 繁體中文
 
+程式、Google 連線及同步狀態移至 Drive 設定狀態下方同一列，窄視窗自動換行。另顯示上傳／下載速率與啟動以來累計量，每秒更新；速率為最近約 3 秒的 Drive HTTP 資料量平均。不是整台電腦流量，不含連線開銷、OAuth 或更新下載；上傳數值不代表伺服器已確認同步成功。
+
 修正同步中無法切換語言：現在五種語言皆可於同步期間切換並自動保存，系統匣文字同步更新；不需暫停、不會套用其他未儲存設定。保存失敗時保留原語言。
 
 本版改善憑證存取與同步結果介面，保留同步預覽的支援界線。新增「準備憑證存取」及執行期間快取，減少重複讀取鑰匙圈；退出、忘記登入或重新設定會清除快取。同步包可依 Agent 展開／收合，顯示本機保存時間並由新到舊排序；各 Agent 改用清楚的狀態卡、傳輸數量與問題處理建議。時間不是原始對話建立時間，更新後仍可能需要 OS 授權。
@@ -22,6 +24,8 @@ macOS 首次開啟若被阻擋，確認下載來源後，到「系統設定 → 
 
 ## 简体中文
 
+程序、Google 连接及同步状态移至 Drive 设置状态下方同一行，窄窗口自动换行。另显示上传／下载速率与启动以来累计量，每秒更新；速率为最近约 3 秒的 Drive HTTP 数据量平均。不是整台电脑流量，不含连接开销、OAuth 或更新下载；上传数值不代表服务器已确认同步成功。
+
 修复同步期间无法切换语言：五种语言可在同步时切换并自动保存，同时更新系统托盘文字；无需暂停，也不会应用其他未保存设置。保存失败时保留原语言。
 
 本版新增凭据访问准备与内存缓存，减少重复读取钥匙串；退出、忘记登录或重新设置会清除缓存。同步包按 Agent 展开／收起，显示本地保存时间并从新到旧排列；状态卡提供明确结果、传输数量与处理建议。保存时间不是原始对话时间，更新后仍可能需要系统授权。
@@ -33,6 +37,8 @@ macOS 首次開啟若被阻擋，確認下載來源後，到「系統設定 → 
 macOS 首次打开若被阻止，确认下载来源后，在「系统设置 → 隐私与安全性 → 仍要打开」确认此 App。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 
 ## English
+
+app, Google and sync states share a row below Drive setup status, wrapping on narrow windows. Upload/download rates and totals since launch refresh each second. Rates average approximately three seconds of Drive HTTP payloads. Excludes system-wide traffic, transport overhead, OAuth and updates; upload counts do not imply server acknowledgement.
 
 Fixes language switching during synchronization. All five languages now save independently and update tray labels without pausing sync or applying other unsaved settings. Failed persistence keeps the previous language.
 
@@ -46,6 +52,8 @@ If macOS blocks the first launch, confirm the download source, then use System S
 
 ## 日本語
 
+アプリ・Google 接続・同期状態を Drive 設定状態の下に一列で表示します。狭い画面では折り返します。送受信速度と起動後の累計を毎秒更新します。速度は直近約3秒の Drive HTTP データ量の平均です。他のアプリ、通信の付加データ、OAuth、更新は含みません。送信量はサーバーの同期完了確認ではありません。
+
 同期中に言語を変更できない問題を修正しました。5言語の変更を個別に自動保存し、トレイの文字も更新します。同期の一時停止や他の未保存設定の適用は不要です。保存失敗時は元の言語を維持します。
 
 認証情報の事前準備とメモリキャッシュにより、キーチェーンの反復読み取りを減らします。終了、ログイン情報削除、設定再開始で消去します。スナップショットは Agent ごとに展開でき、端末への保存日時が新しい順に表示します。状態カードに結果、転送数、対処方法を示します。日時は元の会話日時ではなく、更新後にOSの許可が必要な場合があります。
@@ -57,6 +65,8 @@ macOSは未公証、WindowsはAuthenticode未署名のため、OSの確認が表
 macOSで初回起動が阻止された場合は配布元を確認し、「システム設定 → プライバシーとセキュリティ → このまま開く」でこのAppを確認してください。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 
 ## 한국어
+
+앱, Google 연결, 동기화 상태를 Drive 설정 상태 아래 한 줄에 표시하고 좁은 창에서는 줄바꿈합니다. 업로드·다운로드 속도와 실행 이후 누적량을 매초 갱신합니다. 속도는 최근 약 3초의 Drive HTTP 데이터 평균입니다. 다른 앱, 전송 오버헤드, OAuth, 업데이트는 제외하며 업로드 수치는 서버의 동기화 완료 확인이 아닙니다.
 
 동기화 중 언어를 변경할 수 없던 문제를 수정했습니다. 5개 언어를 개별 자동 저장하고 트레이 문구도 갱신합니다. 동기화를 중지하거나 다른 미저장 설정을 적용하지 않으며 저장 실패 시 이전 언어를 유지합니다.
 

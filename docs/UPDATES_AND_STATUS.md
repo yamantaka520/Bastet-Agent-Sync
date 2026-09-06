@@ -2,7 +2,7 @@
 
 Historical 0.2.0 behavior (superseded by [automatic AMOS sync in 0.2.1](AGENT_MEMORY_OS.md)): version 0.2.0 replaces the hard-coded disconnected label and permanently disabled Start button. Drive setup completion is reported from the native wizard; saved completion is distinct from a token currently held in this process. An idle, read-only status refresh checks token expiry every 15 seconds without contacting Google. It cannot detect remote revocation until a request is made.
 
-## Current Start and status (0.4.2)
+## Current Start and status (0.4.3)
 
 Start validates saved settings and Drive wizard progress, then runs selected local conversation adapters and the AMOS merge independently. Per-source results distinguish empty, syncing, partial and failed work. Credential access has its own visible phase. Missing sessions are added; existing different versions remain conflicts. Pause keeps completed source counters. Sync settings and update installation are blocked while the worker runs; language changes are independent and remain available. “App running” still indicates this desktop instance, not proof of a completed transfer. See [current adapter scope](NATIVE_SESSIONS.md).
 
@@ -18,7 +18,7 @@ The fixed feed is `https://github.com/yamantaka520/Bastet-Agent-Sync/releases/la
 
 ## Release operations
 
-The current [v0.4.2 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) includes the language fix, all supported installer targets and a verified live feed. See [release evidence](VALIDATION.md).
+The previous [v0.4.2 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) includes the language fix, all supported installer targets and a verified live feed. See [release evidence](VALIDATION.md).
 
 The first public [v0.4.0 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.0) includes all installer targets and a live update feed. Direct installer smoke tests passed; a real in-app upgrade between two released versions remains a separate acceptance check.
 
@@ -32,7 +32,7 @@ Official implementation references: [Tauri updater](https://v2.tauri.app/plugin/
 
 Language is an independent display preference and can change during synchronization. Changes save immediately and update tray labels; they do not mark synchronization settings dirty or apply other unsaved form edits. While a save is pending, the selector is disabled to avoid competing writes. Persistence failure retains the previous displayed language. Locale-only writes preserve disconnected source paths and do not bypass sync preflight.
 
-## Unreleased: compact status and Drive traffic
+## 0.4.3: compact status and Drive traffic
 
 App, Google connection and sync status share a row immediately below the Drive setup strip; narrow windows wrap the row. The next row shows upload/download rates and totals. The native status poll refreshes once per second without acquiring the cloud-operation lock. Missing telemetry is shown as unavailable, not zero.
 
