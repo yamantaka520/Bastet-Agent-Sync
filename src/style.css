@@ -721,3 +721,73 @@ footer p {
 .update-panel { margin-top: 1rem; font-size: .78rem; }
 .update-panel button { display: block; margin-top: .5rem; width: 100%; }
 .update-panel p { overflow-wrap: anywhere; }
+
+/* Agent summaries and collapsible snapshot library */
+.source-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+.source-card,
+.snapshot-group {
+  border: 1px solid #d6d0c5;
+  border-radius: 14px;
+  padding: 16px;
+  min-width: 0;
+}
+.source-card h4,
+.snapshot-group h4 {
+  margin: 0 0 10px;
+}
+.source-state {
+  font-weight: 650;
+}
+.sync-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 12px 0;
+}
+.sync-counts dt {
+  font-size: 0.8rem;
+}
+.sync-counts dd {
+  margin: 4px 0 0;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+.source-card details,
+.snapshot-group details {
+  font-size: 0.85rem;
+  margin: 12px 0;
+  overflow-wrap: anywhere;
+}
+.source-issue {
+  font-size: 0.9rem;
+}
+.snapshot-groups {
+  margin-top: 16px;
+}
+.snapshot-group {
+  margin-top: 10px;
+}
+.snapshot-toggle {
+  width: 100%;
+  text-align: left;
+}
+.snapshot-group ul {
+  list-style: none;
+  padding: 0;
+}
+.snapshot-group li {
+  border-top: 1px solid #d6d0c5;
+  padding: 14px 0;
+  overflow-wrap: anywhere;
+}
+.snapshot-time {
+  font-size: 0.9rem;
+}
+details summary {
+  cursor: pointer;
+}

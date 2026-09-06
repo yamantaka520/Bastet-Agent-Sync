@@ -2,6 +2,7 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
 import { names } from "./model";
+import { syncDisplay, issueText, savedTime } from "./sync-display";
 export const sessionMessages = {
   "zh-Hant": [
     "本機對話同步",
@@ -99,7 +100,13 @@ export type SourceStatus = {
   restored: number;
   issues: Record<string, number>;
 };
-type Snapshot = { id: string; agent: string; session: string; cwd: string };
+type Snapshot = {
+  id: string;
+  agent: string;
+  session: string;
+  cwd: string;
+  localSavedAt?: number | null;
+};
 const env: Record<string, string> = {
   codex: "CODEX_HOME",
   "chatgpt-work": "CODEX_HOME",
@@ -121,6 +128,9 @@ export default function NativeSessions({
   sources?: SourceStatus[];
 }) {
   const t = sessionMessages[locale];
+  const d = syncDisplay[locale];
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
   const [items, setItems] = useState<Snapshot[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -144,45 +154,71 @@ export default function NativeSessions({
       <h3>🐈 {t[0]}</h3>
       <p>{t[1]}</p>
       {!!sources?.length && (
-        <>
-          <h4>{t[13]}</h4>
-          <ul>
-            {sources.map((s) => (
-              <li key={s.agent}>
-                <strong>
-                  {s.state === "syncing"
-                    ? "🔄"
-                    : s.state === "error"
-                      ? "❌"
-                      : s.state === "partial"
-                        ? "⚠️"
-                        : s.state === "empty"
-                          ? "📭"
-                          : "✅"}{" "}
-                  {names[s.agent]} —{" "}
-                  {s.state === "syncing"
-                    ? "…"
-                    : s.state === "error"
-                      ? t[10]
-                      : s.state === "partial"
-                        ? t[9]
-                        : s.state === "empty"
-                          ? t[8]
-                          : t[7]}
-                </strong>
-                <p>
-                  {t[11]}: {s.captured} · ↑ {s.published} · ↓ {s.received} ·{" "}
-                  {t[12]}: {s.available} · ↪ {s.restored ?? 0}
+        <div className="source-cards">
+          {sources.map((s) => {
+            const state =
+              s.state === "syncing" && !running ? "paused" : s.state;
+            const labels: Record<string, [string, string]> = {
+              syncing: ["🔄", d[0]],
+              complete: ["✅", d[1]],
+              partial: ["⚠️", d[3]],
+              error: ["❌", d[4]],
+              empty: ["📭", d[5]],
+              paused: ["⏸️", d[6]],
+            };
+            const [icon, label] = labels[state] ?? ["🕒", d[7]];
+            return (
+              <article className="source-card" key={s.agent}>
+                <h4>{names[s.agent] ?? s.agent}</h4>
+                <p className="source-state">
+                  {icon} {label}
                 </p>
-                {Object.entries(s.issues).map(([code, count]) => (
-                  <p key={code} role="alert">
-                    {code} × {count}
+                {state === "complete" &&
+                  !s.published &&
+                  !s.received &&
+                  !s.restored && <p>{d[2]}</p>}
+                {state !== "syncing" && (
+                  <dl className="sync-counts">
+                    <div>
+                      <dt>↑ {d[8]}</dt>
+                      <dd>{s.published}</dd>
+                    </div>
+                    <div>
+                      <dt>↓ {d[9]}</dt>
+                      <dd>{s.received}</dd>
+                    </div>
+                    <div>
+                      <dt>{d[10]}</dt>
+                      <dd>{s.restored ?? 0}</dd>
+                    </div>
+                  </dl>
+                )}
+                {Array.from(
+                  new Set(
+                    Object.keys(s.issues).map((code) =>
+                      issueText(code, locale),
+                    ),
+                  ),
+                ).map((message) => (
+                  <p className="source-issue" key={message}>
+                    {message}
                   </p>
                 ))}
-              </li>
-            ))}
-          </ul>
-        </>
+                <details>
+                  <summary>{d[11]}</summary>
+                  <p>
+                    {t[11]}: {s.captured} · {t[12]}: {s.available}
+                  </p>
+                  {Object.entries(s.issues).map(([code, count]) => (
+                    <p key={code}>
+                      <code>{code}</code> × {count}
+                    </p>
+                  ))}
+                </details>
+              </article>
+            );
+          })}
+        </div>
       )}
       <button
         disabled={!native || running || busy}
@@ -196,33 +232,104 @@ export default function NativeSessions({
       </button>
       {running && <p>{t[4]}</p>}
       {items && (
-        <ul>
-          {!items.length && <li>{t[5]}</li>}
-          {items.map((item) => (
-            <li key={item.id}>
-              <strong>
-                {names[item.agent]} · {item.session}
-              </strong>
-              <p>
-                <code>{item.cwd}</code> · {item.id.slice(0, 12)}
-              </p>
-              <button
-                disabled={running || busy}
-                onClick={() =>
-                  void action(async () => {
-                    const path = await invoke<string | null>(
-                      "restore_received_session",
-                      { agent: item.agent, id: item.id },
+        <div className="snapshot-groups">
+          {!items.length ? (
+            <p>{t[5]}</p>
+          ) : (
+            <>
+              <p>{d[28]}</p>
+              <div className="cloud-actions">
+                <button
+                  onClick={() =>
+                    setExpanded(
+                      Object.fromEntries(
+                        items.map((item) => [item.agent, true]),
+                      ),
+                    )
+                  }
+                >
+                  {d[15]}
+                </button>
+                <button onClick={() => setExpanded({})}>{d[16]}</button>
+              </div>
+              {Array.from(new Set(items.map((item) => item.agent))).map(
+                (agent) => {
+                  const group = items
+                    .filter((item) => item.agent === agent)
+                    .sort(
+                      (a, b) =>
+                        (b.localSavedAt ?? -1) - (a.localSavedAt ?? -1) ||
+                        a.id.localeCompare(b.id),
                     );
-                    if (path) setRestored({ path, item });
-                  })
-                }
-              >
-                {t[3]}
-              </button>
-            </li>
-          ))}
-        </ul>
+                  return (
+                    <section className="snapshot-group" key={agent}>
+                      <h4>
+                        <button
+                          className="snapshot-toggle"
+                          aria-expanded={!!expanded[agent]}
+                          aria-controls={"snapshots-" + agent}
+                          onClick={() =>
+                            setExpanded((previous) => ({
+                              ...previous,
+                              [agent]: !previous[agent],
+                            }))
+                          }
+                        >
+                          <span aria-hidden="true">
+                            {expanded[agent] ? "▾" : "▸"}
+                          </span>{" "}
+                          {names[agent] ?? agent} · {group.length} {d[14]}
+                        </button>
+                      </h4>
+                      {expanded[agent] && (
+                        <ul id={"snapshots-" + agent}>
+                          {group.map((item) => (
+                            <li key={item.id}>
+                              <strong>
+                                {item.cwd.split(/[\/]/).filter(Boolean).pop() ||
+                                  item.session}
+                              </strong>
+                              <p className="snapshot-time">
+                                🕒 {d[12]}:{" "}
+                                {savedTime(item.localSavedAt, locale)}
+                              </p>
+                              <details>
+                                <summary>{d[11]}</summary>
+                                <p>
+                                  Session ID: <code>{item.session}</code>
+                                </p>
+                                <p>
+                                  <code>{item.cwd}</code>
+                                </p>
+                                <p>
+                                  <code>{item.id}</code>
+                                </p>
+                              </details>
+                              <button
+                                disabled={running || busy}
+                                onClick={() =>
+                                  void action(async () => {
+                                    const path = await invoke<string | null>(
+                                      "restore_received_session",
+                                      { agent: item.agent, id: item.id },
+                                    );
+                                    if (path) setRestored({ path, item });
+                                  })
+                                }
+                              >
+                                {t[3]}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </section>
+                  );
+                },
+              )}
+            </>
+          )}
+        </div>
       )}
       {restored && (
         <div>

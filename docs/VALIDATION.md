@@ -1,5 +1,12 @@
 # Validation
 
+## 0.4.1 sync display follow-up — 2026-09-06
+
+- 69 Rust and 26 frontend tests passed (one optional installed AMOS test skipped). UI checks default collapsed groups, individual/all expansion, newest-first ordering, absent/invalid timestamp fallback, selected restoration, paused and unknown states and five-language completeness.
+- Snapshot timestamps come from the local immutable object modification time, labelled as local save time; no original conversation timestamp is invented and no bundle schema/hash changes are introduced.
+- Human-readable issue summaries retain raw codes inside technical details. Unknown source states are waiting, never implicitly successful.
+- Native visual acceptance and replacement of the running older app remain outstanding; 0.4.1 is still unreleased.
+
 ## 0.4.1 credential cache — 2026-09-06
 
 - Local macOS: 69 Rust tests passed, one optional installed AMOS test skipped; 24 frontend tests passed; Clippy with warnings denied and frontend build passed.

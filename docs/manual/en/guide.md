@@ -44,3 +44,6 @@ If macOS blocks the first launch, confirm the download source, then use System S
 ### 🔐 0.4.1
 
 Use **🔐 Prepare credential access** before syncing to read saved credentials together. On macOS choose Always Allow for each requested Bastet item. Successful accesses are cached in memory until exit, forgetting login, restarting setup or changing client configuration. Closing to tray retains the cache. Press again after editing credentials externally. This action does not verify Google access or start sync. Each computer needs authorization; updates may ask again because Developer ID signing is not yet configured.
+
+
+Snapshots now collapse by Agent, with Expand all / Collapse all and local save timestamps sorted newest first. Source cards show clear status, uploaded/downloaded bundle counts and locally added items. Common errors include next steps; technical codes remain expandable. The save timestamp is not the original conversation time.

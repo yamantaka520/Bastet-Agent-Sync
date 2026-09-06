@@ -1,7 +1,9 @@
 # Changelog
 
-## 0.4.1 — credential access (unreleased)
+## 0.4.1 — credential access and clearer sync results (unreleased)
 
+- Group snapshots by agent with collapse/expand controls, local save timestamps and newest-first ordering.
+- Show per-agent result cards, labelled transfer counts and actionable five-language issue summaries; retain technical codes in expandable details.
 - Add five-language credential preparation guidance and an explicit read-only preparation button.
 - Cache successful native credential reads in zeroizing process memory; serialize concurrent misses and keep failed/missing reads retryable.
 - Rotate cache only after persisted writes; evict on failed writes/removals. Clear on logout, setup restart, client replacement and normal exit.

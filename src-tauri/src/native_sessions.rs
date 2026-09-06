@@ -731,6 +731,7 @@ pub struct Received {
     agent: String,
     session: String,
     cwd: String,
+    local_saved_at: Option<u64>,
 }
 fn native_root(app: &tauri::AppHandle) -> Result<(PathBuf, String)> {
     let root = app
@@ -779,6 +780,15 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
                         agent: agent.to_string(),
                         session: v["session"].as_str().unwrap_or("").into(),
                         cwd: v["cwd"].as_str().unwrap_or("").into(),
+                        // Local immutable object save time, not conversation creation time.
+                        local_saved_at: fs::symlink_metadata(
+                            p.join("replica/objects").join(format!("{}.json", b.id)),
+                        )
+                        .ok()
+                        .filter(|m| m.is_file() && !m.file_type().is_symlink())
+                        .and_then(|m| m.modified().ok())
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_secs()),
                     });
                 }
             }
