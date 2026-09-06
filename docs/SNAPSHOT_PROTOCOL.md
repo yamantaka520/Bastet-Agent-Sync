@@ -44,3 +44,5 @@ There is no automatic deletion or garbage collection in v1. A missing source or 
 ## Tests
 
 See [validation](VALIDATION.md) for automated and native UI evidence. The diagnostic uses two replicas, a shared folder, divergent edits, repeated synchronization, restart reconstruction and explicit resolution. Its displayed counts are derived from actual filesystem operations, not fabricated UI data.
+
+Current 0.5.0 scheduling, audit and optional portable-package controls are documented in [SYNC_CONTROL.md](SYNC_CONTROL.md). The underlying contract above remains applicable.

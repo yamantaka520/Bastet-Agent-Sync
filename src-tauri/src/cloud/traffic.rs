@@ -68,11 +68,17 @@ pub struct Counting<R> {
     inner: R,
     direction: usize,
     meter: Arc<Mutex<Meter>>,
+    progress: Option<crate::progress::Reporter>,
 }
 impl<R: Read> Read for Counting<R> {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
-        let n = self.inner.read(buffer)?;
+        let length = crate::resources::chunk(self.direction, buffer.len());
+        let n = self.inner.read(&mut buffer[..length])?;
+        crate::resources::pace(self.direction, n)?;
         if n > 0 {
+            if let Some(p) = &self.progress {
+                p.bytes(n);
+            }
             self.meter.lock().unwrap_or_else(|e| e.into_inner()).record(
                 START.elapsed().as_secs(),
                 self.direction,
@@ -87,15 +93,20 @@ pub fn download<R: Read>(inner: R) -> Counting<R> {
         inner,
         direction: 1,
         meter: METER.clone(),
+        progress: crate::progress::current(),
     }
 }
 pub fn upload(bytes: Vec<u8>) -> reqwest::blocking::Body {
     let length = bytes.len() as u64;
+    if let Some(p) = crate::progress::current() {
+        p.body(Some(length));
+    }
     reqwest::blocking::Body::sized(
         Counting {
             inner: io::Cursor::new(bytes),
             direction: 0,
             meter: METER.clone(),
+            progress: crate::progress::current(),
         },
         length,
     )
@@ -126,6 +137,7 @@ mod tests {
             inner: io::Cursor::new(vec![1; 10]),
             direction: 1,
             meter: meter.clone(),
+            progress: None,
         };
         assert_eq!(meter.lock().unwrap().totals, [0, 0]);
         assert_eq!(reader.read(&mut [0; 4]).unwrap(), 4);

@@ -105,6 +105,7 @@ mod tests {
         }
         fn inspect(&self, id: &str) -> Result<File> {
             Ok(File {
+                size: None,
                 id: id.into(),
                 name: "Bastet".into(),
                 mime_type: "application/vnd.google-apps.folder".into(),

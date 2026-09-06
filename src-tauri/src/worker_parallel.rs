@@ -83,7 +83,15 @@ pub fn run<T: Sync>(groups: &[T], worker: &Worker, action: impl Fn(&T) + Sync) -
     let failed = Mutex::new(false);
     std::thread::scope(|scope| {
         let mut handles = Vec::new();
-        for _ in 0..MAX_PARALLEL.min(groups.len()) {
+        for _ in 0..worker
+            .0
+             .0
+            .lock()
+            .map(|c| c.parallel.unwrap_or(MAX_PARALLEL))
+            .unwrap_or(1)
+            .clamp(1, 6)
+            .min(groups.len())
+        {
             let action = &action;
             let next = &next;
             let failed = &failed;
@@ -95,7 +103,10 @@ pub fn run<T: Sync>(groups: &[T], worker: &Worker, action: impl Fn(&T) + Sync) -
                             Ok(c) => c,
                             Err(_) => break,
                         };
-                        if control.stop || *failed.lock().unwrap_or_else(|e| e.into_inner()) {
+                        if control.stop
+                            || control.pause_until.is_some_and(|t| t > super::now())
+                            || *failed.lock().unwrap_or_else(|e| e.into_inner())
+                        {
                             break;
                         }
                         next.fetch_add(1, Ordering::Relaxed)
@@ -175,8 +186,9 @@ mod tests {
         assert_eq!(tasks.len(), 2);
         assert_eq!(groups, [vec![0, 1]]); // Both use the canonical Codex journal.
     }
-    fn exercise(pause: bool) {
+    fn exercise(pause: bool, parallel: usize) {
         let worker = Worker::default();
+        worker.0 .0.lock().unwrap().parallel = Some(parallel);
         let active = AtomicUsize::new(0);
         let peak = AtomicUsize::new(0);
         let completed = AtomicUsize::new(0);
@@ -197,7 +209,7 @@ mod tests {
                     completed.fetch_add(1, Ordering::SeqCst);
                 })
             });
-            let started = (0..3)
+            let started = (0..parallel)
                 .map(|_| rx.recv_timeout(Duration::from_secs(3)).is_ok())
                 .collect::<Vec<_>>();
             if pause {
@@ -207,20 +219,40 @@ mod tests {
             *gate.0.lock().unwrap() = true;
             gate.1.notify_all();
             handle.join().unwrap().unwrap();
-            assert!(started.into_iter().all(|v| v), "three groups must overlap");
+            assert!(
+                started.into_iter().all(|v| v),
+                "configured groups must overlap"
+            );
             assert!(!excess);
         });
-        assert_eq!(peak.load(Ordering::SeqCst), MAX_PARALLEL);
+        assert_eq!(peak.load(Ordering::SeqCst), parallel);
         assert_eq!(active.load(Ordering::SeqCst), 0); // All active jobs joined before return.
-        assert_eq!(completed.load(Ordering::SeqCst), if pause { 3 } else { 7 });
+        assert_eq!(
+            completed.load(Ordering::SeqCst),
+            if pause { parallel } else { 7 }
+        );
     }
     #[test]
     fn exactly_three_groups_overlap_and_all_work_completes() {
-        exercise(false);
+        exercise(false, 3);
     }
     #[test]
     fn pause_stops_dispatch_and_waits_for_active_groups() {
-        exercise(true);
+        exercise(true, 3);
+    }
+    #[test]
+    fn configured_serial_and_six_group_limits_and_timed_pause_are_honored() {
+        exercise(false, 1);
+        exercise(false, 6);
+        exercise(true, 2);
+        let worker = Worker::default();
+        worker.0 .0.lock().unwrap().pause_until = Some(super::super::now() + 60);
+        let count = AtomicUsize::new(0);
+        run(&[1, 2], &worker, |_| {
+            count.fetch_add(1, Ordering::SeqCst);
+        })
+        .unwrap();
+        assert_eq!(count.load(Ordering::SeqCst), 0);
     }
     #[test]
     fn panic_is_reported_after_threads_join_instead_of_leaving_worker_running() {

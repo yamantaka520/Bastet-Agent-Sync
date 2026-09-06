@@ -31,9 +31,11 @@ pub struct Manifest {
     pub cwd: String,
     pub files: BTreeMap<String, String>,
 }
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceStatus {
+    #[serde(default)]
+    pub progress: Option<crate::progress::Progress>,
     pub agent: String,
     pub state: String,
     pub captured: usize,
@@ -53,7 +55,7 @@ struct Journal {
 fn json<T: Serialize>(v: &T) -> Result<String> {
     serde_json::to_string(v).map_err(|_| "session_invalid".into())
 }
-fn safe_relative(value: &str) -> bool {
+pub(crate) fn safe_relative(value: &str) -> bool {
     !value.is_empty()
         && value.len() < 2048
         && !value.contains(['\\', ':', '\0'])
@@ -599,6 +601,7 @@ pub fn cycle(
         state: "complete".into(),
         ..Default::default()
     };
+    crate::progress::stage("scan", None);
     if !matches!(direction, Direction::Download) {
         let mut batch = replica.export_batch()?;
         if !source.is_dir() {
@@ -619,7 +622,9 @@ pub fn cycle(
             {
                 walk(&source.join("archived_sessions"), 5, &mut paths)?;
             }
+            crate::progress::stage("scan", Some(paths.len()));
             for p in paths {
+                crate::progress::advance();
                 if stop() {
                     return Err("sync_paused".into());
                 }
@@ -690,6 +695,7 @@ pub fn cycle(
         .flat_map(|b| b.snapshot.parents.iter().cloned())
         .collect();
     if !matches!(direction, Direction::Upload) {
+        crate::progress::stage("restore", None);
         for b in all.values().filter(|b| {
             b.snapshot.stream.agent == agent
                 && b.snapshot.stream.profile != journal.node
@@ -700,6 +706,7 @@ pub fn cycle(
                 return Err("sync_paused".into());
             }
             status.available += 1;
+            crate::progress::advance();
             let result = (|| {
                 let m = unpack(b, &all)?;
                 if m.agent != agent
@@ -865,6 +872,97 @@ pub async fn restore_received_session(
     .map_err(|_| "store_unavailable".to_string())?
 }
 
+fn compare_session(
+    app: &tauri::AppHandle,
+    agent: &str,
+    id: &str,
+    source_agent: Option<&str>,
+) -> Result<crate::review::Comparison> {
+    if !crate::model::AGENTS.contains(&agent) || !bundle::is_hash(id) {
+        return Err("session_invalid".into());
+    }
+    let (root, space) = native_root(app)?;
+    let settings = crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
+    let agents = crate::detect(Some(&settings));
+    let canonical = if agent == "claude" {
+        "claude-code"
+    } else if agent == "chatgpt-work" {
+        "codex"
+    } else {
+        agent
+    };
+    let chosen = source_agent.unwrap_or(canonical);
+    if chosen != canonical && !(canonical == "codex" && chosen == "chatgpt-work") {
+        return Err("source_missing".into());
+    }
+    let source = agents
+        .iter()
+        .find(|a| a.id == chosen)
+        .ok_or("source_missing")?;
+    let replica = Replica::open(
+        &root
+            .join(format!("sessions-{canonical}-{space}"))
+            .join("replica"),
+        &space,
+    )?;
+    let all = replica.transport_bundles()?;
+    let b = all.get(id).ok_or("session_invalid")?;
+    let manifest = unpack(b, &all)?;
+    if manifest.agent != canonical || manifest.files.len() > 256 {
+        return Err("session_invalid".into());
+    }
+    let mut files = Vec::new();
+    for (path, encoded) in manifest.files {
+        if !allowed(canonical, &path) {
+            return Err("session_invalid".into());
+        }
+        let incoming = STANDARD.decode(encoded).map_err(|_| "session_invalid")?;
+        files.push(crate::review::diff(
+            path.clone(),
+            crate::review::local_file(Path::new(&source.path), &path, MAX_RAW)?,
+            &incoming,
+        ));
+    }
+    crate::review::comparison(&root, &format!("{canonical}:{id}"), files)
+}
+#[tauri::command]
+pub async fn compare_received_session(
+    app: tauri::AppHandle,
+    agent: String,
+    id: String,
+    source_agent: Option<String>,
+) -> Result<crate::review::Comparison> {
+    tauri::async_runtime::spawn_blocking(move || {
+        compare_session(&app, &agent, &id, source_agent.as_deref())
+    })
+    .await
+    .map_err(|_| "store_unavailable".to_string())?
+}
+#[tauri::command]
+pub async fn review_received_session(
+    app: tauri::AppHandle,
+    agent: String,
+    id: String,
+    fingerprint: String,
+    source_agent: Option<String>,
+) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let comparison = compare_session(&app, &agent, &id, source_agent.as_deref())?;
+        if comparison.fingerprint != fingerprint {
+            return Err("source_changing".into());
+        }
+        let (root, _) = native_root(&app)?;
+        let canonical = match agent.as_str() {
+            "claude" => "claude-code",
+            "chatgpt-work" => "codex",
+            a => a,
+        };
+        crate::review::mark(&root, format!("{canonical}:{id}"), &fingerprint)
+    })
+    .await
+    .map_err(|_| "store_unavailable".to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -925,6 +1023,89 @@ mod tests {
             _ => unreachable!(),
         }
         write(root, "auth.json", b"secret-must-not-travel");
+    }
+    #[test]
+    #[ignore = "requires installed Grok and explicit synthetic fixture root; never reads default profiles"]
+    fn installed_native_cli_restored_fixture() {
+        use std::process::Command;
+        let fixtures = PathBuf::from(
+            std::env::var("BASTET_NATIVE_FIXTURES").expect("explicit synthetic fixtures"),
+        );
+        let temp = tempfile::tempdir().unwrap();
+        let key = SpaceKey::generate().unwrap();
+        for agent in ["grok", "agy"] {
+            let source = fixtures.join(agent);
+            let manifest = if agent == "grok" {
+                let group = fs::read_dir(source.join("sessions"))
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .unwrap()
+                    .path();
+                let session = fs::read_dir(group).unwrap().next().unwrap().unwrap().path();
+                capture_grok(&source, &session).unwrap()
+            } else {
+                let file = fs::read_dir(source.join("conversations"))
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .unwrap()
+                    .path();
+                capture_file(agent, &source, &file, temp.path()).unwrap()
+            };
+            let replica =
+                Replica::open(&temp.path().join(format!("replica-{agent}")), "space").unwrap();
+            let mut journal = Journal {
+                node: "fixture".into(),
+                ..Default::default()
+            };
+            let mut batch = replica.export_batch().unwrap();
+            let id = publish(&manifest, &mut batch, &mut journal, PART_SIZE).unwrap();
+            drop(batch);
+            let all = replica.transport_bundles().unwrap();
+            let received = all
+                .iter()
+                .map(|(id, b)| {
+                    (
+                        id.clone(),
+                        key.open("space", &key.seal(b).unwrap()).unwrap(),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>();
+            let target = temp.path().join(format!("restored-{agent}"));
+            restore(&received[&id], &received, &target).unwrap();
+            if agent == "grok" {
+                let cli = std::env::var("BASTET_GROK_CLI").expect("explicit installed CLI");
+                let output = temp.path().join("export.md");
+                let status = Command::new(cli)
+                    .env("GROK_HOME", &target)
+                    .args(["export", &manifest.session])
+                    .arg(&output)
+                    .status()
+                    .unwrap();
+                assert!(status.success());
+                let text = fs::read_to_string(output).unwrap();
+                assert!(
+                    text.contains("BASTET_RESTORE_SENTINEL_USER")
+                        && text.contains("BASTET_RESTORE_SENTINEL_AGENT")
+                );
+            } else {
+                let path = target.join(manifest.files.keys().next().unwrap());
+                let db = rusqlite::Connection::open_with_flags(
+                    path,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+                )
+                .unwrap();
+                let integrity: String = db
+                    .query_row("PRAGMA integrity_check", [], |r| r.get(0))
+                    .unwrap();
+                assert_eq!(integrity, "ok");
+                let count: i64 = db
+                    .query_row("SELECT count(*) FROM steps", [], |r| r.get(0))
+                    .unwrap();
+                assert!(count > 0);
+            }
+        }
     }
     #[test]
     fn seven_sources_transfer_restore_and_do_not_upload_unchanged_again() {

@@ -23,3 +23,5 @@ ChatGPT Work appears separately in the source list and uses shared local Codex r
 ## Validation
 
 Tests cover automatic queue exchange, failed import retry, unchanged data, cancellation and all-source selection without a global veto. A separately invoked installed-CLI test uses two temporary memory homes to verify export, backup, semantic import and repeat stability. No physical second-device or Windows/Linux interactive acceptance is implied. See [validation](VALIDATION.md).
+
+Current 0.5.0 scheduling, audit and optional portable-package controls are documented in [SYNC_CONTROL.md](SYNC_CONTROL.md). The underlying contract above remains applicable.

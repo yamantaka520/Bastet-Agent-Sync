@@ -31,6 +31,10 @@ pub struct Settings {
     pub schedule: String,
     pub interval_seconds: u32,
     pub close_to_tray: bool,
+    #[serde(default)]
+    pub resources: crate::resources::Options,
+    #[serde(default)]
+    pub portable: crate::portable::Options,
 }
 impl Default for Settings {
     fn default() -> Self {
@@ -45,6 +49,8 @@ impl Default for Settings {
             schedule: "near-realtime".into(),
             interval_seconds: 60,
             close_to_tray: false,
+            resources: Default::default(),
+            portable: Default::default(),
         }
     }
 }
@@ -106,6 +112,8 @@ pub fn discover(
 }
 
 pub fn validate(settings: &Settings) -> Result<(), String> {
+    settings.resources.validate()?;
+    settings.portable.validate()?;
     if settings.schema != 1 || !LOCALES.contains(&settings.locale.as_str()) {
         return Err("invalid_settings".into());
     }

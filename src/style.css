@@ -714,13 +714,35 @@ footer p {
   }
 }
 
-.build-version { display: block; margin: .75rem 0 0; color: var(--muted, #76665a); font-size: .72rem; overflow-wrap: anywhere; }
-.runtime-panel { border-left: 4px solid #cf9259; }
-.runtime-panel h2 { font-size: 1.15rem; margin: .5rem 0; }
-.runtime-panel li { margin: .35rem 0; }
-.update-panel { margin-top: 1rem; font-size: .78rem; }
-.update-panel button { display: block; margin-top: .5rem; width: 100%; }
-.update-panel p { overflow-wrap: anywhere; }
+.build-version {
+  display: block;
+  margin: 0.75rem 0 0;
+  color: var(--muted, #76665a);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+.runtime-panel {
+  border-left: 4px solid #cf9259;
+}
+.runtime-panel h2 {
+  font-size: 1.15rem;
+  margin: 0.5rem 0;
+}
+.runtime-panel li {
+  margin: 0.35rem 0;
+}
+.update-panel {
+  margin-top: 1rem;
+  font-size: 0.78rem;
+}
+.update-panel button {
+  display: block;
+  margin-top: 0.5rem;
+  width: 100%;
+}
+.update-panel p {
+  overflow-wrap: anywhere;
+}
 
 /* Agent summaries and collapsible snapshot library */
 .source-cards {
@@ -836,4 +858,70 @@ details summary {
   border: 1px solid #dbe1cd;
   border-radius: 8px;
   box-shadow: 0 4px 12px #0001;
+}
+
+.operations-panel details {
+  margin: 12px 0;
+  padding: 10px;
+  border: 1px solid #e3e2d8;
+  border-radius: 8px;
+}
+.operations-panel article {
+  padding: 8px;
+  border-bottom: 1px solid #e3e2d8;
+}
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.resource-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 16px 8px 0;
+}
+.resource-controls input[type="number"] {
+  width: 100px;
+}
+.source-progress progress {
+  width: 100%;
+  accent-color: #839063;
+}
+.source-progress {
+  font-size: 12px;
+}
+
+.diff-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.diff-columns pre,
+.portable-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 360px;
+  overflow: auto;
+  background: #f3f3eb;
+  padding: 10px;
+}
+.diff-columns code {
+  overflow-wrap: anywhere;
+}
+.portable-panel label {
+  display: block;
+  padding: 8px;
+}
+.portable-panel details,
+.review-panel details {
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid #e3e2d8;
+  border-radius: 8px;
+}
+@media (max-width: 700px) {
+  .diff-columns {
+    grid-template-columns: 1fr;
+  }
 }

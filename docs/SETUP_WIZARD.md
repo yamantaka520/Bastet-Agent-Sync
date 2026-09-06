@@ -69,3 +69,5 @@ Import persists the OAuth JSON through the native credential store and verifies 
 ## Credential preparation (0.4.1)
 
 After selecting a client, **Prepare credential access** can read the credentials saved so far before syncing. OS prompts may occur for separate entries; preparation does not finish missing wizard steps, verify Google access or start the worker. A failure stays visible and can be retried. See [credential cache lifecycle](CLOUD_SECURITY.md#credential-access-in-041).
+
+Current 0.5.0 scheduling, audit and optional portable-package controls are documented in [SYNC_CONTROL.md](SYNC_CONTROL.md). The underlying contract above remains applicable.

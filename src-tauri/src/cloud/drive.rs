@@ -9,6 +9,21 @@ use reqwest::blocking::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{io::Read, time::Duration};
+#[derive(Clone, Copy)]
+pub enum ObjectKind {
+    Session,
+    Device,
+    Portable,
+}
+impl ObjectKind {
+    fn mime(self) -> &'static str {
+        match self {
+            Self::Session => "application/octet-stream",
+            Self::Device => "application/vnd.bastet.device-encrypted",
+            Self::Portable => "application/vnd.bastet.portable-encrypted",
+        }
+    }
+}
 const FILES: &str = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD: &str = "https://www.googleapis.com/upload/drive/v3/files";
 const FOLDER: &str = "application/vnd.google-apps.folder";
@@ -45,6 +60,8 @@ pub struct File {
     pub trashed: bool,
     #[serde(default)]
     pub version: Option<String>,
+    #[serde(default)]
+    pub size: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -92,6 +109,9 @@ fn read(response: Response, limit: usize) -> Result<Vec<u8>> {
         return Err("drive_response_limit".into());
     }
     let mut bytes = Vec::new();
+    if let Some(p) = crate::progress::current() {
+        p.body(response.content_length());
+    }
     super::traffic::download(response)
         .take(limit as u64 + 1)
         .read_to_end(&mut bytes)
@@ -136,6 +156,7 @@ impl Drive {
             .get(&self.about_url)
             .bearer_auth(self.token.value.as_str())
             .query(&[("fields", "user(permissionId,displayName,emailAddress)")])
+            .timeout(crate::resources::request_timeout())
             .send()
             .map_err(|_| "network_unavailable")?;
         #[derive(Deserialize)]
@@ -162,6 +183,7 @@ impl Drive {
             .get(format!("{}/generateIds", self.files_url))
             .bearer_auth(self.token.value.as_str())
             .query(&[("count", "1"), ("space", "drive"), ("type", "files")])
+            .timeout(crate::resources::request_timeout())
             .send()
             .map_err(|_| "network_unavailable")?;
         #[derive(Deserialize)]
@@ -187,6 +209,14 @@ impl Drive {
             "trashed = false and '{folder}' in parents and mimeType = 'application/octet-stream'"
         ))
     }
+    pub fn list_kind(&self, folder: &str, kind: ObjectKind) -> Result<Vec<File>> {
+        id(folder)?;
+        self.verify_folder(folder)?;
+        self.list(&format!(
+            "trashed = false and '{folder}' in parents and mimeType = '{}'",
+            kind.mime()
+        ))
+    }
     fn list(&self, query: &str) -> Result<Vec<File>> {
         self.check_token()?;
         let mut files = vec![];
@@ -203,13 +233,14 @@ impl Drive {
                     ("pageSize", "1000"),
                     (
                         "fields",
-                        "nextPageToken,incompleteSearch,files(id,name,mimeType,parents,trashed,version)",
+                        "nextPageToken,incompleteSearch,files(id,name,mimeType,parents,trashed,version,size)",
                     ),
                     ("pageToken", next.as_str()),
                     ("supportsAllDrives", "true"),
                     ("includeItemsFromAllDrives", "true"),
                 ])
-                .send()
+                .timeout(crate::resources::request_timeout())
+            .send()
                 .map_err(|_| "network_unavailable")?;
             let page: Page = serde_json::from_slice(&read(r, 1024 * 1024)?)
                 .map_err(|_| "drive_invalid_response")?;
@@ -243,6 +274,7 @@ impl Drive {
                 ("fields", "id,name,mimeType,parents,trashed"),
                 ("supportsAllDrives", "true"),
             ])
+            .timeout(crate::resources::request_timeout())
             .send()
             .map_err(|_| "network_unavailable")?;
         let info: File =
@@ -275,6 +307,7 @@ impl Drive {
                 serde_json::to_vec(&json!({"id":allocated,"name":name,"mimeType":FOLDER}))
                     .map_err(|_| "drive_invalid_metadata")?,
             ))
+            .timeout(crate::resources::request_timeout())
             .send()
             .map_err(|_| "network_unavailable")?;
         serde_json::from_slice(&read(r, 65536)?).map_err(|_| "drive_invalid_response".into())
@@ -287,9 +320,19 @@ impl Drive {
         key: &SpaceKey,
         bundle: &Bundle,
     ) -> Result<File> {
+        self.upload_kind(folder, allocated, key, bundle, ObjectKind::Session)
+    }
+    pub fn upload_kind(
+        &self,
+        folder: &str,
+        allocated: &str,
+        key: &SpaceKey,
+        bundle: &Bundle,
+        kind: ObjectKind,
+    ) -> Result<File> {
         id(allocated)?;
         self.verify_folder(folder)?;
-        let metadata = json!({"id":allocated,"name":format!("{allocated}.bas"),"parents":[folder],"mimeType":"application/octet-stream"});
+        let metadata = json!({"id":allocated,"name":format!("{allocated}.bas"),"parents":[folder],"mimeType":kind.mime()});
         let boundary = format!("bastet_{}", uuid::Uuid::new_v4().simple());
         let encrypted = key.seal(bundle)?;
         let mut bytes=format!("--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n--{boundary}\r\nContent-Type: application/octet-stream\r\n\r\n").into_bytes();
@@ -309,6 +352,7 @@ impl Drive {
                 format!("multipart/related; boundary={boundary}"),
             )
             .body(super::traffic::upload(bytes))
+            .timeout(crate::resources::request_timeout())
             .send()
             .map_err(|_| "network_unavailable")?;
         serde_json::from_slice(&read(r, 65536)?).map_err(|_| "drive_invalid_response".into())
@@ -320,10 +364,19 @@ impl Drive {
         space: &str,
         key: &SpaceKey,
     ) -> Result<Bundle> {
+        self.download_kind(folder, file, space, key, ObjectKind::Session)
+    }
+    pub fn download_kind(
+        &self,
+        folder: &str,
+        file: &str,
+        space: &str,
+        key: &SpaceKey,
+        kind: ObjectKind,
+    ) -> Result<Bundle> {
         id(folder)?;
         let meta = self.metadata(file)?;
-        if !meta.parents.iter().any(|v| v == folder) || meta.mime_type != "application/octet-stream"
-        {
+        if !meta.parents.iter().any(|v| v == folder) || meta.mime_type != kind.mime() {
             return Err("drive_wrong_parent_or_type".into());
         }
         let r = self
@@ -331,9 +384,36 @@ impl Drive {
             .get(format!("{}/{file}", self.files_url))
             .bearer_auth(self.token.value.as_str())
             .query(&[("alt", "media"), ("supportsAllDrives", "true")])
+            .timeout(crate::resources::request_timeout())
             .send()
             .map_err(|_| "network_unavailable")?;
         key.open(space, &read(r, MAX_ENCRYPTED)?)
+    }
+    /// Only the caller's own device report may be replaced; caller supplies its expected profile.
+    pub fn update_device(
+        &self,
+        folder: &str,
+        file: &str,
+        space: &str,
+        key: &SpaceKey,
+        bundle: &Bundle,
+    ) -> Result<()> {
+        let previous = self.download_kind(folder, file, space, key, ObjectKind::Device)?;
+        if previous.snapshot.stream != bundle.snapshot.stream {
+            return Err("device_report_mismatch".into());
+        }
+        let r = self
+            .client
+            .patch(format!("{}/{file}", self.upload_url))
+            .bearer_auth(self.token.value.as_str())
+            .query(&[("uploadType", "media"), ("supportsAllDrives", "true")])
+            .header("Content-Type", ObjectKind::Device.mime())
+            .body(super::traffic::upload(key.seal(bundle)?))
+            .timeout(crate::resources::request_timeout())
+            .send()
+            .map_err(|_| "network_unavailable")?;
+        read(r, 65536)?;
+        Ok(())
     }
 }
 #[cfg(test)]
@@ -550,5 +630,77 @@ mod http_tests {
             "drive_wrong_parent_or_type"
         );
         assert_eq!(server.join().unwrap().len(), 1);
+    }
+    #[test]
+    fn typed_objects_are_separate_and_wrong_type_cannot_be_read() {
+        for kind in [
+            ObjectKind::Session,
+            ObjectKind::Portable,
+            ObjectKind::Device,
+        ] {
+            let (drive, server) =
+                fixture(vec![(200, folder()), (200, br#"{"files":[]}"#.to_vec())]);
+            assert!(drive.list_kind("folder", kind).unwrap().is_empty());
+            let requests = server.join().unwrap();
+            let decoded = url::form_urlencoded::parse(
+                String::from_utf8_lossy(&requests[1])
+                    .split(" HTTP/")
+                    .next()
+                    .unwrap()
+                    .trim_start_matches("GET /files?")
+                    .as_bytes(),
+            )
+            .into_owned()
+            .collect::<std::collections::BTreeMap<_, _>>();
+            assert!(decoded["q"].contains(kind.mime()));
+            assert!(decoded["fields"].contains("size"));
+        }
+        let meta =
+            json!({"id":"object","name":"object.bas","mimeType":ObjectKind::Portable.mime(),"parents":["folder"]})
+                .to_string()
+                .into_bytes();
+        let (drive, server) = fixture(vec![(200, meta)]);
+        assert_eq!(
+            drive
+                .download("folder", "object", "space", &SpaceKey::generate().unwrap())
+                .unwrap_err(),
+            "drive_wrong_parent_or_type"
+        );
+        assert_eq!(server.join().unwrap().len(), 1);
+    }
+    #[test]
+    fn device_update_reuses_id_but_refuses_another_device_stream() {
+        let key = SpaceKey::generate().unwrap();
+        let original = bundle();
+        let meta = json!({"id":"object","name":"object.bas","mimeType":ObjectKind::Device.mime(),"parents":["folder"]})
+            .to_string()
+            .into_bytes();
+        let (drive, server) = fixture(vec![
+            (200, meta.clone()),
+            (200, key.seal(&original).unwrap()),
+            (200, b"{}".to_vec()),
+        ]);
+        drive
+            .update_device("folder", "object", "space", &key, &original)
+            .unwrap();
+        let requests = server.join().unwrap();
+        assert!(String::from_utf8_lossy(&requests[2]).starts_with("PATCH /upload/object?"));
+        assert!(!String::from_utf8_lossy(&requests[2]).contains("PRIVATE FIXTURE"));
+        let mut other = original.snapshot.clone();
+        other.stream.profile = "other".into();
+        let (drive, server) = fixture(vec![(200, meta), (200, key.seal(&original).unwrap())]);
+        assert_eq!(
+            drive
+                .update_device(
+                    "folder",
+                    "object",
+                    "space",
+                    &key,
+                    &Bundle::new(other).unwrap()
+                )
+                .unwrap_err(),
+            "device_report_mismatch"
+        );
+        assert_eq!(server.join().unwrap().len(), 2);
     }
 }

@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: 0.4.2 three-platform installers are published and verified; it permits independent, persisted language changes during sync. 0.4.1 adds credential caching and clearer grouped snapshot/results UI; its three-platform installers are published. 0.4.0 packages the first macOS/Windows/Linux installers with runtime dependency handling and direct release downloads. The 0.3.2 core adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
+Status: 0.5.0 implements the [sync control center](SYNC_CONTROL.md), configurable parallel/resource budgets, persistent audit/device reports, conflict comparison, local cache maintenance and opt-in reviewed portable packages. Installed Agy/Grok local acceptance is recorded with its limits. Three-platform release evidence is tracked in [validation](VALIDATION.md); full physical-device continuation, project mapping and attachment completeness remain separate gates.
 
 ## Product
 
@@ -51,6 +51,6 @@ Version 0.2.0 adds [runtime preflight/status and a signed updater](UPDATES_AND_S
 
 Historical 0.2.1 introduced AMOS automatic sync. The current worker also handles the documented local conversation sources, including shared Codex/Work rollout storage. See [current adapters](NATIVE_SESSIONS.md); cloud Work and full native continuation remain outside guarantees.
 
-## Unreleased concurrency milestone
+## 0.5.0 concurrency and control milestone
 
-The worker now schedules up to three independent storage groups concurrently, while preserving canonical store/journal serialization, alias deduplication and ordered native/AMOS writes. Queued states, safe pause/join and a thread-safe revision cache are implemented. See [behavior and limits](UPDATES_AND_STATUS.md) and [validation](VALIDATION.md). Public v0.4.3 remains sequential until a subsequent release.
+The worker now schedules 1–6 independent storage groups (default 3) concurrently, while preserving canonical store/journal serialization, alias deduplication and ordered native/AMOS writes. Queued states, safe pause/join and a thread-safe revision cache are implemented. See [behavior and limits](UPDATES_AND_STATUS.md) and [validation](VALIDATION.md). The published package version and evidence are tracked in the changelog.

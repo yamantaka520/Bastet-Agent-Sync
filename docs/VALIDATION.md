@@ -1,5 +1,14 @@
 # Validation
 
+## 0.5.0 control center — local acceptance, 2026-09-07
+
+- New regression coverage includes configured concurrency, timed dispatch pause, aggregate bandwidth/cancellation, progress isolation and ETA, history retention/corruption, identity persistence, safe cache cleanup, reviewed fingerprints, path/symlink rejection, portable sanitization/selection, encrypted idempotent preferences exchange and MIME/stream guards. Local results: 97 Rust tests passed, 2 optional installed-CLI tests excluded from the default suite; the new Agy/Grok installed fixture test was separately run and passed. 39 frontend tests, TypeScript/Vite build, Clippy with warnings denied, documentation checks and 3 release-asset tests passed. CI/package evidence follows after release verification.
+- Installed Grok exported both synthetic ACP sentinel messages after Bastet capture, compression, encryption/decryption and isolated-folder restore. Agy's dedicated original test conversation was created and resumed with the installed logged-in CLI; the second invocation repeated its prior marker. Bastet's restored snapshot passed SQLite integrity and nonempty-step checks. No private user conversation was used. Restored-profile Agy model continuation and physical second-device transfer are not claimed.
+- macOS in-app upgrade success is a user statement. Apple notarization and Windows Authenticode are excluded by authorization.
+- Browser visual QA was blocked: the tool could not verify an admin-enforced browser policy. No browser-control workaround or new visual acceptance is claimed. Existing running app was not overwritten.
+- [Exact behavior and limitations](SYNC_CONTROL.md). This entry supersedes the earlier unreleased scheduling status; dated historical evidence below is retained.
+
+
 ## Bounded parallel synchronization — unreleased, 2026-09-06
 
 - 79 native tests passed; one installed-AMOS opt-in test ignored. 32 frontend tests passed. Clippy with warnings denied, optimized native build and production frontend build passed.

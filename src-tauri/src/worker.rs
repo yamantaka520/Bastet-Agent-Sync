@@ -14,7 +14,7 @@ use crate::{
     },
 };
 #[path = "worker_parallel.rs"]
-mod parallel;
+pub(crate) mod parallel;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
@@ -27,6 +27,8 @@ use tauri::{Manager, State};
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     pub traffic: crate::cloud::traffic::Sample,
+    pub observer_error: Option<String>,
+    pub resume_at: Option<u64>,
     pub running: bool,
     pub phase: String,
     pub published: usize,
@@ -42,6 +44,8 @@ struct Control {
     status: Status,
     stop: bool,
     wake: bool,
+    parallel: Option<usize>,
+    pause_until: Option<u64>,
 }
 #[derive(Clone, Default)]
 pub struct Worker(Arc<(Mutex<Control>, Condvar)>);
@@ -50,6 +54,13 @@ impl Worker {
         self.0 .0.lock().map(|c| c.status.running).unwrap_or(true)
     }
     fn stopped(&self) -> bool {
+        self.0
+             .0
+            .lock()
+            .map(|c| c.stop || c.pause_until.is_some_and(|t| t > now()))
+            .unwrap_or(true)
+    }
+    fn permanent_stop(&self) -> bool {
         self.0 .0.lock().map(|c| c.stop).unwrap_or(true)
     }
     fn update(&self, f: impl FnOnce(&mut Status)) {
@@ -169,6 +180,7 @@ pub fn cycle(
         return Err("sync_paused".into());
     }
     if !matches!(direction, Direction::Download) {
+        crate::progress::stage("scan", None);
         let text = memory.export(root)?;
         let fingerprint = amos_runtime::fingerprint(&text)?;
         if fingerprint != l.fingerprint {
@@ -210,6 +222,7 @@ pub fn cycle(
             .values()
             .filter(|b| b.snapshot.stream.agent == "agent-memory-os" && !l.applied.contains(&b.id))
             .collect::<Vec<_>>();
+        crate::progress::stage("restore", Some(remaining.len()));
         while !remaining.is_empty() {
             if stop() {
                 return Err("sync_paused".into());
@@ -223,6 +236,7 @@ pub fn cycle(
                 memory.apply(root, &crate::memory_adapter::restore_export(b)?, &b.id)?;
                 applied += 1;
             }
+            crate::progress::advance();
             l.applied.insert(b.id.clone());
             save(root, &l)?;
         }
@@ -266,7 +280,7 @@ fn run_once(
     let cache_root = root.join(format!("drive-cache-{}", binding.space));
     let cached = queue::CachedObjects::new(guard.as_ref().ok_or("reauth_required")?, &cache_root)?;
     let cached = cached.with_fresh_object(&binding.proof);
-    sync_sources(
+    let result = sync_sources(
         &root,
         worker,
         settings,
@@ -276,7 +290,118 @@ fn run_once(
         &cached,
         memory,
         direction,
-    )
+    );
+    if (settings.portable.settings || settings.portable.skills) && !worker.stopped() {
+        let agents = crate::detect(Some(settings));
+        let (tasks, _) = parallel::plan(&settings.selected_agents, &agents);
+        let transport = crate::portable::Transport {
+            drive: guard.as_ref().ok_or("reauth_required")?,
+            proof: &binding.proof,
+        };
+        let cache_path = root.join(format!("drive-cache-{}", binding.space));
+        let portable_cached = crate::cloud::queue::CachedObjects::new(&transport, &cache_path)?
+            .with_fresh_object(&binding.proof);
+        for task in tasks {
+            if worker.stopped() {
+                break;
+            }
+            if task.canonical == "agent-memory-os" {
+                continue;
+            }
+            let Some(source) = task.path else {
+                continue;
+            };
+            let progress_worker = worker.clone();
+            let indices = task.indices.clone();
+            let _progress = crate::progress::listen(move |progress| {
+                progress_worker.update(|s| {
+                    for &i in &indices {
+                        if let Some(source) = s.sources.get_mut(i) {
+                            source.progress = Some(progress.clone());
+                        }
+                    }
+                })
+            });
+            worker.update(|s| {
+                for &i in &task.indices {
+                    if let Some(source) = s.sources.get_mut(i) {
+                        source.state = "syncing".into();
+                    }
+                }
+            });
+            let exchanged = crate::portable::cycle(
+                &root.join(format!("portable-{}-{}", task.canonical, binding.space)),
+                &source,
+                &task.canonical,
+                &settings.portable,
+                binding,
+                &key,
+                &Cancellable {
+                    remote: &portable_cached,
+                    stop: &|| worker.stopped(),
+                },
+                direction,
+                || worker.stopped(),
+            );
+            worker.update(|s| {
+                if let Ok(r) = &exchanged {
+                    s.published += r.published;
+                    s.received += r.received;
+                }
+                for (alias, &i) in task.indices.iter().enumerate() {
+                    if let Some(source) = s.sources.get_mut(i) {
+                        match &exchanged {
+                            Ok(r) if alias == 0 => {
+                                source.published += r.published;
+                                source.received += r.received;
+                            }
+                            Err(e) => {
+                                source.issues.insert(e.clone(), 1);
+                            }
+                            _ => {}
+                        }
+                        source.state = if source.issues.is_empty() {
+                            "complete"
+                        } else {
+                            "partial"
+                        }
+                        .into();
+                    }
+                }
+            });
+        }
+    }
+    if !worker.stopped() {
+        let outcome = if result.is_err() {
+            "error"
+        } else if worker
+            .0
+             .0
+            .lock()
+            .map(|c| {
+                c.status
+                    .sources
+                    .iter()
+                    .any(|s| s.state == "error" || s.state == "partial")
+            })
+            .unwrap_or(true)
+        {
+            "partial"
+        } else {
+            "complete"
+        };
+        let report = crate::operations::device_exchange(
+            &root,
+            settings,
+            binding,
+            &key,
+            guard.as_ref().ok_or("reauth_required")?,
+            outcome,
+            || worker.stopped(),
+        );
+        worker.update(|s| s.observer_error = report.err());
+    }
+    result
 }
 
 /// Different storage groups run concurrently, but each adapter retains its ordered cycle.
@@ -311,13 +436,24 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
             let task = &tasks[index];
             {
                 let mut c = worker.0 .0.lock().unwrap_or_else(|e| e.into_inner());
-                if c.stop {
+                if c.stop || c.pause_until.is_some_and(|t| t > now()) {
                     return;
                 }
                 for &i in &task.indices {
                     c.status.sources[i].state = "syncing".into();
                 }
             }
+            let progress_worker = worker.clone();
+            let progress_indices = task.indices.clone();
+            let _progress = crate::progress::listen(move |progress| {
+                progress_worker.update(|s| {
+                    for &i in &progress_indices {
+                        if let Some(source) = s.sources.get_mut(i) {
+                            source.progress = Some(progress.clone());
+                        }
+                    }
+                })
+            });
             let result = if task.canonical == "agent-memory-os" {
                 match memory {
                     Some(memory) => cycle(
@@ -374,6 +510,7 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
                 s.applied += status.restored;
                 for (alias, &i) in task.indices.iter().enumerate() {
                     let mut reported = status.clone();
+                    reported.progress = s.sources[i].progress.clone();
                     reported.agent = settings.selected_agents[i].clone();
                     if alias > 0 {
                         reported.published = 0;
@@ -414,6 +551,60 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
     Ok((total, restored))
 }
 
+fn now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+fn wait_ready(worker: &Worker, options: &crate::resources::Options) -> bool {
+    use chrono::Timelike;
+    let mut c = match worker.0 .0.lock() {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    loop {
+        if c.stop {
+            return false;
+        }
+        let paused = c.pause_until.is_some_and(|t| t > now());
+        let local = chrono::Local::now();
+        let allowed = options.allows(local.hour() * 60 + local.minute());
+        if !paused && allowed {
+            c.pause_until = None;
+            c.status.resume_at = None;
+            c.wake = false;
+            return true;
+        }
+        c.status.phase = if paused {
+            "scheduled_pause"
+        } else {
+            "outside_window"
+        }
+        .into();
+        c.status.resume_at = c.pause_until;
+        c = match worker.0 .1.wait_timeout(c, Duration::from_secs(1)) {
+            Ok((c, _)) => c,
+            Err(_) => return false,
+        };
+    }
+}
+#[tauri::command]
+pub fn sync_pause_for(worker: State<'_, Worker>, seconds: u64) -> Result<()> {
+    if !(60..=86400).contains(&seconds) {
+        return Err("invalid_interval".into());
+    }
+    let mut c = worker.0 .0.lock().map_err(|_| "sync_busy")?;
+    if !c.status.running {
+        return Err("sync_not_started".into());
+    }
+    c.wake = true;
+    c.pause_until = Some(now() + seconds);
+    c.status.resume_at = c.pause_until;
+    c.status.phase = "pausing".into();
+    worker.0 .1.notify_all();
+    Ok(())
+}
 #[tauri::command]
 pub fn sync_status(worker: State<'_, Worker>) -> Result<Status> {
     let mut status = worker.0 .0.lock().map_err(|_| "sync_busy")?.status.clone();
@@ -424,6 +615,9 @@ pub fn sync_status(worker: State<'_, Worker>) -> Result<Status> {
 pub fn sync_pause(worker: State<'_, Worker>) -> Result<()> {
     let mut c = worker.0 .0.lock().map_err(|_| "sync_busy")?;
     c.stop = true;
+    c.pause_until = None;
+    c.status.resume_at = None;
+    crate::resources::cancel();
     if c.status.running {
         c.status.phase = "pausing".into();
     }
@@ -437,6 +631,8 @@ pub fn sync_now(worker: State<'_, Worker>) -> Result<()> {
         return Err("sync_not_started".into());
     }
     c.wake = true;
+    c.pause_until = None;
+    c.status.resume_at = None;
     worker.0 .1.notify_all();
     Ok(())
 }
@@ -485,6 +681,8 @@ pub async fn sync_start(
                 return Err("sync_busy".into());
             }
             c.stop = false;
+            c.pause_until = None;
+            c.parallel = Some(settings.resources.parallel);
             c.wake = false;
             c.status = status.clone();
         }
@@ -494,17 +692,47 @@ pub async fn sync_start(
             .spawn(move || {
                 let worker = thread_worker;
                 let mut failures = 0u32;
+                crate::resources::configure(&settings.resources);
                 loop {
-                    if worker.stopped() {
+                    if !wait_ready(&worker, &settings.resources) {
                         break;
                     }
+                    let started = now();
                     worker.update(|s| {
+                        s.sources.clear();
                         s.phase = "syncing".into();
                         s.error = None;
+                        s.observer_error = None;
                     });
                     let result =
                         run_once(&app, &cloud, &worker, &settings, &binding, memory.as_ref());
                     let success = result.is_ok();
+                    if let Ok(c) = worker.0 .0.lock() {
+                        let outcome = match &result {
+                            Err(e) if e == "sync_paused" => "paused",
+                            Err(_) => "error",
+                            Ok(_)
+                                if c.status
+                                    .sources
+                                    .iter()
+                                    .any(|s| matches!(s.state.as_str(), "partial" | "error")) =>
+                            {
+                                "partial"
+                            }
+                            Ok(_) => "complete",
+                        };
+                        let item = crate::operations::History {
+                            started,
+                            finished: now(),
+                            outcome: outcome.into(),
+                            error: result.as_ref().err().cloned(),
+                            sources: c.status.sources.clone(),
+                        };
+                        drop(c);
+                        if let Err(e) = crate::operations::record(&root, item) {
+                            worker.update(|s| s.observer_error = Some(e));
+                        }
+                    }
                     match result {
                         Ok(_) => {
                             failures = 0;
@@ -527,7 +755,11 @@ pub async fn sync_start(
                                 );
                             });
                         }
-                        Err(e) if e == "sync_paused" => break,
+                        Err(e) if e == "sync_paused" => {
+                            if worker.permanent_stop() {
+                                break;
+                            }
+                        }
                         Err(e) => {
                             failures = failures.saturating_add(1);
                             worker.update(|s| {
@@ -550,6 +782,9 @@ pub async fn sync_start(
                     if c.stop {
                         break;
                     }
+                    if c.pause_until.is_some() {
+                        continue;
+                    }
                     if settings.schedule == "manual" {
                         while !c.stop && !c.wake {
                             c = worker.0 .1.wait(c).unwrap();
@@ -566,6 +801,7 @@ pub async fn sync_start(
                     }
                     c.wake = false;
                 }
+                crate::resources::clear();
                 worker.update(|s| {
                     s.running = false;
                     s.phase = "paused".into();

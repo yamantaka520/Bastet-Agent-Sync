@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.4.3
+## 0.5.0
 
-0.4.3 syncs local conversations and Agent Memory OS. Select sources, save and Start; manual JSONL export is unnecessary. Claude/Claude Code share local coding history; Codex/Work share local rollout storage. Agy uses SQLite snapshots; Grok and Pi use native session files.
+0.5.0 syncs local conversations and Agent Memory OS. Select sources, save and Start; manual JSONL export is unnecessary. Claude/Claude Code share local coding history; Codex/Work share local rollout storage. Agy uses SQLite snapshots; Grok and Pi use native session files.
 
 ## Setup
 
@@ -16,7 +16,7 @@ Choose upload, download or bidirectional; manual, interval or near-real-time. Sa
 
 ## Boundaries
 
-Cloud-hosted Claude chats, general ChatGPT chats and cloud Work are not exported. Project files, external attachments, full settings/skills, Cowork VMs and path remapping are not complete. Agy/Grok native resume and physical two-computer acceptance remain unverified. New-folder recovery does not install credentials.
+Installed CLI checks: Grok exported both test messages after Bastet's encrypted isolated-profile restore. Agy repeated a marker in its dedicated original test conversation; its restored database passed integrity checks. Restored-profile Agy model continuation and physical two-device acceptance are not claimed. Grok recovery provides copyable POSIX/PowerShell continuation commands. Cloud chats/Work, project mapping, external attachments and complete settings/skill migration remain outside guarantees.
 
 ## Tray and updates
 
@@ -53,6 +53,19 @@ Snapshots now collapse by Agent, with Expand all / Collapse all and local save t
 
 In 0.4.2, language can be changed while syncing and is saved automatically, including tray labels. Other unsaved settings remain unchanged. If saving fails, the previous language is retained. On 0.4.1, pause synchronization before changing language, then save setup.
 
-0.4.3: app, Google and sync states share a row below Drive setup status, wrapping on narrow windows. Upload/download rates and totals since launch refresh each second. Rates average approximately three seconds of Drive HTTP payloads. Excludes system-wide traffic, transport overhead, OAuth and updates; upload counts do not imply server acknowledgement.
+0.5.0: app, Google and sync states share a row below Drive setup status, wrapping on narrow windows. Upload/download rates and totals since launch refresh each second. Rates average approximately three seconds of Drive HTTP payloads. Excludes system-wide traffic, transport overhead, OAuth and updates; upload counts do not imply server acknowledgement.
 
-Unreleased: up to three independent storage groups sync concurrently; shared stores and overlapping paths remain sequential. Claude/Claude Code and Codex/ChatGPT Work aliases with the same path run once. Each source shows queued, syncing and individual results. Pause stops dispatch and waits for active operations to finish safely. One source failure does not block other groups; real-world speedup remains unmeasured.
+
+## 🐈 0.5.0
+
+0.5.0 adds the sync control center: source stages, examined item counts, current payload bytes and a sampled payload ETA; up to 500 persistent cycle records; encrypted device reports with report/observation times. Device reports are not live online status.
+
+Pause, set 1–6 concurrent storage groups (default 3), upload/download KiB/s limits (0 = unlimited), and local allowed hours, then save. Shared profiles remain sequential. Allowed hours govern cycle start; equal times mean all day and overnight windows are supported. A 15-minute pause resumes while the app runs. Limits measure this app's Drive payload consumption, not system traffic.
+
+Pause and Compare a snapshot to inspect local/incoming text or hashes. Keep local and mark reviewed, or keep both in a new folder. A changed local file invalidates review. Measure local app/cache or Drive object usage on demand; Clear download cache preserves replicas, journals and all cloud history.
+
+Portable settings/skills default off. Opt in, Preview draft choices, expand content, uncheck individual files and save. Only allowlisted scalar preferences and supported text skills are included; standard Codex shared user skills are kept separately. Credentials, hooks, MCP/provider definitions and machine paths are excluded from config. Known secret patterns are filtered, but arbitrary content still needs human review. Received packages require comparison and new-folder recovery; nothing is automatically installed or executed.
+
+Installed CLI checks: Grok exported both test messages after Bastet's encrypted isolated-profile restore. Agy repeated a marker in its dedicated original test conversation; its restored database passed integrity checks. Restored-profile Agy model continuation and physical two-device acceptance are not claimed. Grok recovery provides copyable POSIX/PowerShell continuation commands. Cloud chats/Work, project mapping, external attachments and complete settings/skill migration remain outside guarantees.
+
+[Technical contract](../../SYNC_CONTROL.md) · [Validation](../../VALIDATION.md)

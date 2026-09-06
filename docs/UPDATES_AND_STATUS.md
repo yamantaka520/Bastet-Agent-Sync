@@ -2,7 +2,7 @@
 
 Historical 0.2.0 behavior (superseded by [automatic AMOS sync in 0.2.1](AGENT_MEMORY_OS.md)): version 0.2.0 replaces the hard-coded disconnected label and permanently disabled Start button. Drive setup completion is reported from the native wizard; saved completion is distinct from a token currently held in this process. An idle, read-only status refresh checks token expiry every 15 seconds without contacting Google. It cannot detect remote revocation until a request is made.
 
-## Current Start and status (0.4.3)
+## Current Start and status (0.5.0)
 
 Start validates saved settings and Drive wizard progress, then runs selected local conversation adapters and the AMOS merge independently. Per-source results distinguish empty, syncing, partial and failed work. Credential access has its own visible phase. Missing sessions are added; existing different versions remain conflicts. Pause keeps completed source counters. Sync settings and update installation are blocked while the worker runs; language changes are independent and remain available. “App running” still indicates this desktop instance, not proof of a completed transfer. See [current adapter scope](NATIVE_SESSIONS.md).
 
@@ -18,7 +18,7 @@ The fixed feed is `https://github.com/yamantaka520/Bastet-Agent-Sync/releases/la
 
 ## Release operations
 
-The current [v0.4.3 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.3) includes compact runtime status, Drive payload rates/totals and all installer targets. Four builds, three installer checks and all seven update signatures passed; the live update feed returns 0.4.3.
+Version 0.5.0 packages the control center and resource controls. [Release evidence](VALIDATION.md) records actual build/installer/publication results. macOS in-app upgrade success is user-reported; no new instrumented self-upgrade test is claimed. Apple notarization and Windows Authenticode are explicitly outside this release scope.
 
 The previous [v0.4.2 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) includes the language fix, all supported installer targets and a verified live feed. See [release evidence](VALIDATION.md).
 
@@ -40,10 +40,14 @@ App, Google connection and sync status share a row immediately below the Drive s
 
 Counters measure Drive HTTP request bodies consumed by the HTTP client and successful response bodies read by the application, including metadata and encrypted multipart payloads. Upload consumption can precede server acknowledgement; these numbers are not proof of successful synchronization. Cache hits produce no traffic. Rates are an approximately three-second rolling average, returning to zero when idle; totals persist across sync cycles and reset when the process restarts. Excludes HTTP headers, TLS/TCP overhead, unread/rejected response bodies, OAuth, updates and other applications. No packet inspection, secrets or payload contents are retained.
 
-## Unreleased: bounded parallel synchronization
+## 0.5.0: bounded parallel synchronization
 
-After the existing credential/account preflight, a cycle dispatches at most three storage groups concurrently. Sources appear in selection order with localized queued, syncing and finished states. Claude/Claude Code and Codex/ChatGPT Work aliases using the same canonical profile path execute once, sharing results without double-counting transfers. Different paths in the same canonical family still use one sequential group because they share the existing journal. Overlapping existing source paths, resolved through filesystem canonicalization, also share a group.
+After the existing credential/account preflight, a cycle dispatches 1–6 storage groups concurrently (default 3). Sources appear in selection order with localized queued, syncing and finished states. Claude/Claude Code and Codex/ChatGPT Work aliases using the same canonical profile path execute once, sharing results without double-counting transfers. Different paths in the same canonical family still use one sequential group because they share the existing journal. Overlapping existing source paths, resolved through filesystem canonicalization, also share a group.
 
 Each adapter keeps its ordered capture, exchange and restore/AMOS merge. Independent groups can overlap network transfers; individual adapters do not launch additional transfer pools. Pause prevents new groups and subsequent sources from starting, checks cancellation at existing operation boundaries and waits for active threads to return. It does not force-kill a request or AMOS merge. Completed source counts remain visible. A source failure does not cancel unrelated groups; unexpected task panics become a worker error after joining threads. The next cycle never overlaps the previous one.
 
 The shared Drive cache protects its revision map with short locks and uses sixteen fixed lock stripes to coalesce reads of the same revision/object. It holds no global cache lock across network I/O; unrelated objects sharing a stripe can wait. Missing revisions remain uncached. Space-key proof bypasses the cache even when another source has already listed objects. No Google quota increase or fixed speedup is assumed. Real-account parallel performance remains unmeasured.
+
+## Control center
+
+[Progress, history, device reports, timed pause, storage and portable packages](SYNC_CONTROL.md) describes the new five-language controls, measurement semantics and limits.

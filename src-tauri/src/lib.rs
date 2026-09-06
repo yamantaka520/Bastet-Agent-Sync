@@ -3,6 +3,11 @@ pub mod cloud;
 pub mod memory_adapter;
 mod model;
 mod native_sessions;
+mod operations;
+mod portable;
+mod progress;
+mod resources;
+mod review;
 mod runtime_status;
 pub mod sync;
 mod updates;
@@ -213,9 +218,20 @@ pub fn run() {
             worker::sync_start,
             worker::sync_status,
             worker::sync_pause,
+            worker::sync_pause_for,
+            portable::portable_preview,
+            portable::portable_list,
+            portable::portable_compare,
+            portable::portable_restore,
+            operations::operations_view,
+            operations::storage_usage,
+            operations::clear_download_cache,
+            operations::cloud_storage_usage,
             worker::sync_now,
             native_sessions::list_received_sessions,
             native_sessions::restore_received_session,
+            native_sessions::compare_received_session,
+            native_sessions::review_received_session,
             updates::update_status,
             updates::check_update,
             updates::install_update,

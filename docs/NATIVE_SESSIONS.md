@@ -6,7 +6,7 @@ Selecting sources, saving settings and explicitly pressing Start runs their loca
 | --- | --- | --- |
 | Claude / Claude Code | Claude Code project JSONL and subagent JSONL | Shared local coding profile; Claude cloud chats and Cowork VM state are excluded. Selecting Claude does not export its cloud chat history. |
 | Codex / ChatGPT Work | `sessions` and `archived_sessions` rollout JSONL | Shared local profile, including local desktop tasks. Cloud tasks and general ChatGPT chat history remain account-managed. |
-| Google Agy CLI | One SQLite online backup per conversation database | WAL-aware snapshot; schema checks for trajectory metadata/steps. Native CLI resume and auxiliary brain/project state remain unverified. |
+| Google Agy CLI | One SQLite online backup per conversation database | WAL-aware snapshot; schema checks for trajectory metadata/steps. Dedicated original-profile CLI continuation and restored database integrity passed locally; restored-profile model continuation and auxiliary brain/project state remain unverified. |
 | Grok Build CLI | Summary, update stream, raw chat history, plan, signals and rewind points | Search-index databases are excluded. Compaction checkpoint and external attachment completeness remain unverified. |
 | Pi Agent | Native session JSONL, including inline content | Native format versions 1–3. External attachments and extension state are not bundled. |
 | Agent Memory OS | Official CLI sync export/import with backup | Automatic official merge remains unchanged; see [AMOS contract](AGENT_MEMORY_OS.md). |
@@ -31,7 +31,7 @@ Initial scans compress the data; unchanged text files use metadata hints. Batch 
 
 ## Evidence and remaining gates
 
-Fixture tests exercise all seven local selections, two isolated homes, additive restoration, repeated transfer, conflicts, malformed data, symlinks and WAL snapshots. Installed Codex app-server `thread/read` successfully reconstructed the synthetic conversation in an isolated profile without a model request. Installed Pi SessionManager also reconstructed a synthetic v3 user message from an isolated file. This is not physical two-computer acceptance or verification of every provider's native resume UX. Agy/Grok native continuation, Claude Desktop cloud/Cowork, cloud Work, external attachments, path remapping and three-platform interactive restoration remain open. See [validation](VALIDATION.md).
+Fixture tests exercise all seven local selections, two isolated homes, additive restoration, repeated transfer, conflicts, malformed data, symlinks and WAL snapshots. Installed Codex app-server `thread/read` successfully reconstructed the synthetic conversation in an isolated profile without a model request. Installed Pi SessionManager also reconstructed a synthetic v3 user message from an isolated file. This is not physical two-computer acceptance or verification of every provider's native resume UX. Grok isolated restored-profile export and Agy dedicated original-profile continuation/restored database integrity passed locally in 0.5.0. This is not restored-profile Agy model continuation or complete multi-platform native resume. Claude Desktop cloud/Cowork, cloud Work, external attachments and path remapping remain open. See [validation](VALIDATION.md).
 
 Primary format references: [Codex app-server](https://learn.chatgpt.com/docs/app-server), [Pi session format](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/src/core/session-manager.ts), [Grok session storage](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-pager/docs/user-guide/17-sessions.md), [Claude Code workflows](https://code.claude.com/docs/en/common-workflows). Agy schema handling is based on local read-only schema inspection, not a published portability contract.
 
@@ -41,4 +41,6 @@ Snapshots are grouped by agent and collapsed initially. Expand a group or use Ex
 
 Source cards distinguish active, completed, empty, partial, failed and paused results. Labelled counts separate uploaded/downloaded bundles from locally applied conversations or memories; bundle counts need not equal conversation counts. Common issues show next steps, with raw codes and capture/available counts under Technical details. Unknown states are displayed as waiting, never as success.
 
-Unreleased scheduling update: independent storage groups can run three at a time. Aliases with the same canonical profile run once; shared journals and overlapping source directories stay sequential. Native restoration and AMOS merge ordering are unchanged. See [parallel scheduling](UPDATES_AND_STATUS.md).
+0.5.0 scheduling: 1–6 independent storage groups can run concurrently (default 3). Aliases with the same canonical profile run once; shared journals and overlapping source directories stay sequential. Native restoration and AMOS merge ordering are unchanged. See [parallel scheduling](UPDATES_AND_STATUS.md).
+
+Portable preferences, skills, comparisons and the exact installed-CLI acceptance scope: [control center contract](SYNC_CONTROL.md).

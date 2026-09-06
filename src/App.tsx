@@ -14,6 +14,8 @@ import WorkerStatus, {
   workerError,
   phaseText,
 } from "./WorkerStatus";
+import PortablePanel from "./PortablePanel";
+import OperationsPanel, { ResourceControls } from "./OperationsPanel";
 import TrafficStatus from "./TrafficStatus";
 import MemoryPanel from "./MemoryPanel";
 import CloudPanel, { type WizardView } from "./CloudPanel";
@@ -278,6 +280,25 @@ export default function App() {
             {t.saved}
           </p>
         )}
+        <PortablePanel
+          settings={settings}
+          native={native}
+          locale={settings.locale}
+          value={settings.portable}
+          disabled={busy || running || !loaded}
+          onChange={(value) => change("portable", value)}
+        />
+        <OperationsPanel
+          native={native}
+          locale={settings.locale}
+          runtime={runtime}
+        />
+        <ResourceControls
+          locale={settings.locale}
+          value={settings.resources}
+          disabled={!native || busy || running || !loaded}
+          onChange={(value) => change("resources", value)}
+        />
         <CloudPanel
           native={native}
           locale={settings.locale}

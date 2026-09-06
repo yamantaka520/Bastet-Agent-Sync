@@ -1,5 +1,7 @@
 import type { Locale } from "./i18n";
 export type Settings = {
+  portable?: import("./PortablePanel").PortableOptions;
+  resources?: import("./OperationsPanel").Resources;
   schema: number;
   locale: Locale;
   deviceName: string;

@@ -14,9 +14,11 @@ const api = vi.hoisted(() => ({ native: false, invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => api.native,
   invoke: (command: string, ...args: unknown[]) =>
-    command === "wizard_get"
-      ? Promise.resolve(null)
-      : api.invoke(command, ...args),
+    command === "operations_view"
+      ? Promise.resolve({ history: [], devices: [] })
+      : command === "wizard_get"
+        ? Promise.resolve(null)
+        : api.invoke(command, ...args),
 }));
 afterEach(() => {
   cleanup();

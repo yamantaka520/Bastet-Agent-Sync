@@ -1,3 +1,4 @@
+import { ops } from "./operations-i18n";
 import NativeSessions, {
   sessionMessages,
   type SourceStatus,
@@ -7,6 +8,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
 import { names } from "./model";
 export type SyncStatus = {
+  resumeAt?: number | null;
+  observerError?: string | null;
   traffic?: import("./TrafficStatus").Traffic;
   running: boolean;
   phase: string;
@@ -131,6 +134,8 @@ export const workerMessages = {
   ],
 } as const;
 export function phaseText(s: SyncStatus, locale: Locale) {
+  if (s.phase === "scheduled_pause") return "⏸️ " + ops[locale].timedPause;
+  if (s.phase === "outside_window") return "🕒 " + ops[locale].windowWait;
   const t = workerMessages[locale];
   return (
     (

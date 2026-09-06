@@ -1,3 +1,7 @@
+import { ops } from "./operations-i18n";
+import Continuation from "./Continuation";
+import ReviewPanel from "./ReviewPanel";
+import { SourceProgress, type Progress } from "./OperationsPanel";
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
@@ -91,6 +95,7 @@ export const sessionMessages = {
   ],
 } as const;
 export type SourceStatus = {
+  progress?: Progress | null;
   agent: string;
   state: string;
   captured: number;
@@ -176,6 +181,9 @@ export default function NativeSessions({
                 <p className="source-state">
                   {icon} {label}
                 </p>
+                {state === "syncing" && (
+                  <SourceProgress locale={locale} progress={s.progress} />
+                )}
                 {state === "complete" &&
                   !s.published &&
                   !s.received &&
@@ -308,6 +316,21 @@ export default function NativeSessions({
                                   <code>{item.id}</code>
                                 </p>
                               </details>
+                              <ReviewPanel
+                                locale={locale}
+                                agent={item.agent}
+                                id={item.id}
+                                disabled={running || busy}
+                                onRestore={() =>
+                                  void action(async () => {
+                                    const path = await invoke<string | null>(
+                                      "restore_received_session",
+                                      { agent: item.agent, id: item.id },
+                                    );
+                                    if (path) setRestored({ path, item });
+                                  })
+                                }
+                              />
                               <button
                                 disabled={running || busy}
                                 onClick={() =>
@@ -339,7 +362,16 @@ export default function NativeSessions({
           <p>
             {t[6]}: <code>{restored.path}</code>
           </p>
-          <p>{t[14]}</p>
+          <p>
+            {restored.item.agent === "agy" ? ops[locale].agyRecovery : t[14]}
+          </p>
+          {restored.item.agent === "grok" && (
+            <Continuation
+              locale={locale}
+              path={restored.path}
+              session={restored.item.session}
+            />
+          )}
           <pre>
             {env[restored.item.agent]
               ? `${env[restored.item.agent]} = ${restored.path}`

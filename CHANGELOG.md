@@ -1,10 +1,17 @@
 # Changelog
 
-## Unreleased — bounded parallel synchronization
+## 0.5.0 — sync control center
 
-- Run up to three independent storage groups concurrently; aliases sharing a canonical agent and path execute once. Shared journals and overlapping source paths remain sequential.
+- Run 1–6 independent storage groups concurrently (default 3); aliases sharing a canonical agent and path execute once. Shared journals and overlapping source paths remain sequential.
 - Show all selected sources as queued before dispatch, update each result independently, and count shared work once. Pause stops new dispatch and joins active work before another cycle.
 - Make the Drive revision cache thread-safe and coalesce same-object reads with bounded locks. Always fetch space-key proof from Drive. Existing per-source ordering, retry cadence and conflict rules remain.
+
+- Add per-source stages/counts/current HTTP bytes and sampled payload ETA; persist the latest 500 cycles and encrypted last-reported device metadata.
+- Add aggregate upload/download limits, local allowed hours and 15-minute pause/resume; expose app/cache/Drive object usage and safe idle cache cleanup.
+- Compare incoming/local text or hashes, acknowledge an unchanged fingerprint, and preserve both versions with separate-folder recovery.
+- Add opt-in sanitized preferences and text skills, draft preview, per-file exclusions and inert reviewed receiving packages. Standard Codex shared user skills remain separate. New MIME types keep older clients from treating reports/preferences as conversations.
+- Validate installed Grok export after an encrypted isolated restore; validate dedicated original-profile Agy continuation and restored SQLite integrity. Add safely quoted Grok continuation commands. Full physical-device or restored-profile Agy model acceptance is not claimed.
+- Preserve five-language UI/docs and all installer targets. User-reported macOS in-app upgrade success is recorded. Apple notarization and Windows Authenticode remain excluded.
 
 ## 0.4.3 — compact runtime status and Drive traffic
 

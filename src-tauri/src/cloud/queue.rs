@@ -143,6 +143,7 @@ pub fn exchange_filtered(
     if journal.uploads.len() > MAX_OBJECTS {
         return Err("bundle_limit".into());
     }
+    crate::progress::stage("list", None);
     let ids = remote.ids(&binding.folder)?;
     if ids.len() > MAX_OBJECTS + 1 || ids.iter().any(|id| !token(id)) {
         return Err("bundle_limit".into());
@@ -160,11 +161,16 @@ pub fn exchange_filtered(
     }
     let mut other = BTreeMap::new();
     let mut remote_hashes = std::collections::BTreeSet::new();
+    crate::progress::stage(
+        "download",
+        Some(ids.iter().filter(|id| *id != &binding.proof).count()),
+    );
     for id in ids {
         if id == binding.proof {
             continue;
         }
         let b = remote.get(&binding.folder, &id, &binding.space, key)?;
+        crate::progress::advance();
         b.validate()?;
         if b.snapshot.space != binding.space {
             return Err("space_mismatch".into());
@@ -184,6 +190,15 @@ pub fn exchange_filtered(
     }
     let mut result = Exchange::default();
     if !matches!(direction, Direction::Download) {
+        crate::progress::stage(
+            "upload",
+            Some(
+                local
+                    .keys()
+                    .filter(|id| !remote_hashes.contains(*id))
+                    .count(),
+            ),
+        );
         for (hash, b) in &local {
             if remote_hashes.contains(hash) {
                 result.unchanged += 1;
@@ -217,6 +232,7 @@ pub fn exchange_filtered(
                 Err(e) => return Err(e),
             }
             result.published += 1;
+            crate::progress::advance();
         }
     }
     drop(local);
