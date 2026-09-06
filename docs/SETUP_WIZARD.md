@@ -65,3 +65,7 @@ Refresh, token exchange and account/folder checks are bounded network operations
 ## Imported client credential recovery
 
 Import now writes and reads back the OAuth JSON from the native credential store before completing step 1. A first explicit authorization opens browser consent directly; saved-token refresh is attempted only when resuming a previously authorized setup. Credential-store failures identify whether the imported client or saved login could not be read; browser launch errors have a separate message. After replacing a development build, quit the old process and open the new build before testing credential access. Do not rebuild its running app bundle during a credential test. The observed initial failure was before browser launch; its underlying OS keychain error was not captured, so a code-signature cause is a hypothesis, not a proven diagnosis.
+
+## Credential preparation (0.4.1)
+
+After selecting a client, **Prepare credential access** can read the credentials saved so far before syncing. OS prompts may occur for separate entries; preparation does not finish missing wizard steps, verify Google access or start the worker. A failure stays visible and can be retried. See [credential cache lifecycle](CLOUD_SECURITY.md#credential-access-in-041).

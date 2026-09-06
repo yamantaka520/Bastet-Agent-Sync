@@ -1,6 +1,11 @@
 import type { Locale } from "./i18n";
 export const wizardMessages = {
   en: {
+    unlockCredentials: "🔐 Prepare credential access",
+    credentialHint:
+      "Before syncing, unlock your system credential store. On macOS, choose “Always Allow” for each Bastet credential when prompted. Successful reads stay in memory until you quit, forget login or change the client configuration. Each computer needs its own authorization; updates may prompt again. Use this button again after changing credentials outside Bastet.",
+    credentialsReady:
+      "Saved credentials are ready for this app session. This does not verify Google access or start syncing.",
     cancelLogin: "Cancel browser authorization wait",
     cancelHint:
       "Cancellation is available while waiting for the browser. Token exchange and account checks must finish before retrying.",
@@ -111,6 +116,11 @@ export const wizardMessages = {
     ],
   },
   "zh-Hant": {
+    unlockCredentials: "🔐 準備憑證存取",
+    credentialHint:
+      "同步前請解鎖系統憑證庫。macOS 出現提示時，請針對 Bastet 的各項憑證選擇「永遠允許」。成功讀取的憑證會暫存在記憶體，結束程式、忘記登入或更換用戶端設定時清除。每台電腦須各自授權，更新後可能再次詢問。在程式外修改憑證後，可再按此按鈕重新讀取。",
+    credentialsReady:
+      "已儲存的憑證已準備好供本次程式執行使用；這不代表 Google 連線已驗證，也不會啟動同步。",
     cancelLogin: "取消等待瀏覽器授權",
     cancelHint:
       "等待瀏覽器授權時可以取消。Token 交換與帳號檢查須完成後才能重試。",
@@ -210,6 +220,11 @@ export const wizardMessages = {
     ],
   },
   "zh-Hans": {
+    unlockCredentials: "🔐 准备凭据访问",
+    credentialHint:
+      "同步前请解锁系统凭据库。macOS 出现提示时，请为 Bastet 的各项凭据选择“始终允许”。成功读取的凭据会暂存在内存中，退出程序、忘记登录或更换客户端配置时清除。每台电脑须分别授权，更新后可能再次询问。在程序外修改凭据后，可再次点击此按钮重新读取。",
+    credentialsReady:
+      "已保存的凭据已准备好供本次程序运行使用；这不代表 Google 连接已验证，也不会启动同步。",
     cancelLogin: "取消等待浏览器授权",
     cancelHint:
       "等待浏览器授权时可以取消。Token 交换与账号检查须完成后才能重试。",
@@ -310,6 +325,11 @@ export const wizardMessages = {
     ],
   },
   ja: {
+    unlockCredentials: "🔐 認証情報へのアクセスを準備",
+    credentialHint:
+      "同期前にシステムの認証情報ストアを解除してください。macOS で確認されたら、Bastet の各認証情報に「常に許可」を選択します。読み取った情報は終了、ログイン情報の削除、クライアント設定の変更までメモリに保持します。各パソコンで許可が必要で、更新後に再確認される場合があります。外部で認証情報を変更した場合は、このボタンで再読み込みしてください。",
+    credentialsReady:
+      "保存済みの認証情報を今回の起動中に使用できます。Google 接続の確認や同期の開始は行いません。",
     cancelLogin: "ブラウザー認証待ちをキャンセル",
     cancelHint:
       "ブラウザー待機中にキャンセルできます。トークン交換とアカウント確認は完了するまでお待ちください。",
@@ -421,6 +441,11 @@ export const wizardMessages = {
     ],
   },
   ko: {
+    unlockCredentials: "🔐 자격 증명 접근 준비",
+    credentialHint:
+      "동기화 전에 시스템 자격 증명 저장소를 잠금 해제하세요. macOS에서 요청하면 Bastet의 각 자격 증명에 “항상 허용”을 선택하세요. 읽은 정보는 앱 종료, 로그인 정보 삭제 또는 클라이언트 설정 변경까지 메모리에 보관합니다. 컴퓨터마다 승인이 필요하며 업데이트 후 다시 요청할 수 있습니다. 앱 외부에서 정보를 변경했다면 이 버튼으로 다시 읽으세요.",
+    credentialsReady:
+      "저장된 자격 증명을 이번 앱 실행 중 사용할 준비가 되었습니다. Google 연결을 확인하거나 동기화를 시작하지 않습니다.",
     cancelLogin: "브라우저 인증 대기 취소",
     cancelHint:
       "브라우저 대기 중에 취소할 수 있습니다. 토큰 교환과 계정 확인이 끝나면 다시 시도하세요.",

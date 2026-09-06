@@ -53,6 +53,7 @@ export default function CloudPanel({
   useEffect(() => {
     onChange?.(view);
   }, [view, onChange]);
+  const [credentialsReady, setCredentialsReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [cancelNote, setCancelNote] = useState(false);
@@ -93,6 +94,7 @@ export default function CloudPanel({
   }, [native, busy]);
   async function run(work: () => Promise<WizardView | void>) {
     setBusy(true);
+    setCredentialsReady(false);
     setError("");
     setSamplePassed(false);
     try {
@@ -182,6 +184,26 @@ export default function CloudPanel({
           <h2>{t.title}</h2>
           <p>{t.intro}</p>
         </div>
+      </div>
+      <div className="wizard-note">
+        <p>{t.credentialHint}</p>
+        <button
+          disabled={unavailable || !w?.clientId}
+          onClick={() =>
+            run(async () => {
+              const result = await invoke<WizardView>("wizard_execute", {
+                action: "unlock_credentials",
+                input: "",
+                locale,
+              });
+              setCredentialsReady(true);
+              return result;
+            })
+          }
+        >
+          {t.unlockCredentials}
+        </button>
+        {credentialsReady && <p role="status">{t.credentialsReady}</p>}
       </div>
       {connecting && (
         <div role="status">

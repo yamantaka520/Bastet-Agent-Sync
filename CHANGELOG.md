@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1 — credential access (unreleased)
+
+- Add five-language credential preparation guidance and an explicit read-only preparation button.
+- Cache successful native credential reads in zeroizing process memory; serialize concurrent misses and keep failed/missing reads retryable.
+- Rotate cache only after persisted writes; evict on failed writes/removals. Clear on logout, setup restart, client replacement and normal exit.
+- No OS authorization bypass or Developer ID signing change.
+
 ## 0.4.0 — first public installers
 
 Published 2026-09-06: [installers and five-language release notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.0). Nineteen assets, native installer smoke checks, seven update signatures and public download links verified.

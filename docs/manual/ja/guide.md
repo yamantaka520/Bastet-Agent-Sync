@@ -39,3 +39,8 @@ npm run tauri dev
 [バージョンとダウンロード](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)のバージョン番号から各OSの直接リンクを開けます。Windowsは同梱WebView2を必要に応じて補い、macOSはシステムWebKitを使用します。Linuxはダウンロードした `sh install-linux.sh` でapt/dnf判定・検証・依存パッケージの導入を行います。Node.jsとRustは不要です。AMOS CLIとAgentログインは別途設定してください。macOS未公証・Windows Authenticode未署名のためOSの確認が表示される場合があります。
 
 macOSで初回起動が阻止された場合は配布元を確認し、「システム設定 → プライバシーとセキュリティ → このまま開く」でこのAppを確認してください。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
+
+
+### 🔐 0.4.1
+
+同期前に **🔐 認証情報へのアクセスを準備** を押すと、保存済みの情報をまとめて読み取れます。macOS では Bastet の各項目に「常に許可」を選択します。情報はメモリに保持され、終了、ログイン情報の削除、設定の再開始、クライアント変更時に消去されます。トレイへの格納では保持されます。外部で変更したらボタンで再読み込みしてください。Google 接続の確認や同期の開始は行いません。各パソコンで許可が必要です。Developer ID 署名は未設定のため、更新後に再確認される場合があります。

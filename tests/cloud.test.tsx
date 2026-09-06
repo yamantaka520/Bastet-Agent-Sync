@@ -257,3 +257,37 @@ it("cancels a pending browser wait without resetting progress and enables reconn
   expect(saved.wizard.page).toBe(1);
   expect(invoke).not.toHaveBeenCalledWith("wizard_restart");
 });
+
+it("prepares credentials explicitly without starting sync and clears success on failure", async () => {
+  const saved = initial();
+  saved.wizard.clientId = "fixture.apps.googleusercontent.com";
+  let fail = false;
+  vi.mocked(invoke).mockImplementation(async (cmd) => {
+    if (cmd === "wizard_execute" && fail) throw "credential_store_unavailable";
+    return structuredClone(saved);
+  });
+  render(<CloudPanel native locale="en" />);
+  await waitFor(() =>
+    expect(
+      (screen.getByText(t.unlockCredentials) as HTMLButtonElement).disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByText(t.unlockCredentials));
+  await screen.findByText(t.credentialsReady);
+  expect(invoke).toHaveBeenCalledWith("wizard_execute", {
+    action: "unlock_credentials",
+    input: "",
+    locale: "en",
+  });
+  expect(
+    vi
+      .mocked(invoke)
+      .mock.calls.every(
+        ([cmd]) => cmd === "wizard_get" || cmd === "wizard_execute",
+      ),
+  ).toBe(true);
+  fail = true;
+  fireEvent.click(screen.getByText(t.unlockCredentials));
+  await screen.findByRole("alert");
+  expect(screen.queryByText(t.credentialsReady)).toBeNull();
+});

@@ -165,6 +165,7 @@ pub async fn wizard_restart(app: tauri::AppHandle, state: State<'_, CloudState>)
     let shared = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let mut guard = shared.0.try_lock().map_err(|_| "cloud_busy")?;
+        NativeStore::clear_cache()?;
         let wizard = wizard::restart(&root(&app)?)?;
         *guard = None;
         Ok(view(wizard, false, vec![]))
@@ -176,6 +177,7 @@ pub async fn wizard_restart(app: tauri::AppHandle, state: State<'_, CloudState>)
 #[serde(rename_all = "snake_case")]
 pub enum Action {
     ForgetLogin,
+    UnlockCredentials,
     OpenHelp,
     UseBuild,
     ImportClient,
@@ -238,9 +240,29 @@ pub async fn wizard_execute(
         let mut t = Transaction::open(&root(&app)?)?;
         let mut folders = vec![];
         match action {
-            Action::ForgetLogin => {
-                oauth::forget_login(&config(&t.state)?, &NativeStore)?;
+            Action::UnlockCredentials => {
                 *guard = None;
+                NativeStore::clear_cache()?;
+                let prepared = (|| -> Result<()> {
+                    let c = config(&t.state)?;
+                    if t.state.authorized {
+                        oauth::unlock_login(&c, &NativeStore)?;
+                    }
+                    if let Some(binding) = &t.state.binding {
+                        super::vault::load_space_key(&NativeStore, &binding.space)?;
+                    }
+                    Ok(())
+                })();
+                if prepared.is_err() {
+                    NativeStore::clear_cache()?;
+                }
+                prepared?;
+            }
+            Action::ForgetLogin => {
+                let config = config(&t.state)?;
+                *guard = None;
+                NativeStore::clear_cache()?;
+                oauth::forget_login(&config, &NativeStore)?;
             }
             Action::OpenHelp => {
                 webbrowser::open(
@@ -250,6 +272,7 @@ pub async fn wizard_execute(
             }
             Action::UseBuild => {
                 let c = build_config()?;
+                NativeStore::clear_cache()?;
                 t.client(c.id, "build")?;
                 *guard = None;
             }
@@ -269,6 +292,7 @@ pub async fn wizard_execute(
                     .pick_file();
                 if let Some(path) = chosen {
                     let bytes = Zeroizing::new(storage::read(&path, 65536)?);
+                    NativeStore::clear_cache()?;
                     let c = save_client(&bytes, &NativeStore)?;
                     t.client(c.id, "imported")?;
                     *guard = None;

@@ -39,3 +39,8 @@ npm run tauri dev
 [版本與下載](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)：點選版本號，在 Release notes 依作業系統下載。Windows 安裝器內含 WebView2，偵測缺少時補裝；macOS 使用系統 WebKit；Linux 可執行下載的 `sh install-linux.sh`，自動選擇 apt/dnf、校驗並安裝相依套件。無須 Node.js 或 Rust。AMOS CLI 與各 Agent 帳號需自行設定。macOS 未公證、Windows 無 Authenticode，可能顯示系統信任提示。
 
 macOS 首次開啟若被阻擋，確認下載來源後，到「系統設定 → 隱私權與安全性 → 仍要打開」確認此 App。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
+
+
+### 🔐 0.4.1
+
+同步前可按 **🔐 準備憑證存取**，集中讀取已儲存的憑證。macOS 提示時，針對 Bastet 各項憑證選擇「永遠允許」。成功讀取後暫存於記憶體，結束程式、忘記登入、重新開始設定或更換用戶端時清除；關閉至系統匣會保留。若在程式外修改憑證，可再按按鈕重新讀取。此操作不驗證 Google 連線，也不啟動同步。每台電腦需各自授權；尚未配置 Developer ID 簽章，更新後仍可能再次詢問。

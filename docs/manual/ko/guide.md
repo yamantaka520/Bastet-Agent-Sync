@@ -39,3 +39,8 @@ npm run tauri dev
 [버전 및 다운로드](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)의 버전 번호를 누르면 OS별 직접 다운로드 링크가 표시됩니다. Windows는 누락된 WebView2를 내장 설치기로 설치하며 macOS는 시스템 WebKit을 사용합니다. Linux는 다운로드한 `sh install-linux.sh`로 apt/dnf 감지, 검증 및 의존성 설치를 수행합니다. Node.js와 Rust는 필요하지 않습니다. AMOS CLI와 Agent 로그인은 별도 설정이 필요합니다. macOS 공증 및 Windows Authenticode 서명이 없어 OS 확인이 표시될 수 있습니다.
 
 macOS에서 첫 실행이 차단되면 다운로드 출처를 확인하고 시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기에서 이 앱을 승인하세요. [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
+
+
+### 🔐 0.4.1
+
+동기화 전에 **🔐 자격 증명 접근 준비**를 누르면 저장된 정보를 함께 읽습니다. macOS에서는 Bastet의 각 항목에 “항상 허용”을 선택하세요. 정보는 메모리에 보관되며 앱 종료, 로그인 정보 삭제, 설정 재시작 또는 클라이언트 변경 시 지워집니다. 트레이로 닫으면 유지됩니다. 외부에서 변경했다면 버튼으로 다시 읽으세요. Google 연결 확인이나 동기화 시작은 수행하지 않습니다. 컴퓨터마다 승인이 필요하며 Developer ID 서명이 아직 없어 업데이트 후 다시 요청할 수 있습니다.

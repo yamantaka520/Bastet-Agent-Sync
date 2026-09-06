@@ -312,6 +312,12 @@ fn exchange(
     store.write(&account(config), refresh)?;
     Ok(access(&token))
 }
+/// Read the saved login into the process cache without contacting Google.
+pub fn unlock_login(config: &ClientConfig, store: &impl SecretStore) -> Result<()> {
+    config.validate()?;
+    store.read(&account(config))?.ok_or("reauth_required")?;
+    Ok(())
+}
 pub fn reconnect(config: &ClientConfig, store: &impl SecretStore) -> Result<AccessToken> {
     config.validate()?;
     let refresh = store.read(&account(config))?.ok_or("reauth_required")?;

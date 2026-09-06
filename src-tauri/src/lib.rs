@@ -204,6 +204,11 @@ pub fn run() {
             updates::restart_after_update,
             cloud::desktop::run_crypto_diagnostic
         ])
-        .run(tauri::generate_context!())
-        .expect("desktop runtime failed");
+        .build(tauri::generate_context!())
+        .expect("desktop runtime failed")
+        .run(|_, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                let _ = cloud::vault::NativeStore::clear_cache();
+            }
+        });
 }

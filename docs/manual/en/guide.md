@@ -39,3 +39,8 @@ npm run tauri dev
 [Versions and downloads](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest): click the version for direct installer links in its release notes. Windows detects and installs missing embedded WebView2; macOS uses system WebKit; Linux users can run the downloaded `sh install-linux.sh` for apt/dnf detection, checksums and dependency installation. Node.js and Rust are unnecessary. Configure AMOS CLI and agent accounts separately. macOS is not notarized and Windows has no Authenticode certificate; OS trust prompts may appear.
 
 If macOS blocks the first launch, confirm the download source, then use System Settings → Privacy & Security → Open Anyway for this app. [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
+
+
+### 🔐 0.4.1
+
+Use **🔐 Prepare credential access** before syncing to read saved credentials together. On macOS choose Always Allow for each requested Bastet item. Successful accesses are cached in memory until exit, forgetting login, restarting setup or changing client configuration. Closing to tray retains the cache. Press again after editing credentials externally. This action does not verify Google access or start sync. Each computer needs authorization; updates may ask again because Developer ID signing is not yet configured.

@@ -1,5 +1,13 @@
 # Validation
 
+## 0.4.1 credential cache — 2026-09-06
+
+- Local macOS: 69 Rust tests passed, one optional installed AMOS test skipped; 24 frontend tests passed; Clippy with warnings denied and frontend build passed.
+- New cache checks cover 12 concurrent readers with one backend read, external change after clearing, missing/locked retry, account isolation, rotation, failed mutation eviction and deletion. UI checks explicit preparation without sync and removal of stale success after failure; all five locale key sets match.
+- The initial sandbox run blocked five loopback HTTP/OAuth tests; rerunning with local listener permission passed all default tests.
+- Optimized macOS executable and a separate staged 0.4.1 app were built successfully.
+- Existing running 0.3.1 app was observed and not overwritten. Real keychain prompt counts across repeated sync, exit/relaunch and upgrades remain unverified. Developer ID signing is unchanged; 0.4.1 is not a published release.
+
 ## 0.4.0 release packaging — 2026-09-06
 
 - [v0.4.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.0) is published with 19 assets. All 19 GitHub asset SHA256 digests matched local files; all seven updater signatures, 18 checksum entries and nine platform/format URLs were verified. All nine public installer/support download links returned HTTP 200, and the latest update feed returned version 0.4.0.

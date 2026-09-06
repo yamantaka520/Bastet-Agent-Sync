@@ -49,3 +49,11 @@ The one-shot encrypted exchange queue connects validated M2 replicas through an 
 - [Drive error handling](https://developers.google.com/workspace/drive/api/guides/handle-errors)
 - [RustCrypto chacha20poly1305 0.10.1](https://docs.rs/chacha20poly1305/0.10.1/chacha20poly1305/)
 - [Keyring 3.6.3 native backend features](https://docs.rs/keyring/3.6.3/keyring/)
+
+## Credential access in 0.4.1
+
+The native credential store remains the persistent authority. Successful reads and writes are cached per account in process-local zeroizing memory. Reads, writes, removals and clearing are serialized; failures and missing entries are not cached. Failed mutations evict the affected cached value. Cache clearing overwrites owned secret buffers; no cache is serialized to disk or exposed to the renderer.
+
+The setup panel offers **Prepare credential access**. It clears the prior cache/connection, then reads the configured client, the saved login (if authorized), and the space key (if bound). It performs no Google network request or agent synchronization. Partial failure clears the newly prepared cache. Normal syncing also populates the cache automatically. Forget login, restart setup, client replacement and normal process exit clear the cache; closing to tray keeps it available. If credentials are edited externally or the system keychain is subsequently locked, already cached values remain usable until cleared or the process exits. Press Prepare again to reread external changes.
+
+macOS users can select Always Allow for each requested Bastet item. This is per local OS/app/item authorization, not a blanket grant across devices. Ad-hoc signing remains configured: a new build may prompt again. Stable Developer ID distribution and actual repeated-cycle prompt-count acceptance remain outstanding.
