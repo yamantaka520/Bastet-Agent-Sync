@@ -50,3 +50,7 @@ Agent Memory OS is an additional memory-service source with its own adapter, not
 Version 0.2.0 adds [runtime preflight/status and a signed updater](UPDATES_AND_STATUS.md). This does not satisfy the missing live-store worker, scheduling or two-device gates.
 
 Historical 0.2.1 introduced AMOS automatic sync. The current worker also handles the documented local conversation sources, including shared Codex/Work rollout storage. See [current adapters](NATIVE_SESSIONS.md); cloud Work and full native continuation remain outside guarantees.
+
+## Unreleased concurrency milestone
+
+The worker now schedules up to three independent storage groups concurrently, while preserving canonical store/journal serialization, alias deduplication and ordered native/AMOS writes. Queued states, safe pause/join and a thread-safe revision cache are implemented. See [behavior and limits](UPDATES_AND_STATUS.md) and [validation](VALIDATION.md). Public v0.4.3 remains sequential until a subsequent release.

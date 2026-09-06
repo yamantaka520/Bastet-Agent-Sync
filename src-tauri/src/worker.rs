@@ -13,6 +13,8 @@ use crate::{
         storage, Direction, Replica,
     },
 };
+#[path = "worker_parallel.rs"]
+mod parallel;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeSet,
@@ -263,129 +265,155 @@ fn run_once(
     };
     let cache_root = root.join(format!("drive-cache-{}", binding.space));
     let cached = queue::CachedObjects::new(guard.as_ref().ok_or("reauth_required")?, &cache_root)?;
-    worker.update(|s| s.phase = "syncing".into());
-    let mut total = queue::Exchange::default();
-    let mut merged = 0;
-    let agents = crate::detect(Some(settings));
-    let mut statuses = Vec::new();
-    let mut processed: std::collections::BTreeMap<
-        (String, String),
-        crate::native_sessions::SourceStatus,
-    > = Default::default();
-    for agent in &settings.selected_agents {
-        if worker.stopped() {
-            return Err("sync_paused".into());
-        }
-        worker.update(|s| {
-            s.sources = statuses.clone();
-            s.sources.push(crate::native_sessions::SourceStatus {
+    let cached = cached.with_fresh_object(&binding.proof);
+    sync_sources(
+        &root,
+        worker,
+        settings,
+        &crate::detect(Some(settings)),
+        binding,
+        &key,
+        &cached,
+        memory,
+        direction,
+    )
+}
+
+/// Different storage groups run concurrently, but each adapter retains its ordered cycle.
+#[allow(clippy::too_many_arguments)]
+fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
+    root: &Path,
+    worker: &Worker,
+    settings: &Settings,
+    agents: &[crate::model::Agent],
+    binding: &Binding,
+    key: &crate::cloud::crypto::SpaceKey,
+    remote: &R,
+    memory: Option<&M>,
+    direction: Direction,
+) -> Result<(queue::Exchange, usize)> {
+    use crate::native_sessions::SourceStatus;
+    let (tasks, groups) = parallel::plan(&settings.selected_agents, agents);
+    worker.update(|s| {
+        s.phase = "syncing".into();
+        s.sources = settings
+            .selected_agents
+            .iter()
+            .map(|agent| SourceStatus {
                 agent: agent.clone(),
-                state: "syncing".into(),
+                state: "queued".into(),
                 ..Default::default()
-            });
-        });
-        let result = if agent == "agent-memory-os" {
-            match memory {
-                Some(memory) => cycle(
-                    &root.join(format!("memory-sync-{}", binding.space)),
-                    binding,
-                    &key,
-                    &cached,
-                    memory,
-                    direction,
-                    || worker.stopped(),
-                )
-                .map(|(r, applied)| {
-                    merged += applied;
-                    crate::native_sessions::SourceStatus {
-                        agent: agent.clone(),
+            })
+            .collect();
+    });
+    let result = parallel::run(&groups, worker, |group| {
+        for &index in group {
+            let task = &tasks[index];
+            {
+                let mut c = worker.0 .0.lock().unwrap_or_else(|e| e.into_inner());
+                if c.stop {
+                    return;
+                }
+                for &i in &task.indices {
+                    c.status.sources[i].state = "syncing".into();
+                }
+            }
+            let result = if task.canonical == "agent-memory-os" {
+                match memory {
+                    Some(memory) => cycle(
+                        &root.join(format!("memory-sync-{}", binding.space)),
+                        binding,
+                        key,
+                        remote,
+                        memory,
+                        direction,
+                        || worker.stopped(),
+                    )
+                    .map(|(r, applied)| SourceStatus {
                         state: "complete".into(),
                         published: r.published,
                         received: r.received,
                         restored: applied,
                         ..Default::default()
+                    }),
+                    None => Err("memory_cli_missing".into()),
+                }
+            } else {
+                match &task.path {
+                    Some(source) => crate::native_sessions::cycle(
+                        &root.join(format!("sessions-{}-{}", task.canonical, binding.space)),
+                        binding,
+                        key,
+                        &Cancellable {
+                            remote,
+                            stop: &|| worker.stopped(),
+                        },
+                        &task.canonical,
+                        source,
+                        direction,
+                        || worker.stopped(),
+                    ),
+                    None => Err("source_missing".into()),
+                }
+            };
+            let status = match result {
+                Ok(s) => s,
+                Err(e) if e == "sync_paused" => SourceStatus {
+                    state: "paused".into(),
+                    ..Default::default()
+                },
+                Err(e) => SourceStatus {
+                    state: "error".into(),
+                    issues: std::collections::BTreeMap::from([(e, 1)]),
+                    ..Default::default()
+                },
+            };
+            worker.update(|s| {
+                s.published += status.published;
+                s.received += status.received;
+                s.applied += status.restored;
+                for (alias, &i) in task.indices.iter().enumerate() {
+                    let mut reported = status.clone();
+                    reported.agent = settings.selected_agents[i].clone();
+                    if alias > 0 {
+                        reported.published = 0;
+                        reported.received = 0;
+                        reported.restored = 0;
                     }
-                }),
-                None => Err("memory_cli_missing".into()),
+                    s.sources[i] = reported;
+                }
+            });
+        }
+    });
+    let paused = worker.stopped();
+    worker.update(|s| {
+        for source in &mut s.sources {
+            if matches!(source.state.as_str(), "queued" | "syncing") {
+                source.state = if paused { "paused" } else { "error" }.into();
+                if !paused {
+                    source.issues.insert("sync_worker_failed".into(), 1);
+                }
             }
-        } else {
-            let source = agents
-                .iter()
-                .find(|a| &a.id == agent)
-                .ok_or("source_missing")?;
-            // Claude Desktop's local coding sessions use Claude Code's native profile.
-            // Its account-hosted chats are not stored in this profile.
-            let source_path = if agent == "claude" {
-                agents
-                    .iter()
-                    .find(|a| a.id == "claude-code")
-                    .map(|a| a.path.as_str())
-                    .unwrap_or(&source.path)
-            } else {
-                &source.path
-            };
-            let canonical = match agent.as_str() {
-                "claude" => "claude-code",
-                "chatgpt-work" => "codex",
-                a => a,
-            };
-            let source_key = (canonical.to_string(), source_path.to_string());
-            if let Some(previous) = processed.get(&source_key) {
-                let mut s = previous.clone();
-                s.agent = agent.clone();
-                s.published = 0;
-                s.received = 0;
-                s.restored = 0;
-                Ok(s)
-            } else {
-                crate::native_sessions::cycle(
-                    &root.join(format!("sessions-{canonical}-{}", binding.space)),
-                    binding,
-                    &key,
-                    &Cancellable {
-                        remote: &cached,
-                        stop: &|| worker.stopped(),
-                    },
-                    canonical,
-                    Path::new(source_path),
-                    direction,
-                    || worker.stopped(),
-                )
-                .map(|mut s| {
-                    processed.insert(source_key, s.clone());
-                    s.agent = agent.clone();
-                    s
-                })
-            }
-        };
-        let status = match result {
-            Ok(s) => s,
-            Err(e) if e == "sync_paused" => return Err(e),
-            Err(e) => crate::native_sessions::SourceStatus {
-                agent: agent.clone(),
-                state: "error".into(),
-                issues: std::collections::BTreeMap::from([(e, 1)]),
-                ..Default::default()
-            },
-        };
-        total.published += status.published;
-        total.received += status.received;
-        let published = status.published;
-        let received = status.received;
-        let restored = status.restored;
-        statuses.push(status);
-        worker.update(|s| {
-            s.sources = statuses.clone();
-            s.published += published;
-            s.received += received;
-            s.applied += restored;
-        });
+        }
+    });
+    if paused {
+        return Err("sync_paused".into());
     }
-    if statuses.iter().all(|s| s.state == "error") {
+    result?;
+    let c = worker.0 .0.lock().map_err(|_| "sync_busy")?;
+    if c.status.sources.iter().all(|s| s.state == "error") {
         return Err("sources_failed".into());
     }
-    Ok((total, merged))
+    let mut total = queue::Exchange::default();
+    let mut restored = 0;
+    for source in &c.status.sources {
+        total.published += source.published;
+        total.received += source.received;
+        restored += source.restored;
+    }
+    Ok((total, restored))
 }
+
 #[tauri::command]
 pub fn sync_status(worker: State<'_, Worker>) -> Result<Status> {
     let mut status = worker.0 .0.lock().map_err(|_| "sync_busy")?.status.clone();
@@ -707,5 +735,211 @@ mod tests {
         let p = crate::runtime_status::evaluate(Some(&settings), true);
         assert!(p.reasons.is_empty());
         assert!(p.unsupported_agents.is_empty());
+    }
+    impl Objects for Mutex<Remote> {
+        fn ids(&self, folder: &str) -> Result<Vec<String>> {
+            self.lock().unwrap().ids(folder)
+        }
+        fn allocate(&self) -> Result<String> {
+            self.lock().unwrap().allocate()
+        }
+        fn put(
+            &self,
+            f: &str,
+            id: &str,
+            key: &crate::cloud::crypto::SpaceKey,
+            b: &bundle::Bundle,
+        ) -> Result<()> {
+            self.lock().unwrap().put(f, id, key, b)
+        }
+        fn get(
+            &self,
+            f: &str,
+            id: &str,
+            space: &str,
+            key: &crate::cloud::crypto::SpaceKey,
+        ) -> Result<bundle::Bundle> {
+            self.lock().unwrap().get(f, id, space, key)
+        }
+    }
+    impl Memory for Mutex<Store> {
+        fn export(&self, root: &Path) -> Result<String> {
+            self.lock().unwrap().export(root)
+        }
+        fn apply(&self, root: &Path, text: &str, id: &str) -> Result<()> {
+            self.lock().unwrap().apply(root, text, id)
+        }
+    }
+    #[test]
+    fn parallel_sources_preserve_alias_counts_failure_isolation_and_idempotent_restore() {
+        let temp = tempfile::tempdir().unwrap();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = crate::cloud::crypto::SpaceKey::generate().unwrap();
+        let remote = Mutex::new(Remote(
+            RefCell::new(BTreeMap::from([(
+                "proof".into(),
+                queue::proof_bundle("space").unwrap(),
+            )])),
+            Cell::new(0),
+        ));
+        let memory = Mutex::new(Store(
+            RefCell::new(text("a")),
+            Cell::new(0),
+            Cell::new(false),
+        ));
+        let other_memory = Mutex::new(Store(
+            RefCell::new(text("b")),
+            Cell::new(0),
+            Cell::new(false),
+        ));
+        let id = "019f0000-0000-7000-8000-000000000001";
+        let codex = temp.path().join("codex");
+        let pi = temp.path().join("pi");
+        std::fs::create_dir_all(codex.join("sessions")).unwrap();
+        std::fs::create_dir_all(pi.join("sessions/project")).unwrap();
+        std::fs::write(codex.join(format!("sessions/rollout-{id}.jsonl")), format!("{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"{id}\",\"cwd\":\"/project\"}}}}\n")).unwrap();
+        std::fs::write(
+            pi.join(format!("sessions/project/2026-{id}.jsonl")),
+            format!(
+                "{{\"type\":\"session\",\"version\":3,\"id\":\"{id}\",\"cwd\":\"/project\"}}\n"
+            ),
+        )
+        .unwrap();
+        let settings = Settings {
+            selected_agents: ["codex", "chatgpt-work", "pi", "agent-memory-os", "agy"]
+                .map(str::to_string)
+                .to_vec(),
+            ..Default::default()
+        };
+        let agents = ["codex", "chatgpt-work", "pi"].map(|id| crate::model::Agent {
+            id: id.into(),
+            path: if id == "pi" { &pi } else { &codex }
+                .to_string_lossy()
+                .into_owned(),
+            detected: true,
+            custom: false,
+        });
+        let worker = Worker::default();
+        let a = temp.path().join("a");
+        storage::directory(&a).unwrap();
+        let first = sync_sources(
+            &a,
+            &worker,
+            &settings,
+            &agents,
+            &binding,
+            &key,
+            &remote,
+            Some(&memory),
+            Direction::Upload,
+        )
+        .unwrap();
+        assert_eq!(first.0.published, 3);
+        {
+            let c = worker.0 .0.lock().unwrap();
+            assert_eq!(
+                c.status
+                    .sources
+                    .iter()
+                    .map(|s| &s.agent)
+                    .collect::<Vec<_>>(),
+                settings.selected_agents.iter().collect::<Vec<_>>()
+            );
+            assert_eq!(c.status.sources[1].published, 0);
+            assert_eq!(c.status.sources[1].state, c.status.sources[0].state);
+            assert_eq!(c.status.sources[4].state, "error");
+            assert_eq!(c.status.published, 3);
+        }
+        assert_eq!(
+            sync_sources(
+                &a,
+                &worker,
+                &settings,
+                &agents,
+                &binding,
+                &key,
+                &remote,
+                Some(&memory),
+                Direction::Upload
+            )
+            .unwrap()
+            .0
+            .published,
+            0
+        );
+        let other_agents = agents.map(|mut agent| {
+            agent.path = temp
+                .path()
+                .join(if agent.id == "pi" {
+                    "pi-restored"
+                } else {
+                    "codex-restored"
+                })
+                .to_string_lossy()
+                .into_owned();
+            agent
+        });
+        let b = temp.path().join("b");
+        storage::directory(&b).unwrap();
+        let restored = sync_sources(
+            &b,
+            &worker,
+            &settings,
+            &other_agents,
+            &binding,
+            &key,
+            &remote,
+            Some(&other_memory),
+            Direction::Download,
+        )
+        .unwrap();
+        assert_eq!(restored.0.received, 3);
+        assert_eq!(restored.1, 3);
+        assert_eq!(other_memory.lock().unwrap().1.get(), 1);
+        assert_eq!(
+            sync_sources(
+                &b,
+                &worker,
+                &settings,
+                &other_agents,
+                &binding,
+                &key,
+                &remote,
+                Some(&other_memory),
+                Direction::Download
+            )
+            .unwrap()
+            .1,
+            0
+        );
+        worker.0 .0.lock().unwrap().stop = true;
+        assert_eq!(
+            sync_sources(
+                &b,
+                &worker,
+                &settings,
+                &other_agents,
+                &binding,
+                &key,
+                &remote,
+                Some(&other_memory),
+                Direction::Both
+            )
+            .unwrap_err(),
+            "sync_paused"
+        );
+        assert!(worker
+            .0
+             .0
+            .lock()
+            .unwrap()
+            .status
+            .sources
+            .iter()
+            .all(|s| s.state == "paused"));
     }
 }

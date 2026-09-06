@@ -157,9 +157,12 @@ export default function NativeSessions({
         <div className="source-cards">
           {sources.map((s) => {
             const state =
-              s.state === "syncing" && !running ? "paused" : s.state;
+              ["syncing", "queued"].includes(s.state) && !running
+                ? "paused"
+                : s.state;
             const labels: Record<string, [string, string]> = {
               syncing: ["🔄", d[0]],
+              queued: ["🕒", d[29]],
               complete: ["✅", d[1]],
               partial: ["⚠️", d[3]],
               error: ["❌", d[4]],
@@ -177,7 +180,7 @@ export default function NativeSessions({
                   !s.published &&
                   !s.received &&
                   !s.restored && <p>{d[2]}</p>}
-                {state !== "syncing" && (
+                {state !== "syncing" && state !== "queued" && (
                   <dl className="sync-counts">
                     <div>
                       <dt>↑ {d[8]}</dt>

@@ -31,6 +31,7 @@ const rows = {
     "此項目未完成；請查看詳細資訊後重試。",
     "本輪傳輸",
     "同步包時間代表保存到這台電腦的時間，不是原始對話建立時間。",
+    "排隊中，等待可用同步位置",
   ],
   "zh-Hans": [
     "正在同步，请稍候",
@@ -62,6 +63,7 @@ const rows = {
     "此项目未完成；请查看详细信息后重试。",
     "本轮传输",
     "同步包时间表示保存到此电脑的时间，不是原始对话创建时间。",
+    "排队中，等待可用同步位置",
   ],
   en: [
     "Syncing, please wait",
@@ -93,6 +95,7 @@ const rows = {
     "This item did not complete. Check technical details and retry.",
     "This cycle",
     "Snapshot times indicate when they were saved on this computer, not when the original conversation began.",
+    "Queued; waiting for a sync slot",
   ],
   ja: [
     "同期中です",
@@ -124,6 +127,7 @@ const rows = {
     "未完了の項目です。技術情報を確認して再試行してください。",
     "今回の転送",
     "日時はこの端末への保存日時であり、元の会話の開始日時ではありません。",
+    "順番待ち・同期枠の空きを待機中",
   ],
   ko: [
     "동기화 중입니다",
@@ -155,6 +159,7 @@ const rows = {
     "완료되지 않았습니다. 상세 정보를 확인하고 재시도하세요.",
     "이번 전송",
     "시간은 이 컴퓨터에 저장한 시간이며 원래 대화 시작 시간이 아닙니다.",
+    "대기 중 · 동기화 작업 자리 대기",
   ],
 } as const;
 export const syncDisplay = rows;

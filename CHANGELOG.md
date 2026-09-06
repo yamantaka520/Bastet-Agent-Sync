@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — bounded parallel synchronization
+
+- Run up to three independent storage groups concurrently; aliases sharing a canonical agent and path execute once. Shared journals and overlapping source paths remain sequential.
+- Show all selected sources as queued before dispatch, update each result independently, and count shared work once. Pause stops new dispatch and joins active work before another cycle.
+- Make the Drive revision cache thread-safe and coalesce same-object reads with bounded locks. Always fetch space-key proof from Drive. Existing per-source ordering, retry cadence and conflict rules remain.
+
 ## 0.4.3 — compact runtime status and Drive traffic
 
 Published 2026-09-06: [three-platform installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.3). Four architecture builds, all three installer smoke jobs, seven update signatures, 18 checksums and nine public download links passed.

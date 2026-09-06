@@ -1,5 +1,13 @@
 # Validation
 
+## Bounded parallel synchronization — unreleased, 2026-09-06
+
+- 79 native tests passed; one installed-AMOS opt-in test ignored. 32 frontend tests passed. Clippy with warnings denied, optimized native build and production frontend build passed.
+- Scheduler fixtures demonstrate exactly three concurrent groups, dispatch stopping on pause, all active threads joining before return, and panic-to-error handling. Planner fixtures cover aliases, canonical journals and overlapping paths.
+- Isolated source integration uploads Codex, Pi and AMOS concurrently with a failing source, deduplicates Codex/Work counts, restores into a second temporary device store and does not repeat unchanged uploads/restores. Pre-paused work never starts.
+- Eight concurrent cache readers share one same-revision download; explicit proof requests bypass the cache. Existing revision-change and restart-cache tests still pass. Five-language queued labels and paused fallback are verified.
+- Existing seven-source native format, encryption, conflict and loopback HTTP tests still pass. This is fixture/local build evidence, not a Google account throughput benchmark or native visual acceptance. Public v0.4.3 remains unchanged and the running app was not replaced.
+
 ## 0.4.3 published release — 2026-09-06
 
 - [v0.4.3](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.3) is public/latest with 19 assets. Tagged source: `af213fb82fee1d5e6d299f6ae7db3e8cce961031`.

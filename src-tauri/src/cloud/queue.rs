@@ -453,7 +453,9 @@ mod tests {
 pub struct CachedObjects<'a, R> {
     pub remote: &'a R,
     pub root: &'a Path,
-    revisions: std::cell::RefCell<BTreeMap<String, Option<String>>>,
+    revisions: std::sync::Mutex<BTreeMap<(String, String), Option<String>>>,
+    downloads: [std::sync::Mutex<()>; 16],
+    fresh: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 struct Cached {
@@ -467,13 +469,28 @@ impl<'a, R: Objects> CachedObjects<'a, R> {
             remote,
             root,
             revisions: Default::default(),
+            downloads: Default::default(),
+            fresh: None,
         })
+    }
+}
+impl<R> CachedObjects<'_, R> {
+    /// Key proof must still reach Drive when other adapters have already listed objects.
+    pub fn with_fresh_object(mut self, id: &str) -> Self {
+        self.fresh = Some(id.into());
+        self
     }
 }
 impl<R: Objects> Objects for CachedObjects<'_, R> {
     fn ids(&self, folder: &str) -> Result<Vec<String>> {
         let revisions = self.remote.revisions(folder)?;
-        *self.revisions.borrow_mut() = revisions.iter().cloned().collect();
+        let mut known = self.revisions.lock().map_err(|_| "cloud_cache_busy")?;
+        known.retain(|(f, _), _| f != folder);
+        known.extend(
+            revisions
+                .iter()
+                .map(|(id, revision)| ((folder.to_string(), id.clone()), revision.clone())),
+        );
         Ok(revisions.into_iter().map(|(id, _)| id).collect())
     }
     fn allocate(&self) -> Result<String> {
@@ -483,11 +500,25 @@ impl<R: Objects> Objects for CachedObjects<'_, R> {
         self.remote.put(folder, id, key, bundle)
     }
     fn get(&self, folder: &str, id: &str, space: &str, key: &SpaceKey) -> Result<Bundle> {
-        let rev = self.revisions.borrow().get(id).cloned().flatten();
-        let path = self.root.join(format!(
-            "{}.json",
-            crate::sync::bundle::hash(format!("{folder}:{space}:{id}").as_bytes())
-        ));
+        if self.fresh.as_deref() == Some(id) {
+            return self.remote.get(folder, id, space, key);
+        }
+        let hash = crate::sync::bundle::hash(format!("{folder}:{space}:{id}").as_bytes());
+        // Fixed stripes bound lock memory and coalesce same-object downloads. Unrelated
+        // objects can proceed concurrently; no global lock is held across network I/O.
+        let stripe = usize::from_str_radix(&hash[..2], 16).map_err(|_| "invalid_bundle")?
+            % self.downloads.len();
+        let _download = self.downloads[stripe]
+            .lock()
+            .map_err(|_| "cloud_cache_busy")?;
+        let rev = self
+            .revisions
+            .lock()
+            .map_err(|_| "cloud_cache_busy")?
+            .get(&(folder.to_string(), id.to_string()))
+            .cloned()
+            .flatten();
+        let path = self.root.join(format!("{hash}.json"));
         if let Some(revision) = rev.as_ref() {
             if path.exists() {
                 let cached: Cached = serde_json::from_slice(&storage::read(
@@ -575,5 +606,52 @@ mod cache_tests {
         let cache = CachedObjects::new(&remote, t.path()).unwrap();
         cache.get("folder", "object", "space", &key).unwrap();
         assert_eq!(remote.gets.get(), 3);
+    }
+    #[test]
+    fn concurrent_reads_share_one_download_but_key_proof_always_fetches() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Barrier,
+        };
+        struct SharedRemote(AtomicUsize);
+        impl Objects for SharedRemote {
+            fn ids(&self, _: &str) -> Result<Vec<String>> {
+                Ok(vec!["object".into()])
+            }
+            fn revisions(&self, _: &str) -> Result<Vec<(String, Option<String>)>> {
+                Ok(vec![("object".into(), Some("1".into()))])
+            }
+            fn allocate(&self) -> Result<String> {
+                unreachable!()
+            }
+            fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+                unreachable!()
+            }
+            fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                proof_bundle(space)
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let remote = SharedRemote(AtomicUsize::new(0));
+        let key = SpaceKey::generate().unwrap();
+        let cache = CachedObjects::new(&remote, root.path()).unwrap();
+        cache.ids("folder").unwrap();
+        let barrier = Barrier::new(8);
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                scope.spawn(|| {
+                    barrier.wait();
+                    for _ in 0..5 {
+                        cache.get("folder", "object", "space", &key).unwrap();
+                    }
+                });
+            }
+        });
+        assert_eq!(remote.0.load(Ordering::SeqCst), 1);
+        let cache = cache.with_fresh_object("object");
+        cache.get("folder", "object", "space", &key).unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        assert_eq!(remote.0.load(Ordering::SeqCst), 3);
     }
 }

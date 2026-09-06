@@ -40,3 +40,5 @@ Primary format references: [Codex app-server](https://learn.chatgpt.com/docs/app
 Snapshots are grouped by agent and collapsed initially. Expand a group or use Expand all / Collapse all. Each expanded group sorts by local save time, newest first. The timestamp is the local immutable object's filesystem modification time, not conversation creation time or remote upload time; unavailable times are explicitly unknown. Existing snapshot schemas and hashes are unchanged.
 
 Source cards distinguish active, completed, empty, partial, failed and paused results. Labelled counts separate uploaded/downloaded bundles from locally applied conversations or memories; bundle counts need not equal conversation counts. Common issues show next steps, with raw codes and capture/available counts under Technical details. Unknown states are displayed as waiting, never as success.
+
+Unreleased scheduling update: independent storage groups can run three at a time. Aliases with the same canonical profile run once; shared journals and overlapping source directories stay sequential. Native restoration and AMOS merge ordering are unchanged. See [parallel scheduling](UPDATES_AND_STATUS.md).

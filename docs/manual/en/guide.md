@@ -54,3 +54,5 @@ Snapshots now collapse by Agent, with Expand all / Collapse all and local save t
 In 0.4.2, language can be changed while syncing and is saved automatically, including tray labels. Other unsaved settings remain unchanged. If saving fails, the previous language is retained. On 0.4.1, pause synchronization before changing language, then save setup.
 
 0.4.3: app, Google and sync states share a row below Drive setup status, wrapping on narrow windows. Upload/download rates and totals since launch refresh each second. Rates average approximately three seconds of Drive HTTP payloads. Excludes system-wide traffic, transport overhead, OAuth and updates; upload counts do not imply server acknowledgement.
+
+Unreleased: up to three independent storage groups sync concurrently; shared stores and overlapping paths remain sequential. Claude/Claude Code and Codex/ChatGPT Work aliases with the same path run once. Each source shows queued, syncing and individual results. Pause stops dispatch and waits for active operations to finish safely. One source failure does not block other groups; real-world speedup remains unmeasured.

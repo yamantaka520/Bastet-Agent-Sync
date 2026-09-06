@@ -143,3 +143,40 @@ it("keeps unknown and paused states honest and explains errors before technical 
   expect(screen.getByText(/Data exceeds the current limit/)).toBeTruthy();
   expect(screen.queryByText(/This cycle is complete/)).toBeNull();
 });
+
+it("shows queued sources in all five languages and marks unfinished work paused", () => {
+  for (const locale of ["zh-Hant", "zh-Hans", "en", "ja", "ko"] as const) {
+    const sources = [
+      {
+        agent: "pi",
+        state: "queued",
+        captured: 0,
+        available: 0,
+        published: 0,
+        received: 0,
+        restored: 0,
+        issues: {},
+      },
+    ];
+    const view = render(
+      <NativeSessions
+        native={false}
+        locale={locale}
+        running
+        sources={sources}
+      />,
+    );
+    expect(screen.getByText(`🕒 ${syncDisplay[locale][29]}`)).toBeTruthy();
+    expect(view.container.querySelector(".sync-counts")).toBeNull();
+    view.rerender(
+      <NativeSessions
+        native={false}
+        locale={locale}
+        running={false}
+        sources={sources}
+      />,
+    );
+    expect(screen.getByText(`⏸️ ${syncDisplay[locale][6]}`)).toBeTruthy();
+    cleanup();
+  }
+});
