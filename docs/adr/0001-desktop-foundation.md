@@ -1,6 +1,6 @@
 # ADR 0001 — Tauri desktop and Rust-owned state
 
-Status: adopted for M1, 2026-09-05.
+Status: adopted for M1, 2026-09-05; architecture reviewed for 0.4.2. M1 restrictions below describe that milestone. OAuth and the worker are now implemented; see [current plan](../MASTER_PLAN.md).
 
 Use Tauri 2, React and TypeScript, following the existing Bastet desktop family. Keep file discovery, settings validation and persistence in Rust. Expose typed commands to the UI. The first milestone never reads conversation contents or uploads agent data. GUI settings are separate from agent profiles.
 

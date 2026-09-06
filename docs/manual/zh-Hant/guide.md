@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.4.1
+## 0.4.2
 
-0.4.1 支援本機對話與 Agent Memory OS 同步。勾選來源、儲存後按啟動，不需要手動匯出 JSONL。Claude／Claude Code 共用本機程式工作對話；Codex／Work 共用本機紀錄。Agy 使用 SQLite 快照；Grok、Pi 使用原生對話檔案。
+0.4.2 支援本機對話與 Agent Memory OS 同步。勾選來源、儲存後按啟動，不需要手動匯出 JSONL。Claude／Claude Code 共用本機程式工作對話；Codex／Work 共用本機紀錄。Agy 使用 SQLite 快照；Grok、Pi 使用原生對話檔案。
 
 ## 設定
 

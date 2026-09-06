@@ -6,6 +6,8 @@
 
 ## 繁體中文
 
+修正同步中無法切換語言：現在五種語言皆可於同步期間切換並自動保存，系統匣文字同步更新；不需暫停、不會套用其他未儲存設定。保存失敗時保留原語言。
+
 本版改善憑證存取與同步結果介面，保留同步預覽的支援界線。新增「準備憑證存取」及執行期間快取，減少重複讀取鑰匙圈；退出、忘記登入或重新設定會清除快取。同步包可依 Agent 展開／收合，顯示本機保存時間並由新到舊排序；各 Agent 改用清楚的狀態卡、傳輸數量與問題處理建議。時間不是原始對話建立時間，更新後仍可能需要 OS 授權。
 
 提供五語 GUI、系統匣、可接續的 Google Drive 設定精靈、本機對話加密同步、AMOS 自動備份合併、逐來源狀態與更新按鈕。
@@ -20,6 +22,8 @@ macOS 首次開啟若被阻擋，確認下載來源後，到「系統設定 → 
 
 ## 简体中文
 
+修复同步期间无法切换语言：五种语言可在同步时切换并自动保存，同时更新系统托盘文字；无需暂停，也不会应用其他未保存设置。保存失败时保留原语言。
+
 本版新增凭据访问准备与内存缓存，减少重复读取钥匙串；退出、忘记登录或重新设置会清除缓存。同步包按 Agent 展开／收起，显示本地保存时间并从新到旧排列；状态卡提供明确结果、传输数量与处理建议。保存时间不是原始对话时间，更新后仍可能需要系统授权。
 
 提供五语言界面、系统托盘、可恢复的 Drive 向导、本地对话加密同步、AMOS 自动备份合并和在线更新。Windows 自动检测并补装内置 WebView2；macOS 使用系统 WebKit；Linux 执行 `sh install-linux.sh`，自动选择 apt/dnf、校验下载并安装缺少的依赖，需要网络和管理员权限。无需 Node.js、Rust 或 Drive 桌面版。
@@ -29,6 +33,8 @@ macOS 首次開啟若被阻擋，確認下載來源後，到「系統設定 → 
 macOS 首次打开若被阻止，确认下载来源后，在「系统设置 → 隐私与安全性 → 仍要打开」确认此 App。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 
 ## English
+
+Fixes language switching during synchronization. All five languages now save independently and update tray labels without pausing sync or applying other unsaved settings. Failed persistence keeps the previous language.
 
 This update adds explicit credential preparation and a process-memory cache to reduce repeated keychain reads; exit, forgetting login and setup reset clear the cache. Snapshots collapse by agent and sort by local save time, newest first. Source cards provide clear results, labelled transfer counts and actionable issue summaries. Save times are not original conversation times, and OS authorization may still be needed after updates.
 
@@ -40,6 +46,8 @@ If macOS blocks the first launch, confirm the download source, then use System S
 
 ## 日本語
 
+同期中に言語を変更できない問題を修正しました。5言語の変更を個別に自動保存し、トレイの文字も更新します。同期の一時停止や他の未保存設定の適用は不要です。保存失敗時は元の言語を維持します。
+
 認証情報の事前準備とメモリキャッシュにより、キーチェーンの反復読み取りを減らします。終了、ログイン情報削除、設定再開始で消去します。スナップショットは Agent ごとに展開でき、端末への保存日時が新しい順に表示します。状態カードに結果、転送数、対処方法を示します。日時は元の会話日時ではなく、更新後にOSの許可が必要な場合があります。
 
 5言語のGUI／トレイ、再開可能なDrive設定、本機会話の暗号化同期、AMOS自動バックアップ／マージ、状態表示と署名付き更新に対応します。Windowsは同梱のオフラインインストーラーで不足するWebView2を補い、macOSはシステムWebKitを使用します。Linuxは `sh install-linux.sh` でapt/dnfを判定し、ダウンロードを検証して依存パッケージを補います。ネット接続と管理者権限が必要です。Node.js、Rust、Driveデスクトップは不要です。
@@ -49,6 +57,8 @@ macOSは未公証、WindowsはAuthenticode未署名のため、OSの確認が表
 macOSで初回起動が阻止された場合は配布元を確認し、「システム設定 → プライバシーとセキュリティ → このまま開く」でこのAppを確認してください。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 
 ## 한국어
+
+동기화 중 언어를 변경할 수 없던 문제를 수정했습니다. 5개 언어를 개별 자동 저장하고 트레이 문구도 갱신합니다. 동기화를 중지하거나 다른 미저장 설정을 적용하지 않으며 저장 실패 시 이전 언어를 유지합니다.
 
 자격 증명 접근 준비와 메모리 캐시로 키체인 반복 읽기를 줄였습니다. 종료, 로그인 정보 삭제 또는 설정 재시작 시 캐시를 지웁니다. 스냅샷은 Agent별로 접거나 펼치며 로컬 저장 시간순으로 표시합니다. 상태 카드에 결과, 전송 수 및 해결 방법을 표시합니다. 저장 시간은 원래 대화 시간이 아니며 업데이트 후 OS 승인이 필요할 수 있습니다.
 

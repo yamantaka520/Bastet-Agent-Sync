@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.4.1
+## 0.4.2
 
-0.4.1 はローカル会話と Agent Memory OS を同期します。ソースを選択、保存して開始します。手動 JSONL 出力は不要です。Claude／Claude Code はローカル開発会話、Codex／Work はローカル記録を共有します。Agy は SQLite、Grok と Pi はネイティブ会話ファイルを使用します。
+0.4.2 はローカル会話と Agent Memory OS を同期します。ソースを選択、保存して開始します。手動 JSONL 出力は不要です。Claude／Claude Code はローカル開発会話、Codex／Work はローカル記録を共有します。Agy は SQLite、Grok と Pi はネイティブ会話ファイルを使用します。
 
 ## 設定
 

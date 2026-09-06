@@ -1,6 +1,6 @@
 # 🐈 Google Drive setup wizard
 
-The five-language desktop offers **Step-by-step wizard** and **Manual setup**. Both use the same native validation and saved state. Finishing setup does not enable Agent synchronization; adapters and sync lifecycle controls remain gated.
+The five-language desktop offers **Step-by-step wizard** and **Manual setup**. Both use the same native validation and saved state. Finishing setup does not start synchronization. Select sources, save and explicitly press Start to run the supported adapters. Language changes save independently during sync in 0.4.2.
 
 ## Guided steps
 
@@ -44,7 +44,7 @@ On another computer, configure authorization, select the same accessible folder,
 
 Fixture tests cover per-step reload, mode persistence, malformed-record restart, cancelled export, failure/retry, stable key/proof IDs, joining a space, rejected wrong recovery keys and frontend completion gates. These are not Google consent or physical-device tests. Native UI smoke and CI results are recorded in [Validation](VALIDATION.md).
 
-Real-account consent, three-platform credential-store interactions and two-computer recovery still require configured clients/accounts. Google Picker, background scheduling and native Agent restore remain pending. The wizard's final check verifies setup; it does not transfer Agent data.
+Real-account macOS consent and selected transfers have been exercised; three-platform interactive credential-store checks and physical two-computer recovery remain incomplete. Google Picker remains pending. Background scheduling and additive local conversation restoration are implemented within the [current adapter scope](NATIVE_SESSIONS.md). The wizard's final check verifies setup; it does not transfer Agent data.
 
 Primary setup reference: [Google Drive desktop OAuth setup](https://developers.google.com/workspace/drive/api/quickstart/python). Encryption and API boundaries: [Cloud security contract](CLOUD_SECURITY.md).
 
@@ -64,7 +64,7 @@ Refresh, token exchange and account/folder checks are bounded network operations
 
 ## Imported client credential recovery
 
-Import now writes and reads back the OAuth JSON from the native credential store before completing step 1. A first explicit authorization opens browser consent directly; saved-token refresh is attempted only when resuming a previously authorized setup. Credential-store failures identify whether the imported client or saved login could not be read; browser launch errors have a separate message. After replacing a development build, quit the old process and open the new build before testing credential access. Do not rebuild its running app bundle during a credential test. The observed initial failure was before browser launch; its underlying OS keychain error was not captured, so a code-signature cause is a hypothesis, not a proven diagnosis.
+Import persists the OAuth JSON through the native credential store and verifies its readable application representation before completing step 1. Since 0.4.1 a successful write populates the process cache, so this readback can be served from memory; Prepare credential access explicitly clears the cache and rereads native items. A first explicit authorization opens browser consent directly; saved-token refresh is attempted only when resuming a previously authorized setup. Credential-store failures identify whether the imported client or saved login could not be read; browser launch errors have a separate message. After replacing a development build, quit the old process and open the new build before testing credential access. Do not rebuild its running app bundle during a credential test. The observed initial failure was before browser launch; its underlying OS keychain error was not captured, so a code-signature cause is a hypothesis, not a proven diagnosis.
 
 ## Credential preparation (0.4.1)
 

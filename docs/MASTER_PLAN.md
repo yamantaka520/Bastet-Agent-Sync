@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: 0.4.1 adds credential caching and clearer grouped snapshot/results UI; its three-platform installers are published. 0.4.0 packages the first macOS/Windows/Linux installers with runtime dependency handling and direct release downloads. The 0.3.2 core adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
+Status: 0.4.2 permits independent, persisted language changes during sync. 0.4.1 adds credential caching and clearer grouped snapshot/results UI; its three-platform installers are published. 0.4.0 packages the first macOS/Windows/Linux installers with runtime dependency handling and direct release downloads. The 0.3.2 core adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
 
 ## Product
 
@@ -8,9 +8,9 @@ A local-first desktop companion that synchronizes selected agent settings, skill
 
 ## Architecture
 
-Tauri 2 + React/TypeScript for the desktop UI; Rust owns local discovery, configuration and later the synchronization engine. The renderer has a narrow command interface, not arbitrary filesystem or shell access. One desktop process owns the lifecycle; closing to tray is opt-in and only allowed with an available tray. No daemon or localhost web server is needed for the first foundation.
+Tauri 2 + React/TypeScript for the desktop UI; Rust owns local discovery, configuration and the synchronization engine. The renderer has a narrow command interface, not arbitrary filesystem or shell access. One desktop process owns the lifecycle; closing to tray is opt-in and only allowed with an available tray. No daemon or localhost web server is needed for the first foundation.
 
-Use immutable, content-verified snapshots and a persistent local journal in the sync milestone. Preserve concurrent conversation branches and conflicting settings. Google Drive API with desktop OAuth is the primary planned transport (Linux has no official Drive desktop client); an existing local Drive folder is an optional transport. Do not use cloud lock files as distributed mutexes.
+Use immutable, content-verified snapshots and a persistent local journal in the sync milestone. Preserve concurrent conversation branches and conflicting settings. Google Drive API with desktop OAuth is the implemented production transport (Linux has no official Drive desktop client); the local-folder transport remains an isolated diagnostic, not an enabled agent-sync route. Do not use cloud lock files as distributed mutexes.
 
 ## Milestones and gates
 
@@ -49,4 +49,4 @@ Agent Memory OS is an additional memory-service source with its own adapter, not
 
 Version 0.2.0 adds [runtime preflight/status and a signed updater](UPDATES_AND_STATUS.md). This does not satisfy the missing live-store worker, scheduling or two-device gates.
 
-0.2.1 supersedes the blanket Start gate for Agent Memory OS. See [current adapter](AGENT_MEMORY_OS.md). ChatGPT Work is an eighth distinct source with candidate discovery, not a verified native importer.
+Historical 0.2.1 introduced AMOS automatic sync. The current worker also handles the documented local conversation sources, including shared Codex/Work rollout storage. See [current adapters](NATIVE_SESSIONS.md); cloud Work and full native continuation remain outside guarantees.

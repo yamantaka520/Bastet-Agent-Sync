@@ -2,9 +2,9 @@
 
 Historical 0.2.0 behavior (superseded by [automatic AMOS sync in 0.2.1](AGENT_MEMORY_OS.md)): version 0.2.0 replaces the hard-coded disconnected label and permanently disabled Start button. Drive setup completion is reported from the native wizard; saved completion is distinct from a token currently held in this process. An idle, read-only status refresh checks token expiry every 15 seconds without contacting Google. It cannot detect remote revocation until a request is made.
 
-## Historical 0.2.0 Start and status
+## Current Start and status (0.4.2)
 
-Start validates saved settings and Drive wizard progress, then runs selected local conversation adapters and the AMOS merge independently. Per-source results distinguish empty, syncing, partial and failed work. Credential access has its own visible phase. Missing sessions are added; existing different versions remain conflicts. Pause keeps completed source counters. Settings and updates are blocked while the worker runs. “App running” still indicates this desktop instance, not proof of a completed transfer. See [current adapter scope](NATIVE_SESSIONS.md).
+Start validates saved settings and Drive wizard progress, then runs selected local conversation adapters and the AMOS merge independently. Per-source results distinguish empty, syncing, partial and failed work. Credential access has its own visible phase. Missing sessions are added; existing different versions remain conflicts. Pause keeps completed source counters. Sync settings and update installation are blocked while the worker runs; language changes are independent and remain available. “App running” still indicates this desktop instance, not proof of a completed transfer. See [current adapter scope](NATIVE_SESSIONS.md).
 
 ## Current version identity
 

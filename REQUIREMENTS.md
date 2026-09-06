@@ -1,6 +1,6 @@
 # Bastet Agent Sync — 需求與接續設計
 
-狀態：已授權開始開發；同步與跨電腦恢復尚待實作驗證。實作路線見 [Master plan](docs/MASTER_PLAN.md)。
+狀態（0.4.2）：本機對話與 Agent Memory OS 自動加密同步、五語介面與三平台安裝包已實作；語言可在同步中切換並自動儲存。完整跨機原生續接仍待驗收。下列日期段落保留當時需求與觀察，現況以 docs/NATIVE_SESSIONS.md 與 docs/VALIDATION.md 為準。實作路線見 [Master plan](docs/MASTER_PLAN.md)。
 
 GitHub 儲存庫：https://github.com/yamantaka520/Bastet-Agent-Sync
 
@@ -158,3 +158,8 @@ Grok help 指出對話恢復與程式碼快照恢復為不同操作。所有適�
 ## 三平台安裝與首次發布（2026-09-06）
 
 使用者要求每個 Release 包含 macOS、Windows、Linux 安裝檔；安裝時偵測並補齊 App 必要執行元件。完成後已授權公開第一個 Release；點選版本號進入的五語 Release notes 必須列出安裝檔直接下載連結。Agent 帳號與本機服務設定保留使用者管理，詳細安裝界線見 [Release notes](docs/RELEASE_NOTES.md)。
+
+
+## 語言與文件更新（2026-09-06）
+
+使用者要求同步中仍可切換語言，並授權 v0.4.2 發包及全文件更新。語言獨立自動儲存，不暫停同步，也不套用其他未儲存設定；其餘同步設定仍需暫停後修改。發行包含三平台安裝檔、五語說明、驗證結果與 BastetMind 完整文件快照。

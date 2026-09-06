@@ -1,5 +1,11 @@
 # Validation
 
+## 0.4.2 documentation review — 2026-09-06
+
+All 20 tracked Markdown documents were reviewed for this release. README, requirements, master plan, five locale guides, release notes, changelog, validation, native/AMOS adapters, cloud security, setup, snapshot protocol, update/status and the ADR were reconciled with current code. AGENTS.md and asset provenance remain applicable and retain their original instructions/provenance. Historical validation entries and dated requirements are preserved as history, not current acceptance claims.
+
+Corrections include active Start/Pause and local adapters, separate diagnostic local-folder scope, actual macOS OAuth evidence, account identity checks, cached client readback, current retry boundaries and the language-only save exception during sync. Outstanding physical two-device, interactive OS credential, native resume, OS signing and in-app upgrade checks remain explicit.
+
 ## 0.4.2 language switching — 2026-09-06
 
 - Root cause: the selector was disabled while the worker was running, and locale changes used the full-settings dirty/save path.
