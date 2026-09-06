@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.4.1 — credential access and clearer sync results 
+## 0.4.1 — credential access and clearer sync results
+
+Published 2026-09-06: [installers and five-language release notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.1). All four builds, three installer checks, seven update signatures and nine public download links passed.
 
 - Group snapshots by agent with collapse/expand controls, local save timestamps and newest-first ordering.
 - Show per-agent result cards, labelled transfer counts and actionable five-language issue summaries; retain technical codes in expandable details.

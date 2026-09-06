@@ -1,11 +1,20 @@
 # Validation
 
+## 0.4.1 published release — 2026-09-06
+
+- [v0.4.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.1) is public/latest with 19 assets, built from tagged commit `1a53bef3d3d42382f32ee21038acbe3324c0fe8c`.
+- [Release build 34035454608](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34035454608) passed all four architecture jobs and draft creation. The tag was pushed before dispatch; workflow permissions were unchanged.
+- [Installer smoke 34035906240](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34035906240) passed Windows NSIS install/launch, macOS arm64 install/launch and Ubuntu/Fedora dependency installation checks. Intel macOS DMG integrity was checked locally; interactive Intel launch remains untested.
+- All seven updater signatures were cryptographically verified; all 18 checksum entries and all 19 GitHub asset digests matched downloaded artifacts. Both macOS DMG integrity checks passed. Nine updater platform/format routes match their signed packages.
+- All nine public installer/support links returned HTTP 200. The public latest update feed returned 0.4.1. Existing runtime provisioning and OS signing limitations from 0.4.0 still apply.
+- These checks do not claim real repeated keychain prompt counts, an in-app upgrade between published versions, or complete two-device agent continuation. The existing running local app was not replaced.
+
 ## 0.4.1 sync display follow-up — 2026-09-06
 
 - 69 Rust and 26 frontend tests passed (one optional installed AMOS test skipped). UI checks default collapsed groups, individual/all expansion, newest-first ordering, absent/invalid timestamp fallback, selected restoration, paused and unknown states and five-language completeness.
 - Snapshot timestamps come from the local immutable object modification time, labelled as local save time; no original conversation timestamp is invented and no bundle schema/hash changes are introduced.
 - Human-readable issue summaries retain raw codes inside technical details. Unknown source states are waiting, never implicitly successful.
-- Native visual acceptance and replacement of the running older app remain outstanding; 0.4.1 is still unreleased.
+- Native visual acceptance and replacement of the running older app remain outstanding; 0.4.1 was unreleased at this implementation check; publication is recorded above.
 
 ## 0.4.1 credential cache — 2026-09-06
 
@@ -13,7 +22,7 @@
 - New cache checks cover 12 concurrent readers with one backend read, external change after clearing, missing/locked retry, account isolation, rotation, failed mutation eviction and deletion. UI checks explicit preparation without sync and removal of stale success after failure; all five locale key sets match.
 - The initial sandbox run blocked five loopback HTTP/OAuth tests; rerunning with local listener permission passed all default tests.
 - Optimized macOS executable and a separate staged 0.4.1 app were built successfully.
-- Existing running 0.3.1 app was observed and not overwritten. Real keychain prompt counts across repeated sync, exit/relaunch and upgrades remain unverified. Developer ID signing is unchanged; 0.4.1 is not a published release.
+- Existing running 0.3.1 app was observed and not overwritten. Real keychain prompt counts across repeated sync, exit/relaunch and upgrades remain unverified. Developer ID signing is unchanged; 0.4.1 was not yet published at this implementation check.
 
 ## 0.4.0 release packaging — 2026-09-06
 

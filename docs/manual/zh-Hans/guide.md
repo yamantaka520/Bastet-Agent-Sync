@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.4.0
+## 0.4.1
 
-0.4.0 支持本地对话与 Agent Memory OS 同步。勾选来源、保存后启动，无需手动导出 JSONL。Claude／Claude Code 共用本地编程对话；Codex／Work 共用本地记录。Agy 使用 SQLite 快照；Grok、Pi 使用原生对话文件。
+0.4.1 支持本地对话与 Agent Memory OS 同步。勾选来源、保存后启动，无需手动导出 JSONL。Claude／Claude Code 共用本地编程对话；Codex／Work 共用本地记录。Agy 使用 SQLite 快照；Grok、Pi 使用原生对话文件。
 
 ## 设置
 

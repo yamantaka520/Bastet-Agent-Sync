@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: 0.4.0 packages the first macOS/Windows/Linux installers with runtime dependency handling and direct release downloads. The 0.3.2 core adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
+Status: 0.4.1 adds credential caching and clearer grouped snapshot/results UI; its three-platform installers are published. 0.4.0 packages the first macOS/Windows/Linux installers with runtime dependency handling and direct release downloads. The 0.3.2 core adds local conversation adapters, additive receive, a snapshot recovery library, per-source results and revision-aware Drive caching. AMOS automatic merge remains available. Full native continuation/attachments/path mapping and physical two-device acceptance remain open; see [current contract](NATIVE_SESSIONS.md).
 
 ## Product
 
