@@ -47,3 +47,8 @@ Use **🔐 Prepare credential access** before syncing to read saved credentials 
 
 
 Snapshots now collapse by Agent, with Expand all / Collapse all and local save timestamps sorted newest first. Source cards show clear status, uploaded/downloaded bundle counts and locally added items. Common errors include next steps; technical codes remain expandable. The save timestamp is not the original conversation time.
+
+
+### 0.4.2
+
+In 0.4.2, language can be changed while syncing and is saved automatically, including tray labels. Other unsaved settings remain unchanged. If saving fails, the previous language is retained. On 0.4.1, pause synchronization before changing language, then save setup.

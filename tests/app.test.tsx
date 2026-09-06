@@ -75,7 +75,7 @@ describe("locale and native setup contracts", () => {
     fireEvent.change(screen.getByLabelText("Language"), {
       target: { value: "ja" },
     });
-    expect(screen.getByText(messages.ja.setup)).toBeTruthy();
+    expect(await screen.findByText(messages.ja.setup)).toBeTruthy();
   });
   it("preserves error state and prevents save after unreadable settings", async () => {
     api.native = true;
@@ -228,4 +228,83 @@ it("starts the real worker and allows pause even with skipped sources", async ()
   fireEvent.click(screen.getByRole("button", { name: /Pause sync/ }));
   expect(api.invoke).toHaveBeenCalledWith("sync_start");
   expect(api.invoke).toHaveBeenCalledWith("sync_pause");
+});
+
+it("switches and persists all five languages while sync is running without saving sync settings", async () => {
+  api.native = true;
+  const saved = {
+    ...defaults("en"),
+    deviceName: "Test computer",
+    selectedAgents: ["codex"],
+  };
+  api.invoke.mockImplementation(async (command, args) => {
+    if (command === "bootstrap")
+      return { settings: { ...saved }, agents: [], trayAvailable: true };
+    if (command === "sync_status")
+      return {
+        running: true,
+        phase: "syncing",
+        published: 0,
+        received: 0,
+        applied: 0,
+        lastSuccess: null,
+        error: null,
+        skipped: [],
+      };
+    if (command === "save_locale") saved.locale = args.locale;
+  });
+  const mounted = render(<App />);
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "Save setup" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true),
+  );
+  for (const locale of ["ja", "zh-Hant", "zh-Hans", "en", "ko"] as const) {
+    const select = screen.getByLabelText(messages[saved.locale].language);
+    await waitFor(() =>
+      expect((select as HTMLSelectElement).disabled).toBe(false),
+    );
+    fireEvent.change(select, { target: { value: locale } });
+    await waitFor(() => expect(document.documentElement.lang).toBe(locale));
+    expect(api.invoke).toHaveBeenCalledWith("save_locale", { locale });
+  }
+  expect(
+    api.invoke.mock.calls.some(([cmd]) =>
+      ["save_settings", "sync_pause", "sync_start"].includes(cmd),
+    ),
+  ).toBe(false);
+  mounted.unmount();
+  render(<App />);
+  await waitFor(() =>
+    expect(
+      (screen.getByLabelText(messages.ko.language) as HTMLSelectElement).value,
+    ).toBe("ko"),
+  );
+});
+it("retains current language on persistence failure", async () => {
+  api.native = true;
+  api.invoke.mockImplementation(async (command) => {
+    if (command === "bootstrap")
+      return {
+        settings: { ...defaults("en"), deviceName: "Test" },
+        agents: [],
+        trayAvailable: true,
+      };
+    if (command === "save_locale") throw "save_failed";
+  });
+  render(<App />);
+  const select = screen.getByLabelText("Language");
+  await waitFor(() =>
+    expect((select as HTMLSelectElement).disabled).toBe(false),
+  );
+  fireEvent.change(select, { target: { value: "ja" } });
+  await waitFor(() =>
+    expect(api.invoke).toHaveBeenCalledWith("save_locale", { locale: "ja" }),
+  );
+  await waitFor(() =>
+    expect((select as HTMLSelectElement).disabled).toBe(false),
+  );
+  expect((select as HTMLSelectElement).value).toBe("en");
+  expect(document.documentElement.lang).toBe("en");
 });

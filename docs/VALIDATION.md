@@ -1,5 +1,12 @@
 # Validation
 
+## 0.4.2 language switching — 2026-09-06
+
+- Root cause: the selector was disabled while the worker was running, and locale changes used the full-settings dirty/save path.
+- The locale-only command validates the five supported values, atomically preserves persisted sync settings and updates tray labels. The UI waits for persistence, preserves other draft fields, and does not pause/restart synchronization.
+- 71 Rust tests and 28 frontend tests passed; Clippy with warnings denied and frontend build passed. Regression tests cover all five locales during active sync, reload, failed persistence, initial incomplete setup, disconnected folders, invalid locale and corrupt-file preservation. One optional installed AMOS test was skipped.
+- 0.4.2 is not released or installed over the running app. Native menu rendering and actual running-app language interaction remain to be checked.
+
 ## 0.4.1 published release — 2026-09-06
 
 - [v0.4.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.1) is public/latest with 19 assets, built from tagged commit `1a53bef3d3d42382f32ee21038acbe3324c0fe8c`.

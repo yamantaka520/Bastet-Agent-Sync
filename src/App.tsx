@@ -172,9 +172,15 @@ export default function App() {
           <label className="lang">
             {t.language}
             <select
-              disabled={busy || running}
+              disabled={busy || !loaded}
               value={settings.locale}
-              onChange={(e) => change("locale", e.target.value as Locale)}
+              onChange={(e) => {
+                const locale = e.target.value as Locale;
+                void action(async () => {
+                  if (native) await invoke("save_locale", { locale });
+                  setSettings((current) => ({ ...current, locale }));
+                });
+              }}
             >
               {Object.entries(languages).map(([code, name]) => (
                 <option key={code} value={code}>

@@ -182,6 +182,22 @@ pub fn load(path: &Path) -> Result<Option<Settings>, String> {
 
 pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
     validate(settings)?;
+    persist_settings(path, settings)
+}
+
+/// Only changes the display preference, including before setup is complete or
+/// while an external source is disconnected. Never accepts sync settings from IPC.
+pub fn save_locale(path: &Path, locale: &str) -> Result<Settings, String> {
+    if !LOCALES.contains(&locale) {
+        return Err("invalid_settings".into());
+    }
+    let mut settings = load(path)?.unwrap_or_default();
+    settings.locale = locale.into();
+    persist_settings(path, &settings)?;
+    Ok(settings)
+}
+
+fn persist_settings(path: &Path, settings: &Settings) -> Result<(), String> {
     let parent = path.parent().ok_or("save_failed")?;
     fs::create_dir_all(parent).map_err(|_| "save_failed")?;
     #[cfg(unix)]
@@ -206,6 +222,47 @@ mod tests {
             device_name: "Test device".into(),
             ..Settings::default()
         }
+    }
+    #[test]
+    fn locale_only_save_preserves_sync_settings_and_disconnected_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let mut original = settings();
+        original.selected_agents = vec!["codex".into()];
+        original.folder = dir
+            .path()
+            .join("disconnected")
+            .to_string_lossy()
+            .into_owned();
+        original
+            .custom_paths
+            .insert("codex".into(), original.folder.clone());
+        fs::write(&path, serde_json::to_vec(&original).unwrap()).unwrap();
+        for locale in LOCALES {
+            let updated = save_locale(&path, locale).unwrap();
+            original.locale = locale.into();
+            assert_eq!(
+                serde_json::to_value(updated).unwrap(),
+                serde_json::to_value(&original).unwrap()
+            );
+            assert_eq!(load(&path).unwrap().unwrap().locale, locale);
+        }
+        let before = fs::read(&path).unwrap();
+        assert!(save_locale(&path, "invalid").is_err());
+        assert_eq!(fs::read(&path).unwrap(), before);
+        fs::write(&path, b"corrupt").unwrap();
+        assert!(save_locale(&path, "ja").is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"corrupt");
+    }
+    #[test]
+    fn locale_can_be_saved_before_initial_setup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let saved = save_locale(&path, "ko").unwrap();
+        assert_eq!(saved.locale, "ko");
+        assert!(saved.device_name.is_empty());
+        assert!(validate(&saved).is_err()); // Language does not bypass sync preflight.
+        assert_eq!(load(&path).unwrap().unwrap().locale, "ko");
     }
     #[test]
     fn save_reload_replace() {

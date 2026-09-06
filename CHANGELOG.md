@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2 — language switching fix (unreleased)
+
+- Keep the language selector available during synchronization. Persist locale immediately through a locale-only native command and refresh tray labels without pausing the worker.
+- Preserve other saved settings and unsaved UI edits; failed writes retain the displayed language. Locale changes work before setup completion and with disconnected source paths.
+
 ## 0.4.1 — credential access and clearer sync results
 
 Published 2026-09-06: [installers and five-language release notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.1). All four builds, three installer checks, seven update signatures and nine public download links passed.

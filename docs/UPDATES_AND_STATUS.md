@@ -25,3 +25,7 @@ The first public [v0.4.0 release](https://github.com/yamantaka520/Bastet-Agent-S
 The updater public key is checked in. The private key is excluded from Git and stored in the repository's encrypted `TAURI_SIGNING_PRIVATE_KEY` Actions secret; keep its local backup protected. Never put it into Markdown, logs or the notebook. Update signatures are separate from Apple notarization and Windows Authenticode. The draft pipeline currently uses macOS ad-hoc signing; production OS signing/notarization is not claimed.
 
 Official implementation references: [Tauri updater](https://v2.tauri.app/plugin/updater/), [GitHub release pipeline](https://v2.tauri.app/distribute/pipelines/github/).
+
+## Language changes (0.4.2)
+
+Language is an independent display preference and can change during synchronization. Changes save immediately and update tray labels; they do not mark synchronization settings dirty or apply other unsaved form edits. While a save is pending, the selector is disabled to avoid competing writes. Persistence failure retains the previous displayed language. Locale-only writes preserve disconnected source paths and do not bypass sync preflight.

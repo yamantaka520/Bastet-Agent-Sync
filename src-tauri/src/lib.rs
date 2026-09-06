@@ -123,6 +123,23 @@ fn save_settings(
     Ok(())
 }
 #[tauri::command]
+fn save_locale(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    locale: String,
+) -> Result<(), String> {
+    let mut current = state.settings.lock().map_err(|_| "save_failed")?;
+    let settings = model::save_locale(&state.path, &locale)?;
+    *current = Some(settings);
+    if let Some(tray) = app.tray_by_id("bastet") {
+        if let Ok(next) = menu(&app, &locale) {
+            let _ = tray.set_menu(Some(next));
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn run_sync_diagnostic() -> Result<sync::diagnostic::Diagnostic, String> {
     tauri::async_runtime::spawn_blocking(sync::diagnostic::run)
         .await
@@ -183,6 +200,7 @@ pub fn run() {
             scan_agents,
             choose_folder,
             save_settings,
+            save_locale,
             run_sync_diagnostic,
             cloud::wizard_desktop::wizard_get,
             cloud::wizard_desktop::wizard_navigate,
