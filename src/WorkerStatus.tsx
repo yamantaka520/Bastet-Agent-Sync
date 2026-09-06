@@ -7,6 +7,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
 import { names } from "./model";
 export type SyncStatus = {
+  traffic?: import("./TrafficStatus").Traffic;
   running: boolean;
   phase: string;
   published: number;

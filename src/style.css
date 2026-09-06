@@ -791,3 +791,49 @@ footer p {
 details summary {
   cursor: pointer;
 }
+
+.runtime-summary {
+  margin: -4px 0 10px;
+}
+.runtime-line,
+.traffic-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
+.runtime-line {
+  font-size: 13px;
+}
+.runtime-line > * {
+  white-space: nowrap;
+}
+.traffic-strip {
+  margin-bottom: 20px;
+  color: #626454;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.traffic-strip > span {
+  white-space: nowrap;
+}
+.traffic-strip small {
+  font-size: 11px;
+}
+.traffic-strip details {
+  position: relative;
+}
+.traffic-strip summary {
+  cursor: pointer;
+}
+.traffic-strip details p {
+  position: absolute;
+  z-index: 2;
+  width: 260px;
+  right: 0;
+  padding: 12px;
+  background: #fffefb;
+  border: 1px solid #dbe1cd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px #0001;
+}

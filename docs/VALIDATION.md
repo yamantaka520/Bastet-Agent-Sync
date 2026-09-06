@@ -191,3 +191,9 @@ Verified locally on macOS, 2026-09-05. This is a development build, not a synchr
 - Local-folder selection does not prove Google Drive is connected or has transmitted data. The M2 local snapshot transport is implemented; OAuth, encryption, scheduling and native session restoration remain M3–M5.
 - Native OS menus and the folder chooser follow OS localization; application labels and custom tray items use the selected language. Native menu localization and assistive-technology coverage need further QA.
 - No signed release or auto-start installer has been published.
+
+## 2026-09-06 — compact status and Drive traffic (unreleased)
+
+- Rust: 73 tests passed, one installed-AMOS opt-in test ignored. New tests cover independent byte directions, partial reads/EOF, bounded rolling buckets, idle zero rates and retained totals. Existing encrypted Drive HTTP upload/download fixtures still pass with sized streaming request bodies.
+- Frontend: 31 tests passed, including all five traffic locales, rates/totals, missing samples and runtime-row placement below Drive setup. Production frontend build, optimized native build and Rust Clippy with warnings denied passed.
+- Google account traffic and desktop visual acceptance for this change have not been tested. Existing running app and public v0.4.2 installers are unchanged.

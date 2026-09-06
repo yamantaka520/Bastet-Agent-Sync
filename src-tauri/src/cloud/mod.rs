@@ -10,3 +10,5 @@ pub type Result<T> = std::result::Result<T, String>;
 
 pub mod wizard;
 pub mod wizard_desktop;
+
+pub mod traffic;

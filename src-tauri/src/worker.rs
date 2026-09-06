@@ -24,6 +24,7 @@ use tauri::{Manager, State};
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
+    pub traffic: crate::cloud::traffic::Sample,
     pub running: bool,
     pub phase: String,
     pub published: usize,
@@ -387,7 +388,9 @@ fn run_once(
 }
 #[tauri::command]
 pub fn sync_status(worker: State<'_, Worker>) -> Result<Status> {
-    Ok(worker.0 .0.lock().map_err(|_| "sync_busy")?.status.clone())
+    let mut status = worker.0 .0.lock().map_err(|_| "sync_busy")?.status.clone();
+    status.traffic = crate::cloud::traffic::sample();
+    Ok(status)
 }
 #[tauri::command]
 pub fn sync_pause(worker: State<'_, Worker>) -> Result<()> {

@@ -92,7 +92,7 @@ fn read(response: Response, limit: usize) -> Result<Vec<u8>> {
         return Err("drive_response_limit".into());
     }
     let mut bytes = Vec::new();
-    response
+    super::traffic::download(response)
         .take(limit as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| "network_unavailable")?;
@@ -270,7 +270,11 @@ impl Drive {
             .post(&self.files_url)
             .bearer_auth(self.token.value.as_str())
             .query(&[("fields", "id,name,mimeType,parents,trashed")])
-            .json(&json!({"id":allocated,"name":name,"mimeType":FOLDER}))
+            .header("Content-Type", "application/json")
+            .body(super::traffic::upload(
+                serde_json::to_vec(&json!({"id":allocated,"name":name,"mimeType":FOLDER}))
+                    .map_err(|_| "drive_invalid_metadata")?,
+            ))
             .send()
             .map_err(|_| "network_unavailable")?;
         serde_json::from_slice(&read(r, 65536)?).map_err(|_| "drive_invalid_response".into())
@@ -304,7 +308,7 @@ impl Drive {
                 "Content-Type",
                 format!("multipart/related; boundary={boundary}"),
             )
-            .body(bytes)
+            .body(super::traffic::upload(bytes))
             .send()
             .map_err(|_| "network_unavailable")?;
         serde_json::from_slice(&read(r, 65536)?).map_err(|_| "drive_invalid_response".into())

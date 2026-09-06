@@ -14,6 +14,7 @@ import WorkerStatus, {
   workerError,
   phaseText,
 } from "./WorkerStatus";
+import TrafficStatus from "./TrafficStatus";
 import MemoryPanel from "./MemoryPanel";
 import CloudPanel, { type WizardView } from "./CloudPanel";
 import UpdatePanel from "./UpdatePanel";
@@ -220,20 +221,27 @@ export default function App() {
         </div>
         <section
           id="runtime-status"
-          className="panel runtime-panel"
+          className="runtime-summary"
           aria-live="polite"
         >
-          {native && <strong>{rt[0]}</strong>}
-          <p>{cloud?.connected ? rt[3] : rt[4]}</p>
-          <h2>
-            {checkingStart
-              ? wt[2]
-              : blocked
-                ? rt[7]
-                : runtime?.phase
-                  ? phaseText(runtime, settings.locale)
-                  : rt[5]}
-          </h2>
+          <div className="runtime-line">
+            <strong>{native ? rt[0] : t.preview}</strong>
+            <span>{cloud?.connected ? rt[3] : rt[4]}</span>
+            <strong>
+              {checkingStart
+                ? wt[2]
+                : blocked
+                  ? rt[7]
+                  : runtime?.phase
+                    ? phaseText(runtime, settings.locale)
+                    : rt[5]}
+            </strong>
+          </div>
+        </section>
+        {native && (
+          <TrafficStatus locale={settings.locale} traffic={runtime?.traffic} />
+        )}
+        <section className="panel runtime-panel">
           <WorkerStatus
             native={native}
             locale={settings.locale}
@@ -260,7 +268,6 @@ export default function App() {
             </ul>
           )}
         </section>
-        {!native && <p className="notice">{t.preview}</p>}
         {error && (
           <p role="alert" className="error">
             {errorText}

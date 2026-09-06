@@ -31,3 +31,9 @@ Official implementation references: [Tauri updater](https://v2.tauri.app/plugin/
 ## Language changes (0.4.2)
 
 Language is an independent display preference and can change during synchronization. Changes save immediately and update tray labels; they do not mark synchronization settings dirty or apply other unsaved form edits. While a save is pending, the selector is disabled to avoid competing writes. Persistence failure retains the previous displayed language. Locale-only writes preserve disconnected source paths and do not bypass sync preflight.
+
+## Unreleased: compact status and Drive traffic
+
+App, Google connection and sync status share a row immediately below the Drive setup strip; narrow windows wrap the row. The next row shows upload/download rates and totals. The native status poll refreshes once per second without acquiring the cloud-operation lock. Missing telemetry is shown as unavailable, not zero.
+
+Counters measure Drive HTTP request bodies consumed by the HTTP client and successful response bodies read by the application, including metadata and encrypted multipart payloads. Upload consumption can precede server acknowledgement; these numbers are not proof of successful synchronization. Cache hits produce no traffic. Rates are an approximately three-second rolling average, returning to zero when idle; totals persist across sync cycles and reset when the process restarts. Excludes HTTP headers, TLS/TCP overhead, unread/rejected response bodies, OAuth, updates and other applications. No packet inspection, secrets or payload contents are retained.

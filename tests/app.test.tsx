@@ -308,3 +308,35 @@ it("retains current language on persistence failure", async () => {
   expect((select as HTMLSelectElement).value).toBe("en");
   expect(document.documentElement.lang).toBe("en");
 });
+
+it("places the three runtime states directly below the Drive setup strip", async () => {
+  api.native = true;
+  api.invoke.mockImplementation(async (command) => {
+    if (command === "bootstrap")
+      return { settings: defaults("en"), agents: [], trayAvailable: true };
+    if (command === "sync_status")
+      return {
+        running: true,
+        phase: "syncing",
+        published: 0,
+        received: 0,
+        applied: 0,
+        lastSuccess: null,
+        error: null,
+        skipped: [],
+        traffic: {
+          uploaded: 2048,
+          downloaded: 0,
+          uploadRate: 1024,
+          downloadRate: 0,
+        },
+      };
+  });
+  const { container } = render(<App />);
+  await screen.findByText("1 KiB/s");
+  const summary = container.querySelector("#runtime-status")!;
+  expect(summary.previousElementSibling?.className).toBe("status-strip");
+  expect(summary.querySelector(".runtime-line")?.children).toHaveLength(3);
+  expect(summary.nextElementSibling?.className).toBe("traffic-strip");
+  expect(summary.textContent).toContain("Syncing selected sources");
+});
