@@ -2,7 +2,7 @@
 
 ## 0.4.3 — compact runtime status and Drive traffic
 
-Release preparation: three-platform signed packages and installer verification pending.
+Published 2026-09-06: [three-platform installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.3). Four architecture builds, all three installer smoke jobs, seven update signatures, 18 checksums and nine public download links passed.
 
 - Move app, Google and sync states into one responsive row immediately below Drive setup status.
 - Show separate upload/download rates and session totals in all five locales, refreshed each second. Rates use approximately three seconds of Drive HTTP payload consumption; no OS-wide traffic or transfer-success inference.

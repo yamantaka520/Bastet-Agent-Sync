@@ -1,5 +1,14 @@
 # Validation
 
+## 0.4.3 published release — 2026-09-06
+
+- [v0.4.3](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.3) is public/latest with 19 assets. Tagged source: `af213fb82fee1d5e6d299f6ae7db3e8cce961031`.
+- [Release build 34039070119](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34039070119) passed all four architecture builds and draft creation, including 31 frontend tests and native tests on each build host.
+- [Installer smoke 34039591327](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34039591327) passed macOS arm64 and Windows NSIS install/launch, plus Ubuntu/Fedora package dependency checks.
+- Seven updater signatures cryptographically verified; 18 checksum entries and 19 GitHub digests match downloaded artifacts. Both macOS DMGs pass integrity checks. All nine updater platform/format routes match signed artifacts.
+- Nine public installer/support URLs returned HTTP 200. The public latest.json exactly matches the verified 0.4.3 manifest.
+- Five-language guides and release notes describe compact status and payload traffic scope. Live-account traffic display, native visual acceptance, Intel GUI launch, in-app upgrade and full physical two-device continuation remain separate checks. The running local app was not replaced. macOS remains ad-hoc signed/unnotarized and Windows lacks Authenticode.
+
 ## 0.4.2 published release — 2026-09-06
 
 - [v0.4.2](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) is public/latest with 19 assets. Tagged source: `7865eed3bb60365f3d8be3e2e121624dcb17f9aa`.

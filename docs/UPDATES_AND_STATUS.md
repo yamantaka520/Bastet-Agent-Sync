@@ -18,6 +18,8 @@ The fixed feed is `https://github.com/yamantaka520/Bastet-Agent-Sync/releases/la
 
 ## Release operations
 
+The current [v0.4.3 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.3) includes compact runtime status, Drive payload rates/totals and all installer targets. Four builds, three installer checks and all seven update signatures passed; the live update feed returns 0.4.3.
+
 The previous [v0.4.2 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) includes the language fix, all supported installer targets and a verified live feed. See [release evidence](VALIDATION.md).
 
 The first public [v0.4.0 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.0) includes all installer targets and a live update feed. Direct installer smoke tests passed; a real in-app upgrade between two released versions remains a separate acceptance check.
