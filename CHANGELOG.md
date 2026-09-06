@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.1 — credential access and clearer sync results (unreleased)
+## 0.4.1 — credential access and clearer sync results 
 
 - Group snapshots by agent with collapse/expand controls, local save timestamps and newest-first ordering.
 - Show per-agent result cards, labelled transfer counts and actionable five-language issue summaries; retain technical codes in expandable details.
