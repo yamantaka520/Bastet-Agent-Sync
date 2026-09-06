@@ -18,6 +18,8 @@ The fixed feed is `https://github.com/yamantaka520/Bastet-Agent-Sync/releases/la
 
 ## Release operations
 
+The current [v0.4.2 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) includes the language fix, all supported installer targets and a verified live feed. See [release evidence](VALIDATION.md).
+
 The first public [v0.4.0 release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.0) includes all installer targets and a live update feed. Direct installer smoke tests passed; a real in-app upgrade between two released versions remains a separate acceptance check.
 
 [Release notes template](RELEASE_NOTES.md) documents installation and support boundaries. `.github/workflows/release.yml` is a manual, main-branch-only signed draft workflow. It builds macOS arm64/x64, Windows x64 and Linux x64 independently, then validates all packages in one final job. It uses `tauri.release.conf.json` to produce updater archives/signatures and a merged `latest.json`, then leaves the release **draft** for artifact review. Normal pushes do not publish or install anything. Before dispatch, push the version tag at the exact main commit through an authorized Git identity; draft creation verifies that tag instead of asking the Actions token to create a workflow-bearing reference. If the platform denies release API access, the signed workflow artifacts remain available for authorized CLI publication. After verifying all platform packages and signatures, publish that draft to make the feed available. Do not publish a partially completed matrix.

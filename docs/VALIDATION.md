@@ -1,5 +1,14 @@
 # Validation
 
+## 0.4.2 published release — 2026-09-06
+
+- [v0.4.2](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.2) is public/latest with 19 assets. Tagged source: `7865eed3bb60365f3d8be3e2e121624dcb17f9aa`.
+- [Release build 34037416517](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34037416517) passed all four architecture builds and draft creation; workflow permissions were unchanged. [Language fix CI 34037163236](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34037163236) also passed.
+- [Installer smoke 34037855791](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34037855791) passed macOS arm64 install/launch, Windows NSIS install/launch, and Ubuntu/Fedora native package dependency checks.
+- All seven updater signatures were cryptographically verified; all 18 checksum entries and all 19 GitHub digests matched downloaded assets. Both macOS DMGs passed integrity checks. All nine updater platform/format routes match their signed artifacts.
+- Nine public installer/support links returned HTTP 200; the actual latest.json feed returned 0.4.2.
+- Native interactive language/tray switching, repeated keychain prompt counts, in-app upgrade between published versions, Intel GUI launch and full physical two-device continuation remain separate acceptance checks. The running local app was not replaced. Existing macOS ad-hoc and Windows unsigned OS trust limitations remain.
+
 ## 0.4.2 documentation review — 2026-09-06
 
 All 20 tracked Markdown documents were reviewed for this release. README, requirements, master plan, five locale guides, release notes, changelog, validation, native/AMOS adapters, cloud security, setup, snapshot protocol, update/status and the ADR were reconciled with current code. AGENTS.md and asset provenance remain applicable and retain their original instructions/provenance. Historical validation entries and dated requirements are preserved as history, not current acceptance claims.
@@ -11,11 +20,11 @@ Corrections include active Start/Pause and local adapters, separate diagnostic l
 - Root cause: the selector was disabled while the worker was running, and locale changes used the full-settings dirty/save path.
 - The locale-only command validates the five supported values, atomically preserves persisted sync settings and updates tray labels. The UI waits for persistence, preserves other draft fields, and does not pause/restart synchronization.
 - 71 Rust tests and 28 frontend tests passed; Clippy with warnings denied and frontend build passed. Regression tests cover all five locales during active sync, reload, failed persistence, initial incomplete setup, disconnected folders, invalid locale and corrupt-file preservation. One optional installed AMOS test was skipped.
-- 0.4.2 is not released or installed over the running app. Native menu rendering and actual running-app language interaction remain to be checked.
+- At the implementation check, 0.4.2 was not yet released; publication is recorded above. It was not installed over the running app. Native menu rendering and actual running-app language interaction remain to be checked.
 
 ## 0.4.1 published release — 2026-09-06
 
-- [v0.4.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.1) is public/latest with 19 assets, built from tagged commit `1a53bef3d3d42382f32ee21038acbe3324c0fe8c`.
+- [v0.4.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.4.1) was published as latest with 19 assets, built from tagged commit `1a53bef3d3d42382f32ee21038acbe3324c0fe8c`.
 - [Release build 34035454608](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34035454608) passed all four architecture jobs and draft creation. The tag was pushed before dispatch; workflow permissions were unchanged.
 - [Installer smoke 34035906240](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34035906240) passed Windows NSIS install/launch, macOS arm64 install/launch and Ubuntu/Fedora dependency installation checks. Intel macOS DMG integrity was checked locally; interactive Intel launch remains untested.
 - All seven updater signatures were cryptographically verified; all 18 checksum entries and all 19 GitHub asset digests matched downloaded artifacts. Both macOS DMG integrity checks passed. Nine updater platform/format routes match their signed packages.
