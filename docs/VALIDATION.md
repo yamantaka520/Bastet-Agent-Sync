@@ -1,11 +1,19 @@
 # Validation
 
+## 0.5.1 published release — 2026-09-09
+
+- [v0.5.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.1) is public/latest with 19 assets and five-language notes. Tagged source: `dcc40c46f9358bf2be7b5443fa17a4825db07d15`.
+- [Four architecture builds, run 34308068921](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34308068921), [independent three-platform CI, run 34308065357](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34308065357), and [installer checks, run 34308625229](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34308625229) all passed.
+- Installer checks cover Windows installation/native launch, macOS arm64 DMG/ad-hoc signature/native launch, Ubuntu DEB dependencies and Fedora RPM dependencies. Linux graphical interaction and Intel Mac native launch are outside these checks.
+- All seven updater signatures, 19 GitHub digests, 18 SHA256SUMS entries and nine updater routes matched. Both macOS DMGs passed integrity checks; archived version and architecture matched. Nine public installer/support links returned HTTP 200, and the public latest update feed matched the verified artifact.
+- Isolated mixed-space fixtures demonstrate the fix; physical two-computer acceptance and any individual device failure cause remain unverified. No user app or active agent store was replaced. Apple notarization and Windows Authenticode remain excluded.
+
 ## 0.5.1 encrypted-space fix — local acceptance, 2026-09-09
 
 - Mixed-space encrypted fixtures now preserve own-space transfer, skip foreign objects with a partial warning, and remain idempotent on repeat. The configured proof remains mandatory, including for device-report refreshes. Malformed public envelopes, wrong keys for the configured space and unsupported versions remain fatal. Foreign ciphertext cannot be authenticated without its key and is never imported. New-space setup refuses occupied session-object folders before key/proof allocation.
 - Local validation: 103 Rust tests passed, 2 optional installed-CLI tests ignored; 43 frontend tests passed. TypeScript/Vite build, Clippy with warnings denied, formatting, documentation and release-asset checks passed.
 - These are isolated fixtures, including loopback HTTP tests. They do not establish the cause of any particular Windows failure or real two-computer success. Device foreign-object warnings describe the latest attempted refresh; cached refreshes are throttled for 60 seconds.
-- Release build, independent CI and installer checks are pending. No active agent store, cloud history or running user app was replaced.
+- Release and installer evidence is recorded above. No active agent store, cloud history or running user app was replaced.
 
 ## 0.5.0 published release — 2026-09-07
 

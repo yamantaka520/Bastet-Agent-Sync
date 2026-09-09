@@ -16,7 +16,7 @@
 
 A local-first desktop companion for synchronizing supported local agent conversations and Agent Memory OS data through Google Drive. Part of the Bastet family.
 
-> **0.5.0 — sync control center.** Configurable 1–6 parallel groups, payload progress, persistent cycle history, encrypted device reports, bandwidth/time controls, conflict comparison, cache maintenance and opt-in portable preference/skill packages with per-file preview. Agy/Grok installed-CLI evidence is documented precisely; full physical two-device acceptance remains open. [Current support](docs/NATIVE_SESSIONS.md) · [Control center](docs/SYNC_CONTROL.md) · [Evidence](docs/VALIDATION.md).
+> **0.5.1 — encrypted-space fix.** Sync continues for the configured space when a cloud folder contains other encrypted spaces, with a partial warning. Strict key proof and malformed-data checks remain; occupied sync folders require the original recovery kit. Includes the 0.5.0 sync control center. [Download](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.1) · [Current support](docs/NATIVE_SESSIONS.md) · [Control center](docs/SYNC_CONTROL.md) · [Evidence](docs/VALIDATION.md).
 
 The desktop includes a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 
