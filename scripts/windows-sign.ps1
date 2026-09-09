@@ -11,6 +11,7 @@ $file = (Resolve-Path -LiteralPath $Path).Path
 if ([IO.Path]::GetExtension($file) -notin '.exe', '.dll', '.msi') {
     throw 'Unsupported Authenticode file type'
 }
+try {
 Import-Module ArtifactSigning -RequiredVersion 0.1.8 -ErrorAction Stop
 $parameters = @{
     Endpoint = $env:ARTIFACT_SIGNING_ENDPOINT
@@ -34,3 +35,11 @@ $parameters = @{
 }
 Invoke-ArtifactSigning @parameters
 & (Join-Path $PSScriptRoot 'windows-verify.ps1') -Paths @($file)
+
+} catch {
+    # Tauri can hide callback stderr. Preserve the exception message in the job summary.
+    if ($env:GITHUB_STEP_SUMMARY) {
+        @('### Windows signing callback failed', '```text', $_.Exception.Message, '```') | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+    }
+    throw
+}

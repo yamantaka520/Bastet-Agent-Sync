@@ -35,6 +35,19 @@ jobs:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Configure Tauri signing callback
+        shell: pwsh
+        run: |
+          Install-Module -Name ArtifactSigning -RequiredVersion 0.1.8 -Force -Repository PSGallery -Scope CurrentUser
+          $callback = Join-Path $env:GITHUB_WORKSPACE 'scripts/windows-sign.ps1'
+          $config = @{ bundle = @{ windows = @{ signCommand = @{ cmd = 'pwsh'; args = @('-NoProfile', '-NonInteractive', '-File', $callback, '-Path', '%1') } } } }
+          $config | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'tauri-signing.json')
+      - name: Verify signing access before compilation
+        shell: pwsh
+        run: |
+          $probe = Join-Path $env:RUNNER_TEMP 'BastetSigningProbe.dll'
+          Add-Type -TypeDefinition 'public static class BastetSigningProbe { public static string Purpose() { return "Signature verification only"; } }' -OutputAssembly $probe
+          ./scripts/windows-sign.ps1 -Path $probe
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -49,18 +62,12 @@ jobs:
         with:
           workspaces: src-tauri
           key: release-x86_64-pc-windows-msvc
+          cache-on-failure: true
       - run: npm ci
       - run: npm test
       - run: python scripts/check_docs.py
       - run: python scripts/test_release_assets.py
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
-      - name: Configure Tauri signing callback
-        shell: pwsh
-        run: |
-          Install-Module -Name ArtifactSigning -RequiredVersion 0.1.8 -Force -Repository PSGallery -Scope CurrentUser
-          $callback = Join-Path $env:GITHUB_WORKSPACE 'scripts/windows-sign.ps1'
-          $config = @{ bundle = @{ windows = @{ signCommand = @{ cmd = 'pwsh'; args = @('-NoProfile', '-NonInteractive', '-File', $callback, '-Path', '%1') } } } }
-          $config | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'tauri-signing.json')
       - name: Build Authenticode installers and signed updater artifacts
         shell: pwsh
         env:
