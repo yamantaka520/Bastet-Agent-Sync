@@ -10,6 +10,12 @@ The Microsoft Entra application's federated credential must match the repository
 
 Match the exact issuer, subject and audience printed by the Azure login step. GitHub's subject can include immutable owner/repository IDs; the Azure GitHub form may generate a name-only subject that does not match. In that case use an **Other issuer** federated credential with the exact observed subject. Do not remove the immutable IDs or widen the branch restriction to work around the mismatch. Azure error `AADSTS700213` indicates this trust mismatch before any signing request occurs.
 
+## Read-only management inspection
+
+The optional `azure-signing-inspect.yml` workflow reads the account and profile trust types through the same main-branch OIDC credential. Configure `ARTIFACT_SIGNING_RESOURCE_ID` as a repository variable; keep its value out of source documents. Account-scoped Reader permits inspection; Contributor permits profile management and does not replace the separate signing role. The inspection only issues GET requests and projects status/type fields, without exporting identity documents or certificates.
+
+Public Trust requires a qualifying public identity validation. Private identity validation cannot substitute for it. Check Microsoft's current [eligibility and identity-validation instructions](https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart) before creating another profile; Azure hosting region does not establish publisher geographic eligibility. Identity validation is completed in the Azure portal.
+
 ## Execution and verification
 
 The main-branch-only Windows workflow requests `id-token: write`; other build jobs do not. It authenticates with Azure CLI through GitHub OIDC, installs ArtifactSigning 0.1.8 from PowerShell Gallery, and generates a temporary Tauri configuration with an absolute signing callback path. Cloud keys stay in the signing service.
