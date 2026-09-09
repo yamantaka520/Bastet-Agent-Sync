@@ -14,6 +14,8 @@ Match the exact issuer, subject and audience printed by the Azure login step. Gi
 
 The main-branch-only Windows workflow requests `id-token: write`; other build jobs do not. It authenticates with Azure CLI through GitHub OIDC, installs ArtifactSigning 0.1.8 from PowerShell Gallery, and generates a temporary Tauri configuration with an absolute signing callback path. Cloud keys stay in the signing service.
 
+Before compilation, a small generated DLL probes the same signing callback and Windows trust validation. A successful service-side signing response alone is insufficient; an untrusted root or missing timestamp blocks the job. Public Trust Test and Private Trust profiles do not establish public distribution trust.
+
 Tauri invokes the callback during packaging, so application and installer signing occurs before the updater artifacts are signed. The callback uses SHA-256 and RFC 3161 timestamps and rejects an invalid or untimestamped result. Signing is mandatory: no unsigned fallback is uploaded.
 
 Before upload, the workflow verifies both installers, installs NSIS into an isolated runner folder, verifies the installed application and uninstaller, launches the application, and administratively extracts MSI to verify its application. It also checks that unsigned input fails verification. The release workflow waits for this Windows job and the other architecture builds before creating a draft. Standalone dispatch builds test artifacts only and does not publish a release.
