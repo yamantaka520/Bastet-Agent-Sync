@@ -1,0 +1,106 @@
+name: Windows signed packages
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  windows:
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+      ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+      ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Azure configuration
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          foreach ($name in 'AZURE_CLIENT_ID', 'AZURE_TENANT_ID', 'AZURE_SUBSCRIPTION_ID', 'ARTIFACT_SIGNING_ENDPOINT', 'ARTIFACT_SIGNING_ACCOUNT', 'ARTIFACT_SIGNING_PROFILE') {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) { throw "Missing repository variable: $name" }
+          }
+      - name: Azure login with GitHub OIDC
+        uses: azure/login@4c03e4685fe81df2c50d5714c7d93cf39d8deb7f # v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: release-x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm test
+      - run: python scripts/check_docs.py
+      - run: python scripts/test_release_assets.py
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Configure Tauri signing callback
+        shell: pwsh
+        run: |
+          Install-Module -Name ArtifactSigning -RequiredVersion 0.1.8 -Force -Repository PSGallery -Scope CurrentUser
+          $callback = Join-Path $env:GITHUB_WORKSPACE 'scripts/windows-sign.ps1'
+          $config = @{ bundle = @{ windows = @{ signCommand = @{ cmd = 'pwsh'; args = @('-NoProfile', '-NonInteractive', '-File', $callback, '-Path', '%1') } } } }
+          $config | ConvertTo-Json -Depth 8 | Set-Content -Encoding utf8 (Join-Path $env:RUNNER_TEMP 'tauri-signing.json')
+      - name: Build Authenticode installers and signed updater artifacts
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: npx tauri build --target x86_64-pc-windows-msvc --bundles nsis,msi --config src-tauri/tauri.release.conf.json --config "$env:RUNNER_TEMP/tauri-signing.json"
+      - name: Collect packages
+        run: python scripts/release_assets.py collect --target x86_64-pc-windows-msvc
+      - name: Verify installers and installed application
+        shell: pwsh
+        run: |
+          $packages = @(Get-ChildItem release-assets/* -File | Where-Object Extension -in '.exe', '.msi')
+          if ($packages.Count -ne 2) { throw 'Expected NSIS and MSI installers' }
+          ./scripts/windows-verify.ps1 -Paths $packages.FullName
+          $installer = @($packages | Where-Object Extension -eq '.exe')[0]
+          $destination = Join-Path $env:RUNNER_TEMP 'BastetSignedSmoke'
+          $install = Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$destination" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer failed: $($install.ExitCode)" }
+          $binary = Join-Path $destination 'bastet-agent-sync.exe'
+          ./scripts/windows-verify.ps1 -Paths @($binary)
+          $app = Start-Process -FilePath $binary -PassThru
+          Start-Sleep -Seconds 10
+          $app.Refresh()
+          if ($app.HasExited) { throw 'Installed application exited during launch check' }
+          Stop-Process -Id $app.Id
+          $msi = @($packages | Where-Object Extension -eq '.msi')[0]
+          $expanded = Join-Path $env:RUNNER_TEMP 'BastetMsiContents'
+          $extract = Start-Process msiexec.exe -ArgumentList '/a', "`"$($msi.FullName)`"", '/qn', "TARGETDIR=`"$expanded`"" -Wait -PassThru
+          if ($extract.ExitCode -ne 0) { throw "MSI extraction failed: $($extract.ExitCode)" }
+          $inner = @(Get-ChildItem $expanded -Recurse -Filter bastet-agent-sync.exe)
+          if ($inner.Count -ne 1) { throw 'Expected one application inside MSI' }
+          ./scripts/windows-verify.ps1 -Paths $inner.FullName
+          $unsigned = Join-Path $env:RUNNER_TEMP 'unsigned.exe'
+          [IO.File]::WriteAllText($unsigned, 'unsigned fixture')
+          $rejected = $false
+          try { ./scripts/windows-verify.ps1 -Paths @($unsigned) } catch { $rejected = $true }
+          if (!$rejected) { throw 'Signature verification accepted unsigned input' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-x86_64-pc-windows-msvc
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14

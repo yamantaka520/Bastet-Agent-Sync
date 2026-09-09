@@ -1,5 +1,11 @@
 # Validation
 
+## Windows publisher signing — integration pending live acceptance
+
+- The Windows workflow uses a pinned Azure login action and ArtifactSigning PowerShell module with OIDC. Its Tauri callback requires a valid Authenticode signature and timestamp; NSIS/MSI inner applications are checked before upload. Unsigned input must be rejected.
+- This changes future Windows packaging only. Existing published 0.5.1 assets remain unchanged. Azure login, public-trust signing, installed-binary verification and launch are not yet claimed; the standalone Windows workflow will provide evidence.
+- [Setup and packaging contract](WINDOWS_SIGNING.md). Apple notarization remains outside scope.
+
 ## 0.5.1 published release — 2026-09-09
 
 - [v0.5.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.1) is public/latest with 19 assets and five-language notes. Tagged source: `dcc40c46f9358bf2be7b5443fa17a4825db07d15`.

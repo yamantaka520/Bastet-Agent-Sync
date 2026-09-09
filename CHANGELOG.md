@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Windows publisher signing
+
+- Add a reusable Windows build workflow with GitHub OIDC and Microsoft Artifact Signing. Tauri signs application and installer binaries before updater signatures are generated. Signing failures block package upload and release drafting.
+- Validate installer signatures, timestamps and the application inside both NSIS and MSI; launch the NSIS-installed application on a hosted runner. Azure identifiers remain repository variables. Live signing acceptance is pending.
+
 ## 0.5.1 — encrypted-space diagnostics
 
 - Distinguish `foreign_space`, `unsupported_encryption_version` and `encrypted_space_mismatch` after strict proof verification; skip only non-proof foreign-space objects and report `foreign_space_objects` as a partial result.

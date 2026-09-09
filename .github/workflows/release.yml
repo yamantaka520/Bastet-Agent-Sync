@@ -19,9 +19,6 @@ jobs:
           - os: macos-latest
             target: x86_64-apple-darwin
             bundles: app,dmg
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            bundles: nsis,msi
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             bundles: deb,rpm,appimage
@@ -81,8 +78,15 @@ jobs:
           path: release-assets/*
           if-no-files-found: error
           retention-days: 14
+  windows:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/windows-signing.yml
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   draft:
-    needs: build
+    needs: [build, windows]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
