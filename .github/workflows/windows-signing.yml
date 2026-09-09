@@ -81,6 +81,7 @@ jobs:
           if ($install.ExitCode -ne 0) { throw "Installer failed: $($install.ExitCode)" }
           $binary = Join-Path $destination 'bastet-agent-sync.exe'
           ./scripts/windows-verify.ps1 -Paths @($binary)
+          ./scripts/windows-verify.ps1 -Paths @((Join-Path $destination 'uninstall.exe'))
           $app = Start-Process -FilePath $binary -PassThru
           Start-Sleep -Seconds 10
           $app.Refresh()

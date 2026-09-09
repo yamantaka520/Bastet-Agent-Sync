@@ -3,7 +3,7 @@
 ## Unreleased — Windows publisher signing
 
 - Add a reusable Windows build workflow with GitHub OIDC and Microsoft Artifact Signing. Tauri signs application and installer binaries before updater signatures are generated. Signing failures block package upload and release drafting.
-- Validate installer signatures, timestamps and the application inside both NSIS and MSI; launch the NSIS-installed application on a hosted runner. Azure identifiers remain repository variables. Live signing acceptance is pending.
+- Validate installer signatures, timestamps and the application inside both NSIS and MSI; launch the NSIS-installed application on a hosted runner. Azure identifiers remain repository variables. Live signing acceptance is pending correction of an Azure federated-subject mismatch; the initial login failed before signing.
 
 ## 0.5.1 — encrypted-space diagnostics
 

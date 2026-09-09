@@ -1,9 +1,10 @@
 # Validation
 
-## Windows publisher signing — integration pending live acceptance
+## Windows publisher signing — Azure trust mismatch, 2026-09-09
 
 - The Windows workflow uses a pinned Azure login action and ArtifactSigning PowerShell module with OIDC. Its Tauri callback requires a valid Authenticode signature and timestamp; NSIS/MSI inner applications are checked before upload. Unsigned input must be rejected.
-- This changes future Windows packaging only. Existing published 0.5.1 assets remain unchanged. Azure login, public-trust signing, installed-binary verification and launch are not yet claimed; the standalone Windows workflow will provide evidence.
+- Static workflow validation with actionlint, documentation checks and 3 release-asset tests passed. [First live run 34318563228](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/34318563228) failed at Azure login with `AADSTS700213`: the presented immutable repository subject did not match an Entra federated credential. No signing request or package publication occurred.
+- Azure trust must match the exact observed subject before retry. Existing public 0.5.1 assets remain unchanged; live signing, installed-binary verification and launch are not yet claimed.
 - [Setup and packaging contract](WINDOWS_SIGNING.md). Apple notarization remains outside scope.
 
 ## 0.5.1 published release — 2026-09-09
