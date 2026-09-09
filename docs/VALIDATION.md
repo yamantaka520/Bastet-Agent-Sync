@@ -1,5 +1,12 @@
 # Validation
 
+## 0.5.1 encrypted-space fix — local acceptance, 2026-09-09
+
+- Mixed-space encrypted fixtures now preserve own-space transfer, skip foreign objects with a partial warning, and remain idempotent on repeat. The configured proof remains mandatory, including for device-report refreshes. Malformed public envelopes, wrong keys for the configured space and unsupported versions remain fatal. Foreign ciphertext cannot be authenticated without its key and is never imported. New-space setup refuses occupied session-object folders before key/proof allocation.
+- Local validation: 103 Rust tests passed, 2 optional installed-CLI tests ignored; 43 frontend tests passed. TypeScript/Vite build, Clippy with warnings denied, formatting, documentation and release-asset checks passed.
+- These are isolated fixtures, including loopback HTTP tests. They do not establish the cause of any particular Windows failure or real two-computer success. Device foreign-object warnings describe the latest attempted refresh; cached refreshes are throttled for 60 seconds.
+- Release build, independent CI and installer checks are pending. No active agent store, cloud history or running user app was replaced.
+
 ## 0.5.0 published release — 2026-09-07
 
 - [v0.5.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.0) is public/latest with 19 assets and five-language notes containing direct installer links. Tagged source: `297d8c9cbf552effb2721a3facf89ae6dbb22b9c`.

@@ -6,6 +6,7 @@ import { ops } from "./operations-i18n";
 import { formatBytes } from "./TrafficStatus";
 import type { SyncStatus } from "./WorkerStatus";
 import type { SourceStatus } from "./NativeSessions";
+import { spaceErrorText } from "./space-errors";
 export type Resources = {
   parallel: number;
   uploadKib: number;
@@ -284,7 +285,12 @@ export default function OperationsPanel({
           {t.resumeAt}: {date(runtime.resumeAt)}
         </p>
       )}
-      {(error || runtime?.observerError) && <p role="alert">{t.error}</p>}
+      {error && <p role="alert">{t.error}</p>}
+      {runtime?.observerError && (
+        <p role="alert">
+          {spaceErrorText(runtime.observerError, locale) ?? t.error}
+        </p>
+      )}
       <details>
         <summary>{t.history}</summary>
         <button

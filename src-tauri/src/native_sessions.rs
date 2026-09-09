@@ -689,6 +689,11 @@ pub fn cycle(
     )?;
     status.published = exchange.published;
     status.received = exchange.received;
+    if exchange.foreign_objects > 0 {
+        status
+            .issues
+            .insert("foreign_space_objects".into(), exchange.foreign_objects);
+    }
     let all = replica.transport_bundles()?;
     let parents: std::collections::BTreeSet<_> = all
         .values()

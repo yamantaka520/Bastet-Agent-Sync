@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
 import { names } from "./model";
+import { spaceErrorText } from "./space-errors";
 export type SyncStatus = {
   resumeAt?: number | null;
   observerError?: string | null;
@@ -160,6 +161,8 @@ export function phaseText(s: SyncStatus, locale: Locale) {
 }
 export function workerError(error: string, locale: Locale) {
   const t = workerMessages[locale];
+  const spaceError = spaceErrorText(error, locale);
+  if (spaceError) return spaceError;
   return (
     (
       {

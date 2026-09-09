@@ -444,7 +444,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod http_tests {
+pub(crate) mod http_tests {
     use super::*;
     use std::{
         io::{Read, Write},
@@ -452,7 +452,9 @@ mod http_tests {
         thread,
     };
     // Test-only HTTP origin; production constructors always use fixed HTTPS Google endpoints.
-    fn fixture(responses: Vec<(u16, Vec<u8>)>) -> (Drive, thread::JoinHandle<Vec<Vec<u8>>>) {
+    pub(crate) fn fixture(
+        responses: Vec<(u16, Vec<u8>)>,
+    ) -> (Drive, thread::JoinHandle<Vec<Vec<u8>>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());

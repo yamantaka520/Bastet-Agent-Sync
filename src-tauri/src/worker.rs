@@ -360,6 +360,13 @@ fn run_once(
                             }
                             _ => {}
                         }
+                        if let Ok(r) = &exchanged {
+                            if r.foreign_objects > 0 {
+                                source
+                                    .issues
+                                    .insert("foreign_space_objects".into(), r.foreign_objects);
+                            }
+                        }
                         source.state = if source.issues.is_empty() {
                             "complete"
                         } else {
@@ -466,7 +473,20 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
                         || worker.stopped(),
                     )
                     .map(|(r, applied)| SourceStatus {
-                        state: "complete".into(),
+                        state: if r.foreign_objects > 0 {
+                            "partial"
+                        } else {
+                            "complete"
+                        }
+                        .into(),
+                        issues: if r.foreign_objects > 0 {
+                            std::collections::BTreeMap::from([(
+                                "foreign_space_objects".into(),
+                                r.foreign_objects,
+                            )])
+                        } else {
+                            std::collections::BTreeMap::new()
+                        },
                         published: r.published,
                         received: r.received,
                         restored: applied,

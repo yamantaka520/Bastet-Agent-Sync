@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1 — encrypted-space diagnostics (upcoming, unreleased)
+
+- Distinguish `foreign_space`, `unsupported_encryption_version` and `encrypted_space_mismatch` after strict proof verification; skip only non-proof foreign-space objects and report `foreign_space_objects` as a partial result.
+- Apply the encrypted-space classification to native sessions, Agent Memory OS, portable packages and device reports. Never import foreign objects, auto-select keys, or suppress decryption, corruption or version failures.
+- Reject a non-empty new-space session-object folder with `folder_has_sync_objects` before key/proof allocation. Joining requires the original recovery kit; selecting the same folder or observing some downloads is not proof of a common space key.
+- Windows physical validation and the 0.5.1 release are still pending.
+
 ## 0.5.0 — sync control center
 
 Published 2026-09-07: [three-platform installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.0). Four architecture builds, independent CI and all installer checks passed; seven signatures, 19 digests, 18 checksums and nine public links were verified.

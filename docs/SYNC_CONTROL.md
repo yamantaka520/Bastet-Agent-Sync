@@ -43,3 +43,9 @@ Local installed-CLI acceptance, without a second computer:
 - **Agy:** a new dedicated test conversation was created with the installed logged-in CLI. A later `--conversation` invocation repeated its prior marker. Bastet's WAL-consistent snapshot, encrypted round trip and separate-folder restore passed SQLite integrity and nonempty-step checks. The installed CLI exposes no verified alternate profile switch. Its continuation check used the original test profile; restored-profile model continuation, auxiliary brain/project state and physical transfer are **not claimed**. No misleading one-click launch is provided for a separate Agy recovery folder.
 
 Grok's source-of-truth update format was checked against its [official storage implementation](https://github.com/xai-org/grok-build/blob/main/crates/codegen/xai-grok-shell/src/session/storage/mod.rs). Complex compaction, external attachments and project remapping remain adapter limits. See [native sessions](NATIVE_SESSIONS.md).
+
+## 0.5.1 encrypted-space diagnostics
+
+A folder containing several encrypted spaces can interrupt older clients with `wrong_space_or_version`. Isolated fixtures reproduce this condition; they do not establish physical two-computer acceptance.
+
+The fixture-tested fix separates `foreign_space`, `unsupported_encryption_version` and `encrypted_space_mismatch`. The configured proof remains strict. Only structurally valid non-proof foreign objects may be skipped, producing `foreign_space_objects`. Session, AMOS and portable results remain partial; device reports show an observer warning on the attempted refresh. Foreign ciphertext cannot be authenticated without its key and is never imported. Malformed public envelopes, wrong keys for the configured space, and unsupported versions remain fatal. Device refreshes independently verify the configured proof before remote reads or writes. Cached refreshes are throttled for 60 seconds.

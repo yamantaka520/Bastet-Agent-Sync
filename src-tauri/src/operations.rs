@@ -131,6 +131,10 @@ pub fn device_exchange(
     if stop() {
         return Err("sync_paused".into());
     }
+    let proof = drive.download(&binding.folder, &binding.proof, &binding.space, key)?;
+    if proof != crate::cloud::queue::proof_bundle(&binding.space)? {
+        return Err("invalid_space_proof".into());
+    }
     if settings.direction != "download" {
         let report = DeviceReport {
             id: identity.id.clone(),
@@ -179,6 +183,7 @@ pub fn device_exchange(
         reports.retain(|r| r.id != local.id);
         reports.push(local);
     }
+    let mut foreign_objects = 0;
     if settings.direction != "upload" {
         let files = drive.list_kind(&binding.folder, ObjectKind::Device)?;
         if files.len() > 128 {
@@ -188,13 +193,21 @@ pub fn device_exchange(
             if stop() {
                 return Err("sync_paused".into());
             }
-            let b = drive.download_kind(
+            let downloaded = drive.download_kind(
                 &binding.folder,
                 &file.id,
                 &binding.space,
                 key,
                 ObjectKind::Device,
-            )?;
+            );
+            let b = match downloaded {
+                Ok(b) => b,
+                Err(e) if e == "foreign_space" => {
+                    foreign_objects += 1;
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
             let mut report: DeviceReport = serde_json::from_str(
                 &b.snapshot
                     .files
@@ -216,7 +229,11 @@ pub fn device_exchange(
     }
     reports.sort_by_key(|a| std::cmp::Reverse(a.observed_at));
     reports.truncate(128);
-    write_json(&path, &reports)
+    write_json(&path, &reports)?;
+    if foreign_objects > 0 {
+        return Err("foreign_space_objects".into());
+    }
+    Ok(())
 }
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -433,6 +450,101 @@ mod tests {
         assert_eq!(clear_cache(&cache).unwrap(), 0);
         assert!(cache.join("journal.json").is_file());
         assert!(root.path().join("replica.json").is_file());
+    }
+    #[test]
+    fn device_reports_require_own_space_proof_before_upload_or_listing() {
+        let root = tempfile::tempdir().unwrap();
+        let key = SpaceKey::generate().unwrap();
+        let (drive, server) = crate::cloud::drive::http_tests::fixture(vec![
+            (200, serde_json::to_vec(&serde_json::json!({"id":"proof","name":"proof","parents":["folder"],"mimeType":"application/octet-stream"})).unwrap()),
+            (200, key.seal(&crate::cloud::queue::proof_bundle("other-space").unwrap()).unwrap()),
+        ]);
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        assert_eq!(
+            device_exchange(
+                root.path(),
+                &Settings::default(),
+                &binding,
+                &key,
+                &drive,
+                "complete",
+                || false
+            )
+            .unwrap_err(),
+            "foreign_space"
+        );
+        assert!(!root.path().join("devices-space.json").exists());
+        assert_eq!(server.join().unwrap().len(), 2);
+    }
+    #[test]
+    fn device_reports_skip_foreign_space_and_keep_valid_reports_with_visible_warning() {
+        let root = tempfile::tempdir().unwrap();
+        let key = SpaceKey::generate().unwrap();
+        let report = DeviceReport {
+            id: "device-a".into(),
+            name: "Test device".into(),
+            outcome: "complete".into(),
+            agents: vec!["grok".into()],
+            ..Default::default()
+        };
+        let make = |space: &str| {
+            Bundle::new(Snapshot {
+                schema: 1,
+                space: space.into(),
+                device: report.id.clone(),
+                stream: Stream {
+                    agent: "codex".into(),
+                    profile: report.id.clone(),
+                    conversation: "bastet-device-report".into(),
+                },
+                parents: vec![],
+                files: BTreeMap::from([(
+                    "device.json".into(),
+                    Entry::new(serde_json::to_string(&report).unwrap()),
+                )]),
+            })
+            .unwrap()
+        };
+        let meta = |id: &str| serde_json::json!({"id":id,"name":"report","parents":["folder"],"mimeType":"application/vnd.bastet.device-encrypted"});
+        let (drive, server) = crate::cloud::drive::http_tests::fixture(vec![
+            (200, serde_json::to_vec(&serde_json::json!({"id":"proof","name":"proof","parents":["folder"],"mimeType":"application/octet-stream"})).unwrap()),
+            (200, key.seal(&crate::cloud::queue::proof_bundle("space").unwrap()).unwrap()),
+            (200, serde_json::to_vec(&serde_json::json!({"id":"folder","name":"sync","mimeType":"application/vnd.google-apps.folder"})).unwrap()),
+            (200, serde_json::to_vec(&serde_json::json!({"files":[meta("foreign"),meta("own")]})).unwrap()),
+            (200, serde_json::to_vec(&meta("foreign")).unwrap()), (200, key.seal(&make("other-space")).unwrap()),
+            (200, serde_json::to_vec(&meta("own")).unwrap()), (200, key.seal(&make("space")).unwrap()),
+        ]);
+        let settings = Settings {
+            direction: "download".into(),
+            ..Default::default()
+        };
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        assert_eq!(
+            device_exchange(
+                root.path(),
+                &settings,
+                &binding,
+                &key,
+                &drive,
+                "complete",
+                || false
+            )
+            .unwrap_err(),
+            "foreign_space_objects"
+        );
+        let saved: Vec<DeviceReport> =
+            read_json(&root.path().join("devices-space.json"), 1024 * 1024).unwrap();
+        assert_eq!(saved.len(), 1);
+        assert_eq!(saved[0].name, "Test device");
+        assert_eq!(server.join().unwrap().len(), 8);
     }
     #[test]
     fn identity_survives_restart_and_invalid_reports_are_rejected() {

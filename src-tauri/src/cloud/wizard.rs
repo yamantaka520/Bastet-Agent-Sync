@@ -240,6 +240,11 @@ impl Transaction {
     pub fn prepare(&mut self, remote: &impl Objects, vault: &impl SecretStore) -> Result<Wizard> {
         let folder = self.state.folder_id.clone().ok_or("wizard_step_required")?;
         if self.state.binding.is_none() {
+            // Creating another key in an occupied folder does not join its existing devices.
+            // Require an explicit recovery-kit join or a fresh folder before allocating anything.
+            if !remote.ids(&folder)?.is_empty() {
+                return Err("folder_has_sync_objects".into());
+            }
             let space = uuid::Uuid::new_v4().to_string();
             let proof = remote.allocate()?;
             let binding = Binding {
@@ -589,6 +594,30 @@ mod tests {
         let mut t = folder_ready(d.path());
         t.prepare(&Remote::default(), &Vault::default()).unwrap();
         assert!(t.folder("other".into(), "Y".into()).is_err());
+    }
+    #[test]
+    fn occupied_folder_requires_join_before_allocating_a_new_key_or_proof() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let remote = Remote::default();
+        let vault = Vault::default();
+        let other_vault = Vault::default();
+        let mut first = folder_ready(a.path());
+        first.prepare(&remote, &vault).unwrap();
+        let kit = first.recovery(&vault).unwrap();
+        first.recovery_exported().unwrap();
+        first.publish(&remote, &vault).unwrap();
+        let allocated = remote.allocated.get();
+        let mut second = folder_ready(b.path());
+        assert_eq!(
+            second.prepare(&remote, &other_vault).unwrap_err(),
+            "folder_has_sync_objects"
+        );
+        assert_eq!(remote.allocated.get(), allocated);
+        assert!(other_vault.0.borrow().is_empty());
+        assert!(second.state.binding.is_none());
+        second.import(&kit, &remote, &other_vault).unwrap();
+        assert_eq!(second.state.binding, first.state.binding);
     }
     #[test]
     fn joining_verifies_recovery_before_persisting_key_and_survives_restart() {

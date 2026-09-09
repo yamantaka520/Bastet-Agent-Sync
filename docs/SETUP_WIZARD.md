@@ -71,3 +71,9 @@ Import persists the OAuth JSON through the native credential store and verifies 
 After selecting a client, **Prepare credential access** can read the credentials saved so far before syncing. OS prompts may occur for separate entries; preparation does not finish missing wizard steps, verify Google access or start the worker. A failure stays visible and can be retried. See [credential cache lifecycle](CLOUD_SECURITY.md#credential-access-in-041).
 
 Current 0.5.0 scheduling, audit and optional portable-package controls are documented in [SYNC_CONTROL.md](SYNC_CONTROL.md). The underlying contract above remains applicable.
+
+## 0.5.1 space-join safeguards
+
+When preparing a new space, the wizard now rejects a non-empty session-object folder before allocating a key or proof, with `folder_has_sync_objects`. This prevents an existing encrypted space from being mistaken for a new one. To join an existing space, use that space's original recovery kit; an OAuth client JSON file is not a recovery kit. Only if this computer uses the wrong recovery kit, restart the wizard to import the correct kit; preserve cloud and agent data. A correctly verified kit needs no reset.
+
+Selecting the same local folder alone does not join a space, and seeing some downloaded objects does not prove that all peers use the same key. The safeguard passed isolated tests; physical two-computer acceptance is not claimed.

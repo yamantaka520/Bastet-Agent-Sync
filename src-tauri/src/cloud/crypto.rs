@@ -71,8 +71,11 @@ impl SpaceKey {
             return Err("bundle_limit".into());
         }
         let envelope: Envelope = serde_json::from_slice(bytes).map_err(|_| "invalid_envelope")?;
-        if envelope.version != 1 || envelope.space != expected_space {
-            return Err("wrong_space_or_version".into());
+        if envelope.version != 1 {
+            return Err("unsupported_encryption_version".into());
+        }
+        if !token(&envelope.space) {
+            return Err("invalid_envelope".into());
         }
         let nonce = B64
             .decode(&envelope.nonce)
@@ -85,6 +88,12 @@ impl SpaceKey {
             .map_err(|_| "invalid_envelope")?;
         if ciphertext.len() > MAX_WIRE as usize + 16 {
             return Err("bundle_limit".into());
+        }
+        if ciphertext.len() < 16 {
+            return Err("invalid_envelope".into());
+        }
+        if envelope.space != expected_space {
+            return Err("foreign_space".into());
         }
         let cipher =
             XChaCha20Poly1305::new_from_slice(self.0.as_ref()).map_err(|_| "encryption_failed")?;
@@ -102,7 +111,7 @@ impl SpaceKey {
         let bundle: Bundle = serde_json::from_slice(&plaintext).map_err(|_| "invalid_bundle")?;
         bundle.validate()?;
         if bundle.snapshot.space != expected_space {
-            return Err("wrong_space_or_version".into());
+            return Err("encrypted_space_mismatch".into());
         }
         Ok(bundle)
     }
@@ -158,6 +167,32 @@ mod tests {
         assert!(!String::from_utf8_lossy(&one).contains("secret fixture"));
         let recovered = SpaceKey::recover(&key.recovery_code()).unwrap();
         assert_eq!(recovered.open("test-space", &one).unwrap(), b);
+    }
+    #[test]
+    fn malformed_foreign_envelopes_are_not_skippable() {
+        let key = SpaceKey::generate().unwrap();
+        let bytes = key.seal(&sample()).unwrap();
+        assert_eq!(
+            key.open("other-space", &bytes).unwrap_err(),
+            "foreign_space"
+        );
+        for (field, value) in [
+            ("space", "../x"),
+            ("space", ""),
+            ("nonce", "!invalid!"),
+            ("nonce", "AA"),
+            ("ciphertext", "!invalid!"),
+            ("ciphertext", "AA"),
+        ] {
+            let mut envelope: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            envelope[field] = value.into();
+            assert_eq!(
+                key.open("other-space", &serde_json::to_vec(&envelope).unwrap())
+                    .unwrap_err(),
+                "invalid_envelope",
+                "{field}={value}"
+            );
+        }
     }
     #[test]
     fn tampering_wrong_key_space_and_version_fail_closed() {

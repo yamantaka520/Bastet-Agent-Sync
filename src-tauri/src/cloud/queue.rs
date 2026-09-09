@@ -95,6 +95,7 @@ pub struct Exchange {
     pub unchanged: usize,
     pub conflicts: usize,
     pub pending: usize,
+    pub foreign_objects: usize,
 }
 /// Never treats a wrong key, missing proof or incomplete listing as an empty remote space.
 pub fn exchange(
@@ -159,6 +160,7 @@ pub fn exchange_filtered(
     if total > MAX_STORE || local.len() > MAX_OBJECTS {
         return Err("bundle_limit".into());
     }
+    let mut result = Exchange::default();
     let mut other = BTreeMap::new();
     let mut remote_hashes = std::collections::BTreeSet::new();
     crate::progress::stage(
@@ -169,8 +171,18 @@ pub fn exchange_filtered(
         if id == binding.proof {
             continue;
         }
-        let b = remote.get(&binding.folder, &id, &binding.space, key)?;
+        let downloaded = remote.get(&binding.folder, &id, &binding.space, key);
         crate::progress::advance();
+        let b = match downloaded {
+            Ok(b) => b,
+            // Only a positively classified foreign envelope can be skipped. The binding proof above
+            // is always strict; unsupported formats, wrong keys and corrupted objects still fail.
+            Err(e) if e == "foreign_space" => {
+                result.foreign_objects += 1;
+                continue;
+            }
+            Err(e) => return Err(e),
+        };
         b.validate()?;
         if b.snapshot.space != binding.space {
             return Err("space_mismatch".into());
@@ -188,7 +200,6 @@ pub fn exchange_filtered(
             other.insert(b.id.clone(), b);
         }
     }
-    let mut result = Exchange::default();
     if !matches!(direction, Direction::Download) {
         crate::progress::stage(
             "upload",
@@ -442,6 +453,81 @@ mod tests {
         exchange(&q, &a, &binding, &key, &remote, Direction::Upload).unwrap();
         assert_eq!(remote.next.get(), 1);
         assert_eq!(remote.objects.borrow().len(), 2);
+    }
+    #[test]
+    fn mixed_folder_preserves_own_downloads_and_reports_foreign_objects_without_importing_them() {
+        let (temp, binding, key, remote, a, b) = setup();
+        a.export_from(stream(), files("own-space"), None).unwrap();
+        exchange(
+            &temp.path().join("qa"),
+            &a,
+            &binding,
+            &key,
+            &remote,
+            Direction::Upload,
+        )
+        .unwrap();
+        let foreign_key = SpaceKey::generate().unwrap();
+        let foreign = proof_bundle("another-space").unwrap();
+        remote
+            .objects
+            .borrow_mut()
+            .insert("foreign".into(), foreign_key.seal(&foreign).unwrap());
+        let q = temp.path().join("qb");
+        let r = exchange(&q, &b, &binding, &key, &remote, Direction::Download).unwrap();
+        assert_eq!((r.received, r.foreign_objects), (1, 1));
+        assert!(b
+            .transport_bundles()
+            .unwrap()
+            .values()
+            .all(|v| v.snapshot.space == binding.space));
+        let r = exchange(&q, &b, &binding, &key, &remote, Direction::Download).unwrap();
+        assert_eq!((r.received, r.published, r.foreign_objects), (0, 0, 1));
+        // The selected proof is never optional, even if normal objects can be isolated.
+        remote
+            .objects
+            .borrow_mut()
+            .insert(binding.proof.clone(), foreign_key.seal(&foreign).unwrap());
+        assert_eq!(
+            exchange(&q, &b, &binding, &key, &remote, Direction::Download).unwrap_err(),
+            "foreign_space"
+        );
+        assert_eq!(b.transport_bundles().unwrap().len(), 1);
+    }
+    #[test]
+    fn same_space_wrong_keys_unknown_versions_and_malformed_objects_are_not_skipped() {
+        let (temp, binding, key, remote, _, b) = setup();
+        let own = proof_bundle(&binding.space).unwrap();
+        let wrong_key = SpaceKey::generate().unwrap();
+        remote
+            .objects
+            .borrow_mut()
+            .insert("bad".into(), wrong_key.seal(&own).unwrap());
+        let q = temp.path().join("queue");
+        assert_eq!(
+            exchange(&q, &b, &binding, &key, &remote, Direction::Download).unwrap_err(),
+            "decrypt_failed"
+        );
+        let mut envelope: serde_json::Value =
+            serde_json::from_slice(&key.seal(&own).unwrap()).unwrap();
+        envelope["version"] = 2.into();
+        remote
+            .objects
+            .borrow_mut()
+            .insert("bad".into(), serde_json::to_vec(&envelope).unwrap());
+        assert_eq!(
+            exchange(&q, &b, &binding, &key, &remote, Direction::Download).unwrap_err(),
+            "unsupported_encryption_version"
+        );
+        remote
+            .objects
+            .borrow_mut()
+            .insert("bad".into(), b"not an envelope".to_vec());
+        assert_eq!(
+            exchange(&q, &b, &binding, &key, &remote, Direction::Download).unwrap_err(),
+            "invalid_envelope"
+        );
+        assert!(b.transport_bundles().unwrap().is_empty());
     }
     #[test]
     fn wrong_key_or_missing_proof_prevents_any_transfer() {

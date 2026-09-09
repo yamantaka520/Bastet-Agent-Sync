@@ -69,3 +69,9 @@ Portable settings/skills default off. Opt in, Preview draft choices, expand cont
 Installed CLI checks: Grok exported both test messages after Bastet's encrypted isolated-profile restore. Agy repeated a marker in its dedicated original test conversation; its restored database passed integrity checks. Restored-profile Agy model continuation and physical two-device acceptance are not claimed. Grok recovery provides copyable POSIX/PowerShell continuation commands. Cloud chats/Work, project mapping, external attachments and complete settings/skill migration remain outside guarantees.
 
 [Technical contract](../../SYNC_CONTROL.md) · [Validation](../../VALIDATION.md)
+
+## 0.5.1
+
+0.5.1 fixes interrupted synchronization when one cloud folder contains multiple encrypted spaces. After verifying the current space, Bastet skips data from other spaces, continues processing its own data, and shows a partial result. Wrong keys, malformed data, and unsupported versions still stop processing.
+
+A folder containing sync data cannot be used to create a new space. Join with the recovery kit from the original device, or choose an empty folder for a new space. An OAuth client JSON only configures Google sign-in. If the same recovery kit already verifies correctly, no reset or recreation is needed; check it again if expected data is missing. Isolated tests passed; physical two-computer sync remains unverified.
