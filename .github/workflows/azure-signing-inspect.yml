@@ -1,0 +1,45 @@
+name: Inspect Azure signing configuration
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Azure login with GitHub OIDC
+        uses: azure/login@4c03e4685fe81df2c50d5714c7d93cf39d8deb7f # v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Read account and profile trust types
+        env:
+          ACCOUNT_ID: ${{ vars.ARTIFACT_SIGNING_RESOURCE_ID }}
+        shell: python
+        run: |
+          import json, os, re, subprocess
+          account = os.environ['ACCOUNT_ID'].rstrip('/')
+          pattern = r'/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\.CodeSigning/codeSigningAccounts/[^/]+'
+          if not re.fullmatch(pattern, account, re.IGNORECASE):
+              raise SystemExit('Missing or invalid ARTIFACT_SIGNING_RESOURCE_ID')
+          def read(path, query):
+              result = subprocess.run(['az', 'rest', '--method', 'get', '--url',
+                  'https://management.azure.com' + path + '?api-version=2024-02-05-preview',
+                  '--query', query, '--output', 'json'], check=True, capture_output=True, text=True)
+              return json.loads(result.stdout)
+          try:
+              result = {
+                  'account': read(account, '{location:location,sku:properties.sku.name,state:properties.provisioningState}'),
+                  'profiles': read(account + '/certificateProfiles', 'value[].{name:name,type:properties.profileType,status:properties.status,state:properties.provisioningState}')
+              }
+          except subprocess.CalledProcessError as error:
+              print(error.stderr)
+              raise SystemExit(error.returncode)
+          rendered = json.dumps(result, indent=2)
+          print(rendered)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Azure management read succeeded. No resources were modified.\n\n```json\n' + rendered + '\n```\n')
