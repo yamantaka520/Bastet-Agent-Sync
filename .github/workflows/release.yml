@@ -1,6 +1,13 @@
 name: Desktop release packages
 on:
   workflow_dispatch:
+    inputs:
+      windows_signing:
+        description: Windows publisher signing policy (deferred publishes unsigned Windows installers)
+        required: true
+        type: choice
+        default: required
+        options: [required, deferred]
 permissions:
   contents: write
 concurrency:
@@ -82,14 +89,88 @@ jobs:
       APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   windows:
+    if: inputs.windows_signing == 'required'
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/windows-signing.yml
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+  windows-deferred:
+    if: github.ref == 'refs/heads/main' && inputs.windows_signing == 'deferred'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: release-x86_64-pc-windows-msvc
+          cache-on-failure: true
+      - run: npm ci
+      - run: npm test
+      - run: python scripts/check_docs.py
+      - run: python scripts/test_release_assets.py
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Build Windows packages with publisher signing explicitly deferred
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: npx tauri build --target x86_64-pc-windows-msvc --bundles nsis,msi --config src-tauri/tauri.release.conf.json
+      - name: Collect packages and disclose signing status
+        shell: pwsh
+        run: |
+          python scripts/release_assets.py collect --target x86_64-pc-windows-msvc
+          'Windows Authenticode is explicitly deferred. Updater signatures and installer smoke checks are still required. These packages do not establish Windows publisher trust.' >> $env:GITHUB_STEP_SUMMARY
+      - name: Verify deferred Windows installers and native launch
+        shell: pwsh
+        run: |
+          $installer = @(Get-ChildItem release-assets/*.exe)
+          $msi = @(Get-ChildItem release-assets/*.msi)
+          if ($installer.Count -ne 1 -or $msi.Count -ne 1) { throw 'Expected NSIS and MSI installers' }
+          $destination = Join-Path $env:RUNNER_TEMP 'BastetDeferredSmoke'
+          $install = Start-Process -FilePath $installer[0].FullName -ArgumentList '/S', "/D=$destination" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer failed: $($install.ExitCode)" }
+          $binary = Join-Path $destination 'bastet-agent-sync.exe'
+          if (!(Test-Path $binary)) { throw 'Installed executable missing' }
+          $app = Start-Process -FilePath $binary -PassThru
+          try {
+            Start-Sleep -Seconds 10
+            $app.Refresh()
+            if ($app.HasExited) { throw 'Installed application exited during launch check' }
+          } finally {
+            if (!$app.HasExited) { Stop-Process -Id $app.Id }
+          }
+          $expanded = Join-Path $env:RUNNER_TEMP 'BastetDeferredMsi'
+          $extract = Start-Process msiexec.exe -ArgumentList '/a', "`"$($msi[0].FullName)`"", '/qn', "TARGETDIR=`"$expanded`"" -Wait -PassThru
+          if ($extract.ExitCode -ne 0) { throw "MSI extraction failed: $($extract.ExitCode)" }
+          $inner = @(Get-ChildItem $expanded -Recurse -Filter bastet-agent-sync.exe)
+          if ($inner.Count -ne 1) { throw 'Expected one application inside MSI' }
+          if ((Get-FileHash $binary).Hash -ne (Get-FileHash $inner[0].FullName).Hash) { throw 'NSIS and MSI application contents differ' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-x86_64-pc-windows-msvc
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
   draft:
-    needs: [build, macos, windows]
+    needs: [build, macos, windows, windows-deferred]
+    if: >-
+      always() && needs.build.result == 'success' && needs.macos.result == 'success' &&
+      ((inputs.windows_signing == 'required' && needs.windows.result == 'success') ||
+       (inputs.windows_signing == 'deferred' && needs.windows-deferred.result == 'success'))
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

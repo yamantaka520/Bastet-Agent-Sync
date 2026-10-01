@@ -11,7 +11,8 @@
 ## Unreleased — macOS Developer ID signing
 
 - Add isolated Apple Silicon and Intel Developer ID signing and notarization workflows, reused by release packaging. Require signed, notarized and Gatekeeper-accepted app, DMG and updater contents before upload.
-- Local certificate/private-key matching, real timestamped hardened-runtime probe signing and Apple notarization API authentication passed. Both hosted architectures passed tests and submitted apps to Apple; notarization is In Progress and final package acceptance remains pending; existing releases are unchanged. Windows signing work is deferred.
+- Local certificate/private-key matching, real timestamped hardened-runtime probe signing and Apple notarization API authentication passed. Both original apps are notarized. Apple Silicon packages passed hosted and independent signature, ticket, Gatekeeper and updater verification; Intel encountered a runner network failure while waiting and did not upload a package. Existing releases are unchanged. Windows signing work is deferred.
+- Make Windows publisher-signing deferral an explicit release input. Required signing remains the default and never automatically falls back; the deferred path preserves updater signatures and installer smoke requirements and discloses unsigned Windows publisher status.
 
 ## Unreleased — Windows publisher signing
 

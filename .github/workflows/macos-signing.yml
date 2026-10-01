@@ -73,6 +73,22 @@ jobs:
         run: bash scripts/macos-signing.sh finish '${{ matrix.target }}' '${{ matrix.arch }}'
       - name: Collect verified packages
         run: python scripts/release_assets.py collect --target '${{ matrix.target }}'
+      - name: Preserve unverified app after a failed check
+        if: failure()
+        shell: bash
+        run: |
+          app="src-tauri/target/${{ matrix.target }}/release/bundle/macos/Bastet Agent Sync.app"
+          if [[ -d "$app" ]]; then
+            ditto -c -k --keepParent --sequesterRsrc "$app" "$RUNNER_TEMP/unverified-${{ matrix.target }}.zip"
+          fi
+      - name: Upload unverified app for signing recovery
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unverified-app-${{ matrix.target }}
+          path: ${{ runner.temp }}/unverified-${{ matrix.target }}.zip
+          if-no-files-found: ignore
+          retention-days: 2
       - uses: actions/upload-artifact@v4
         with:
           name: packages-${{ matrix.target }}

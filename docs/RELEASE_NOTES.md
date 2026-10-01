@@ -6,46 +6,50 @@
 
 ## 繁體中文
 
-0.5.1 修正同一雲端資料夾混有不同加密空間時的同步中斷。驗證目前空間後，程式會略過其他空間的資料，繼續處理本空間資料，並顯示部分完成。錯誤金鑰、損壞資料與不支援的版本仍會停止處理。
+0.6.0 加入跨系統專案路徑對應與獨立對話接續目錄。收到的版本不會覆寫原本 Agent 資料；在還原目錄繼續對話後，可同步回傳子版本，同時修改則保留分支。請將參與同步的電腦全部升級，並設定每台電腦的本機專案路徑。
 
-已有同步資料的資料夾不能直接建立新空間；加入時請匯入原始裝置的恢復檔，或為新空間選擇空資料夾。OAuth client JSON 只用於 Google 登入設定。同一份恢復檔已驗證正確時，不需要重設或重建空間；缺少預期資料時再核對恢復檔。隔離測試已通過，兩台實機同步仍待驗證。
+同步會略過未變動內容的重複壓縮、合併重疊雲端查詢，並降低進度回報成本。仍驗證完整內容、子對話及資料庫 WAL，沒有以快取略過空間金鑰驗證。
 
-安裝包：Windows 以內含離線安裝器補齊 WebView2；macOS 使用系統 WebKit；Linux `install-linux.sh` 選擇 apt/dnf、校驗下載並安裝相依套件。不需要 Node.js、Rust 或 Drive Desktop。更新包有簽章；Apple 公證與 Windows Authenticode 不在本次範圍，可能出現 OS 信任提示。
+目前支援範圍與實測證據見儲存庫的 VALIDATION.md 與 CROSS_OS_HANDOFF.md。官方讀取器能開啟資料不等於模型已成功續聊；Agy 仍以資料庫還原為限。專案程式碼、附件、外部依賴與登入憑證不會自動搬移，還原環境可能需要重新登入。
 
+安裝包使用內建／系統元件，不需要 Node.js、Rust 或 Drive Desktop。macOS 發布需通過 Developer ID、公證及 Gatekeeper 驗證。Windows Authenticode 暫緩，可能出現系統信任提示；更新包簽章仍須驗證，與作業系統發行者簽章不同。
 
 ## 简体中文
 
-0.5.1 修复同一个云端文件夹混有不同加密空间时的同步中断。验证当前空间后，程序会跳过其他空间的数据，继续处理本空间数据，并显示部分完成。错误密钥、损坏数据和不支持的版本仍会停止处理。
+0.6.0 加入跨系统项目路径映射与独立对话续接目录。收到的版本不会覆盖原有 Agent 数据；在还原目录继续对话后，可同步回传子版本，同时修改则保留分支。请升级所有参与同步的电脑，并配置各自的本地项目路径。
 
-已有同步数据的文件夹不能直接创建新空间；加入时请导入原始设备的恢复文件，或为新空间选择空文件夹。OAuth client JSON 仅用于 Google 登录设置。同一份恢复文件已验证正确时，无需重置或重建空间；缺少预期数据时再核对恢复文件。隔离测试已通过，两台实机同步仍待验证。
+同步会跳过未变动内容的重复压缩、合并重叠云端查询，并降低进度回报开销。仍验证完整内容、子对话及数据库 WAL，不会用缓存跳过空间密钥验证。
 
-安装包：Windows 使用内置离线安装器补齐 WebView2；macOS 使用系统 WebKit；Linux `install-linux.sh` 自动选择 apt/dnf、校验下载并安装依赖。不需要 Node.js、Rust 或 Drive Desktop。更新包有签名；Apple 公证和 Windows Authenticode 不在本次范围，可能出现系统信任提示。
+支持范围与实测证据见仓库的 VALIDATION.md 和 CROSS_OS_HANDOFF.md。官方读取器能打开数据不代表模型已成功续聊；Agy 仍限于数据库恢复。项目代码、附件、外部依赖和登录凭据不会自动迁移，还原环境可能需要重新登录。
 
+安装包使用内置／系统组件，不需要 Node.js、Rust 或 Drive Desktop。macOS 发布须通过 Developer ID、公证和 Gatekeeper 验证。Windows Authenticode 暂缓，可能出现系统信任提示；更新包签名仍须验证，与系统发布者签名不同。
 
 ## English
 
-0.5.1 fixes interrupted synchronization when one cloud folder contains multiple encrypted spaces. After verifying the current space, Bastet skips data from other spaces, continues processing its own data, and shows a partial result. Wrong keys, malformed data, and unsupported versions still stop processing.
+0.6.0 adds cross-platform project path mappings and isolated conversation profiles. Received versions never overwrite your default agent store. Continuing a restored profile publishes a child version back to the other computer; concurrent edits retain separate branches. Upgrade every participating computer and configure its local project paths.
 
-A folder containing sync data cannot be used to create a new space. Join with the recovery kit from the original device, or choose an empty folder for a new space. An OAuth client JSON only configures Google sign-in. If the same recovery kit already verifies correctly, no reset or recreation is needed; check it again if expected data is missing. Isolated tests passed; physical two-computer sync remains unverified.
+Synchronization avoids recompressing unchanged captures, shares overlapping cloud listings and reduces progress-report overhead. Complete content, child conversations and SQLite WAL snapshots are still checked. Caching never substitutes for space-key proof verification.
 
-Installers: Windows uses the embedded offline installer for missing WebView2; macOS uses system WebKit; Linux `install-linux.sh` selects apt/dnf, verifies downloads, and installs dependencies. Node.js, Rust, and Drive Desktop are not required. Update packages are signed. Apple notarization and Windows Authenticode are outside this release scope, so OS trust prompts may appear.
+See VALIDATION.md and CROSS_OS_HANDOFF.md in the repository for tested scope and evidence. A successful official-reader check does not establish model continuation. Agy remains database recovery. Project code, attachments, external dependencies and credentials are not automatically transferred; restored profiles may need local sign-in.
 
+Installers use bundled or system components; Node.js, Rust and Drive Desktop are not required. macOS publication requires Developer ID signing, notarization and Gatekeeper checks. Windows Authenticode is deferred, so OS trust prompts may appear. Update-package signatures remain mandatory and are separate from OS publisher signatures.
 
 ## 日本語
 
-0.5.1 は、同じクラウドフォルダーに複数の暗号化スペースが混在する場合の同期中断を修正します。現在のスペースを検証した後、別スペースのデータをスキップし、自分のスペースの処理を続け、部分完了を表示します。誤った鍵、破損データ、不対応バージョンでは処理を停止します。
+0.6.0 では、OS 間のプロジェクトパス対応と、会話再開用の独立したプロファイルを追加しました。受信したバージョンは既存の Agent データを上書きしません。復元先で会話を続けると子バージョンを同期し、同時編集では両方の分岐を保持します。同期するすべての端末を更新し、各端末のプロジェクトパスを設定してください。
 
-同期データがあるフォルダーに新しいスペースは作成できません。参加には元の端末のリカバリーキットを使い、新規作成には空のフォルダーを選んでください。OAuth client JSON は Google ログインの設定用です。同じキットが正しく検証済みならリセットや再作成は不要です。必要なデータがない場合にキットを確認してください。隔離テストは成功しましたが、実機2台の同期は未検証です。
+変更のない内容の再圧縮を省き、重複するクラウド一覧取得を共有し、進捗通知の負荷を軽減します。内容、子会話、SQLite WAL の検証と同期空間の鍵の確認は引き続き行います。
 
-インストーラー：Windows は同梱のオフラインインストーラーで不足する WebView2 を導入し、macOS はシステム WebKit、Linux の `install-linux.sh` は apt/dnf の選択、ダウンロード検証、依存パッケージ導入を行います。Node.js、Rust、Drive Desktop は不要です。更新パッケージには署名があります。Apple 公証と Windows Authenticode は対象外のため、OS の確認画面が出る場合があります。
+検証範囲と結果はリポジトリの VALIDATION.md と CROSS_OS_HANDOFF.md を参照してください。公式リーダーで読み込めることは、モデルによる会話再開の成功を意味しません。Agy はデータベース復元に限定されます。コード、添付ファイル、外部依存関係、認証情報は自動転送されず、復元先で再ログインが必要な場合があります。
 
+Node.js、Rust、Drive Desktop の別途導入は不要です。macOS の公開には Developer ID 署名、公証、Gatekeeper 検証が必要です。Windows Authenticode は延期しているため、OS の信頼確認が表示される場合があります。更新パッケージの署名検証は必須であり、OS の発行者署名とは別です。
 
 ## 한국어
 
-0.5.1은 하나의 클라우드 폴더에 여러 암호화 공간이 섞여 있을 때 동기화가 중단되는 문제를 수정합니다. 현재 공간을 확인한 후 다른 공간의 데이터를 건너뛰고 현재 공간의 처리를 계속하며 부분 완료를 표시합니다. 잘못된 키, 손상된 데이터와 지원되지 않는 버전은 처리를 중단합니다.
+0.6.0은 운영체제 간 프로젝트 경로 매핑과 대화 재개용 독립 프로필을 추가합니다. 수신한 버전은 기존 Agent 저장소를 덮어쓰지 않습니다. 복원 프로필에서 대화를 이어가면 하위 버전을 다시 동기화하며, 동시 수정은 별도 분기로 보존합니다. 참여하는 모든 컴퓨터를 업데이트하고 각 컴퓨터의 프로젝트 경로를 설정하세요.
 
-동기화 데이터가 있는 폴더에는 새 공간을 만들 수 없습니다. 참여하려면 원래 장치의 복구 키트를 가져오고, 새 공간을 만들려면 빈 폴더를 선택하세요. OAuth client JSON은 Google 로그인 설정용입니다. 같은 키트가 이미 올바르게 확인되었다면 재설정이나 재생성이 필요 없습니다. 예상한 데이터가 없을 때 키트를 확인하세요. 격리 테스트는 통과했지만 실제 컴퓨터 두 대의 동기화는 아직 검증되지 않았습니다.
+변경되지 않은 내용의 반복 압축을 생략하고, 겹치는 클라우드 목록 요청을 공유하며, 진행 알림 비용을 줄입니다. 전체 내용, 하위 대화, SQLite WAL과 동기화 공간 키 검증은 계속 수행합니다.
 
-설치 프로그램: Windows는 포함된 오프라인 설치기로 누락된 WebView2를 설치하고, macOS는 시스템 WebKit을 사용하며, Linux의 `install-linux.sh`는 apt/dnf 선택, 다운로드 검증과 의존성 설치를 수행합니다. Node.js, Rust, Drive Desktop은 필요하지 않습니다. 업데이트 패키지에는 서명이 있습니다. Apple 공증과 Windows Authenticode는 이번 범위에서 제외되어 OS 확인이 나타날 수 있습니다.
+검증 범위와 결과는 저장소의 VALIDATION.md 및 CROSS_OS_HANDOFF.md를 확인하세요. 공식 리더가 데이터를 읽는다는 사실만으로 모델의 대화 재개 성공을 의미하지 않습니다. Agy는 데이터베이스 복원으로 제한됩니다. 코드, 첨부 파일, 외부 의존성 및 인증 정보는 자동 전송되지 않으며, 복원 환경에서 다시 로그인해야 할 수 있습니다.
 
-[Validation](https://github.com/yamantaka520/Bastet-Agent-Sync/blob/main/docs/VALIDATION.md) · [Sync control contract](https://github.com/yamantaka520/Bastet-Agent-Sync/blob/main/docs/SYNC_CONTROL.md)
+Node.js, Rust, Drive Desktop을 별도로 설치할 필요가 없습니다. macOS 공개에는 Developer ID 서명, 공증 및 Gatekeeper 검증이 필요합니다. Windows Authenticode는 보류되어 OS 신뢰 경고가 표시될 수 있습니다. 업데이트 패키지 서명 검증은 필수이며 OS 게시자 서명과는 별개입니다.

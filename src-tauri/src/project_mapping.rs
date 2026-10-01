@@ -697,11 +697,12 @@ mod tests {
         assert_eq!(changed.files.keys().next(), manifest.files.keys().next());
         let text = decoded(&changed);
         assert!(text.ends_with(history));
-        assert!(
-            text.matches(&format!("\"cwd\":\"{}\"", changed.cwd))
-                .count()
-                == 2
-        );
+        let records: Vec<serde_json::Value> = text
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(records[0]["payload"]["cwd"], changed.cwd);
+        assert_eq!(records[1]["payload"]["cwd"], changed.cwd);
         assert_eq!(decoded(&manifest), source);
     }
 

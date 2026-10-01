@@ -1,4 +1,6 @@
 //! Allowlisted session snapshots. Receiving never writes into a live agent profile.
+#[cfg(test)]
+mod perf_tests;
 use crate::{
     cloud::{
         crypto::SpaceKey,
@@ -2113,9 +2115,20 @@ mod tests {
         let handoff = &registry.entries[0];
         let file = handoff.path.join(&handoff.main_file);
         let before = fs::read(&file).unwrap();
-        assert!(std::str::from_utf8(&before)
-            .unwrap()
-            .contains(target_project.to_str().unwrap()));
+        let header: serde_json::Value = serde_json::from_str(
+            std::str::from_utf8(&before)
+                .unwrap()
+                .lines()
+                .next()
+                .unwrap(),
+        )
+        .unwrap();
+        let restored_cwd = header["payload"]["cwd"].as_str().unwrap();
+        assert_eq!(restored_cwd, handoff.cwd);
+        assert_eq!(
+            Path::new(restored_cwd).canonicalize().unwrap(),
+            target_project.canonicalize().unwrap()
+        );
         let r = cycle_with_mappings(
             &b_root,
             &binding,

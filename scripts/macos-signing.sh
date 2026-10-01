@@ -133,6 +133,7 @@ with open(sys.argv[1], encoding='utf-8') as source:
 print(f"DMG notarization accepted: {result.get('id', 'no submission id')}")
 PY
   xcrun stapler staple "$dmg"
+  codesign --verify --strict --verbose=2 "$dmg"
   xcrun stapler validate "$dmg"
   spctl --assess --type open --context context:primary-signature --verbose=2 "$dmg"
   mount="$state/mounted-dmg"
