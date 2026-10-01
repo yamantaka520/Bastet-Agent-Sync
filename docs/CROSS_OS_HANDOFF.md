@@ -30,7 +30,7 @@ Changing a mapping does not rewrite a profile already in use. That profile retai
 | Claude Code / local Claude selection | Structural `cwd` and verified project encoding, including subagent paths | Cloud Claude/Cowork is excluded. |
 | Pi | Session-header `cwd` and native project encoding | External extensions and attachments are not provisioned. |
 | Grok | Summary `cwd` and URL-encoded project group | Index/checkpoint and attachment completeness remain separate gates. |
-| Agy | No database path rewriting | WAL-consistent recovery; restored-profile model continuation is not established. |
+| Agy | No database path rewriting | WAL-consistent recovery; explicit same-host database restore/resume was tested, but stored absolute workspace paths are not remapped. |
 | Agent Memory OS | Existing official export/import adapter | Requires its compatible CLI and initialized local store. |
 
 Mapping understands Unix, Windows drive and UNC absolute paths. Windows source matching is case-insensitive; Unix matching is case-sensitive. Whole directory components are matched, never a textual prefix such as `app` inside `apple`. Destination folders must exist locally. Immutable snapshots retain their original paths; only the prepared profile is translated.

@@ -6,7 +6,7 @@ Authorized 2026-10-02: complete cross-platform CI and six directed round trips, 
 - [x] Actual Codex, Claude Code, Pi and Grok model/tool continuation with encrypted return to a fresh receiving profile.
 - [x] Optimized 200-session fixture, restart/recovery checks and isolated real-Drive measurement with cleanup.
 - [ ] Complete three-platform CI and all six OS-to-OS return checks.
-- [ ] Complete the Agy restored-profile investigation; document its actual supported boundary.
+- [x] Complete the Agy restored-profile investigation: explicit native database recovery/resume passes; stored absolute workspace paths are not remapped.
 - [ ] Verify four installer targets, signatures, macOS notarization and installer smoke checks.
 - [ ] Publish and record the final delivery evidence in BastetMind.
 

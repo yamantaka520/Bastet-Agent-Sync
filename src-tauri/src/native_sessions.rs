@@ -2678,6 +2678,82 @@ mod tests {
             .max_by_key(|b| b.snapshot.parents.len())
             .unwrap()
     }
+    /// Opt-in recovery of a real, isolated Agy conversation database through
+    /// the production SQLite snapshot, encrypted bundle, and restore paths.
+    #[test]
+    #[ignore = "requires isolated BASTET_AGY_RECOVERY_SOURCE and BASTET_AGY_RECOVERY_TARGET"]
+    fn live_agy_native_recovery() {
+        let source = PathBuf::from(std::env::var_os("BASTET_AGY_RECOVERY_SOURCE").unwrap());
+        let target = PathBuf::from(std::env::var_os("BASTET_AGY_RECOVERY_TARGET").unwrap());
+        let temp_roots = [
+            std::env::temp_dir(),
+            #[cfg(unix)]
+            PathBuf::from("/tmp"),
+        ];
+        let source = fs::canonicalize(source).unwrap();
+        let parent = fs::canonicalize(target.parent().unwrap()).unwrap();
+        assert!(temp_roots.iter().any(|root| {
+            let root = fs::canonicalize(root).unwrap();
+            source.starts_with(&root) && parent.starts_with(&root)
+        }));
+        assert!(!target.exists());
+        let working = tempfile::tempdir().unwrap();
+        let key = cross_key();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "cross-os".into(),
+            proof: "proof".into(),
+        };
+        let remote = cross_remote(None, "agy", &key);
+        let result = cycle(
+            working.path(),
+            &binding,
+            &key,
+            &remote,
+            "agy",
+            &source,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(result.captured, 1, "{:?}", result.issues);
+        let all = Replica::open(&working.path().join("replica"), "cross-os")
+            .unwrap()
+            .transport_bundles()
+            .unwrap();
+        let reopened = all
+            .iter()
+            .map(|(id, bundle)| {
+                let encrypted = key.seal(bundle).unwrap();
+                (id.clone(), key.open("cross-os", &encrypted).unwrap())
+            })
+            .collect::<BTreeMap<_, _>>();
+        let head = cross_head(&reopened, "agy");
+        let manifest = restore(head, &reopened, &target).unwrap();
+        let database = target.join(format!("conversations/{}.db", manifest.session));
+        let connection = rusqlite::Connection::open_with_flags(
+            database,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        assert_eq!(
+            connection
+                .query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0))
+                .unwrap(),
+            "ok"
+        );
+        let steps: i64 = connection
+            .query_row("SELECT COUNT(*) FROM steps", [], |row| row.get(0))
+            .unwrap();
+        assert!(steps > 0);
+        println!(
+            "agy recovery PASS session={} steps={} restored={} head={}",
+            manifest.session,
+            steps,
+            target.display(),
+            head.id
+        );
+    }
     #[test]
     #[ignore = "requires explicit BASTET_HANDOFF_MODE and temporary artifact directories"]
     fn cross_os_handoff_exchange() {
@@ -2889,9 +2965,11 @@ mod tests {
             PathBuf::from(std::env::var_os("BASTET_LIVE_RETURN_INPUT").expect("fixture root"))
                 .canonicalize()
                 .unwrap();
-        let mut temp_roots = vec![std::env::temp_dir()];
-        #[cfg(unix)]
-        temp_roots.push(PathBuf::from("/tmp"));
+        let temp_roots = [
+            std::env::temp_dir(),
+            #[cfg(unix)]
+            PathBuf::from("/tmp"),
+        ];
         assert!(temp_roots
             .iter()
             .filter_map(|root| root.canonicalize().ok())
