@@ -1,6 +1,6 @@
 # 🐈 Bastet Agent Sync — Master plan
 
-Status: 0.5.0 is published with verified three-platform installers and implements the [sync control center](SYNC_CONTROL.md), configurable parallel/resource budgets, persistent audit/device reports, conflict comparison, local cache maintenance and opt-in reviewed portable packages. Installed Agy/Grok local acceptance is recorded with its limits. Three-platform release evidence is tracked in [validation](VALIDATION.md); unreleased 0.6.0 adds [project mapping and managed handoff](CROSS_OS_HANDOFF.md); full provider model continuation, physical-device acceptance and attachment completeness remain separate gates.
+Status: 0.6.0 is published with verified four-architecture installers, three-platform CI, six directed cross-OS round trips, project mapping and managed conversation handoff. Actual Codex, Claude Code, Pi and Grok model/tool continuation and causal return passed in isolated profiles. Agy explicit native database recovery/resume passed on one host, but its absolute workspace paths are not remapped. Optimized synthetic and separate real-Drive measurements are recorded in [validation](VALIDATION.md). Physical-device acceptance, attachment completeness, Intel GUI launch and cross-version self-upgrade remain separate gates.
 
 ## Product
 

@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.6.0 原始碼預覽
+## 0.6.0 跨系統對話接續
 
-尚未發布的原始碼加入跨系統專案路徑對應與對話版本接續。儲存來源與本機的專案對應後同步，暫停並選擇「接續已恢復的版本」。接續內容會帶著父版本同步回去，雙邊分支分別保留，不覆蓋原有 Agent 資料。Agy 仍為資料庫還原。下方下載連結仍指向已發布版本。[操作與限制](../../CROSS_OS_HANDOFF.md)。
+0.6.0 加入跨系統專案路徑對應與對話版本接續。儲存來源與本機的專案對應後同步，暫停並選擇「接續已恢復的版本」。接續內容會帶著父版本同步回去，雙邊分支分別保留，不覆蓋原有 Agent 資料。Agy 仍為資料庫還原。請將參與同步的電腦全部升級至 0.6.0。[操作與限制](../../CROSS_OS_HANDOFF.md)。
 
 ## 0.5.0
 
@@ -40,14 +40,14 @@ npm run tauri dev
 
 ## 🐈 下載與安裝
 
-[版本與下載](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)：點選版本號，在 Release notes 依作業系統下載。Windows 安裝器內含 WebView2，偵測缺少時補裝；macOS 使用系統 WebKit；Linux 可執行下載的 `sh install-linux.sh`，自動選擇 apt/dnf、校驗並安裝相依套件。無須 Node.js 或 Rust。AMOS CLI 與各 Agent 帳號需自行設定。macOS 未公證、Windows 無 Authenticode，可能顯示系統信任提示。
+[版本與下載](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)：點選版本號，在 Release notes 依作業系統下載。Windows 安裝器內含 WebView2，偵測缺少時補裝；macOS 使用系統 WebKit；Linux 可執行下載的 `sh install-linux.sh`，自動選擇 apt/dnf、校驗並安裝相依套件。無須 Node.js 或 Rust。AMOS CLI 與各 Agent 帳號需自行設定。macOS 0.6.0 已完成 Developer ID 簽章與 Apple 公證。Windows Authenticode 暫緩，可能顯示系統信任提示；更新包簽章仍會驗證。
 
 macOS 首次開啟若被阻擋，確認下載來源後，到「系統設定 → 隱私權與安全性 → 仍要打開」確認此 App。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 
 
 ### 🔐 0.4.1
 
-同步前可按 **🔐 準備憑證存取**，集中讀取已儲存的憑證。macOS 提示時，針對 Bastet 各項憑證選擇「永遠允許」。成功讀取後暫存於記憶體，結束程式、忘記登入、重新開始設定或更換用戶端時清除；關閉至系統匣會保留。若在程式外修改憑證，可再按按鈕重新讀取。此操作不驗證 Google 連線，也不啟動同步。每台電腦需各自授權；尚未配置 Developer ID 簽章，更新後仍可能再次詢問。
+同步前可按 **🔐 準備憑證存取**，集中讀取已儲存的憑證。macOS 提示時，針對 Bastet 各項憑證選擇「永遠允許」。成功讀取後暫存於記憶體，結束程式、忘記登入、重新開始設定或更換用戶端時清除；關閉至系統匣會保留。若在程式外修改憑證，可再按按鈕重新讀取。此操作不驗證 Google 連線，也不啟動同步。每台電腦仍需各自授權；升級後是否再次提示，需依實際環境驗收。
 
 
 同步包依 Agent 分組，預設收合，可逐組或全部展開／收合；展開後依本機保存時間由新到舊排列。各 Agent 以狀態卡顯示結果、上傳／下載同步包及加入本機的數量。常見問題提供處理建議，技術代碼可展開查看。保存時間不是原始對話建立時間。

@@ -2,9 +2,9 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.6.0 source preview
+## 0.6.0 cross-platform conversation handoff
 
-The unreleased source adds cross-OS project mapping and managed conversation handoff. Save the source-to-local project paths, synchronize, pause and choose **Continue restored version**. Continued edits sync back with their parent version; concurrent branches remain separate. Default agent stores are not overwritten. Agy remains database recovery. Installers linked below still refer to the published release. [Workflow and limits](../../CROSS_OS_HANDOFF.md).
+0.6.0 adds cross-OS project mapping and managed conversation handoff. Save the source-to-local project paths, synchronize, pause and choose **Continue restored version**. Continued edits sync back with their parent version; concurrent branches remain separate. Default agent stores are not overwritten. Agy remains database recovery. Upgrade every participating computer to 0.6.0. [Workflow and limits](../../CROSS_OS_HANDOFF.md).
 
 ## 0.5.0
 
@@ -40,14 +40,14 @@ npm run tauri dev
 
 ## 🐈 Download and install
 
-[Versions and downloads](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest): click the version for direct installer links in its release notes. Windows detects and installs missing embedded WebView2; macOS uses system WebKit; Linux users can run the downloaded `sh install-linux.sh` for apt/dnf detection, checksums and dependency installation. Node.js and Rust are unnecessary. Configure AMOS CLI and agent accounts separately. macOS is not notarized and Windows has no Authenticode certificate; OS trust prompts may appear.
+[Versions and downloads](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest): click the version for direct installer links in its release notes. Windows detects and installs missing embedded WebView2; macOS uses system WebKit; Linux users can run the downloaded `sh install-linux.sh` for apt/dnf detection, checksums and dependency installation. Node.js and Rust are unnecessary. Configure AMOS CLI and agent accounts separately. macOS 0.6.0 is Developer ID signed and Apple notarized. Windows Authenticode is deferred, so OS trust prompts may appear; update-package signatures remain verified.
 
 If macOS blocks the first launch, confirm the download source, then use System Settings → Privacy & Security → Open Anyway for this app. [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 
 
 ### 🔐 0.4.1
 
-Use **🔐 Prepare credential access** before syncing to read saved credentials together. On macOS choose Always Allow for each requested Bastet item. Successful accesses are cached in memory until exit, forgetting login, restarting setup or changing client configuration. Closing to tray retains the cache. Press again after editing credentials externally. This action does not verify Google access or start sync. Each computer needs authorization; updates may ask again because Developer ID signing is not yet configured.
+Use **🔐 Prepare credential access** before syncing to read saved credentials together. On macOS choose Always Allow for each requested Bastet item. Successful accesses are cached in memory until exit, forgetting login, restarting setup or changing client configuration. Closing to tray retains the cache. Press again after editing credentials externally. This action does not verify Google access or start sync. Each computer still needs its own authorization. Permission prompts across upgrades require verification in the actual environment.
 
 
 Snapshots now collapse by Agent, with Expand all / Collapse all and local save timestamps sorted newest first. Source cards show clear status, uploaded/downloaded bundle counts and locally added items. Common errors include next steps; technical codes remain expandable. The save timestamp is not the original conversation time.

@@ -5,12 +5,12 @@ Authorized 2026-10-02: complete cross-platform CI and six directed round trips, 
 - [x] Isolated managed profiles, project mappings, preserved branches and five locales.
 - [x] Actual Codex, Claude Code, Pi and Grok model/tool continuation with encrypted return to a fresh receiving profile.
 - [x] Optimized 200-session fixture, restart/recovery checks and isolated real-Drive measurement with cleanup.
-- [ ] Complete three-platform CI and all six OS-to-OS return checks.
+- [x] Complete three-platform CI and all six OS-to-OS return checks.
 - [x] Complete the Agy restored-profile investigation: explicit native database recovery/resume passes; stored absolute workspace paths are not remapped.
-- [ ] Verify four installer targets, signatures, macOS notarization and installer smoke checks.
-- [ ] Publish and record the final delivery evidence in BastetMind.
+- [x] Verify four installer targets, signatures, macOS notarization and installer smoke checks.
+- [x] Publish and record the final delivery evidence in BastetMind.
 
-Measured results and limitations are recorded in [validation](VALIDATION.md). Agy is currently database recovery only. The installed user application and active agent stores are not acceptance-test targets.
+Published 2026-10-02: [v0.6.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.6.0). Measured results and limitations are recorded in [validation](VALIDATION.md). Agy is currently database recovery only. The installed user application and active agent stores are not acceptance-test targets.
 
 ## 0.5.0 completed checklist
 

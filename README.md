@@ -16,9 +16,9 @@
 
 A local-first desktop companion for synchronizing supported local agent conversations and Agent Memory OS data through Google Drive. Part of the Bastet family.
 
-> **0.5.1 — encrypted-space fix.** Sync continues for the configured space when a cloud folder contains other encrypted spaces, with a partial warning. Strict key proof and malformed-data checks remain; occupied sync folders require the original recovery kit. Includes the 0.5.0 sync control center. [Download](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.1) · [Current support](docs/NATIVE_SESSIONS.md) · [Control center](docs/SYNC_CONTROL.md) · [Evidence](docs/VALIDATION.md).
+> **0.6.0 — cross-platform conversation handoff and faster unchanged sync.** Map local project paths, continue received versions in isolated profiles, and sync causal descendants while retaining concurrent branches. Includes the encrypted-space fix and sync control center. [Download](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.6.0) · [Handoff and limits](docs/CROSS_OS_HANDOFF.md) · [Current support](docs/NATIVE_SESSIONS.md) · [Evidence](docs/VALIDATION.md).
 
-Unreleased 0.6.0 source adds [cross-OS project mapping and managed conversation handoff](docs/CROSS_OS_HANDOFF.md). Continued edits retain causal ancestry and concurrent branches. The download above remains 0.5.1 until the new version is published.
+macOS installers are Developer ID signed and notarized. Windows publisher signing remains deferred; updater signatures are verified on every platform. Agy remains explicit database recovery without workspace remapping.
 
 The desktop includes a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 

@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased — 0.6.0 cross-OS conversation handoff and sync performance
+## 0.6.0 — cross-OS conversation handoff and sync performance
+
+Published 2026-10-02: [installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.6.0). Four architecture builds, three-platform CI and installer checks, six directed cross-OS returns, seven updater signatures and all release checksums passed. Actual continuation and performance boundaries are recorded in [validation](docs/VALIDATION.md).
 
 - Avoid repeated compression of unchanged native captures, coalesce overlapping cloud listings and throttle routine progress notifications while preserving final counters. See [sync controls](docs/SYNC_CONTROL.md) for cache and validation boundaries.
 - Verify isolated real-Drive upload, cache reuse, append and receive/restore with synthetic sessions, plus actual Pi, Claude Code, Codex and Grok model/tool continuation and encrypted return. Agy explicit database recovery/resume also passes in isolated same-host profiles, while workspace remapping remains unsupported. Measurements and remaining platform gates are recorded in [validation](docs/VALIDATION.md).
@@ -9,13 +11,13 @@
 - Reject cross-platform filename and case/Unicode/path collisions in native and portable payloads before restoration.
 - Add OS-to-OS fixture exchange and return checks for macOS, Windows and Linux, plus optional installed-provider read checks. See [handoff contract](docs/CROSS_OS_HANDOFF.md) and [validation](docs/VALIDATION.md) for measured results and remaining gates. Agy remains database recovery; full model continuation is not implied.
 
-## Unreleased — macOS Developer ID signing
+### macOS Developer ID signing
 
 - Add isolated Apple Silicon and Intel Developer ID signing and notarization workflows, reused by release packaging. Require signed, notarized and Gatekeeper-accepted app, DMG and updater contents before upload.
-- Local certificate/private-key matching, real timestamped hardened-runtime probe signing and Apple notarization API authentication passed. Both original apps are notarized. Apple Silicon packages passed hosted and independent signature, ticket, Gatekeeper and updater verification; Intel encountered a runner network failure while waiting and did not upload a package. Existing releases are unchanged. Windows signing work is deferred.
+- Both 0.6.0 Mac architectures passed hosted and independent signature, notarization-ticket, Gatekeeper, version, architecture and updater verification. A previous Intel runner lost network access while polling; its replacement release build passed. Earlier public assets were not replaced. Windows publisher signing remains deferred.
 - Make Windows publisher-signing deferral an explicit release input. Required signing remains the default and never automatically falls back; the deferred path preserves updater signatures and installer smoke requirements and discloses unsigned Windows publisher status.
 
-## Unreleased — Windows publisher signing
+## Pending — Windows publisher signing
 
 - Add a reusable Windows build workflow with GitHub OIDC and Microsoft Artifact Signing. Tauri signs application and installer binaries before updater signatures are generated. Signing failures block package upload and release drafting.
 - Validate installer signatures, timestamps and the application inside both NSIS and MSI; launch the NSIS-installed application on a hosted runner. Azure identifiers remain repository variables. Azure OIDC and signing requests now succeed after the federated-subject correction. Read-only Azure management inspection confirms the configured profile uses Private Trust CI Policy. Windows rejects the issued certificate chain as untrusted; public-trust profile acceptance remains pending and no signed installer has been published.

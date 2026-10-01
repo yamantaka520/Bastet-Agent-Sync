@@ -1,6 +1,6 @@
 # macOS Developer ID signing and notarization
 
-macOS distribution uses Developer ID Application signing and Apple notarization. The standalone `macos-signing.yml` workflow tests Apple Silicon and Intel packages independently of Windows. It uploads verified test artifacts and does not publish a release. The full release workflow reuses the same macOS job; its separate Windows gate remains deferred pending an eligible signing provider.
+macOS distribution uses Developer ID Application signing and Apple notarization. The standalone `macos-signing.yml` workflow tests Apple Silicon and Intel packages independently of Windows. It uploads verified test artifacts and does not publish a release. The full release workflow reuses the same macOS job. Version 0.6.0 uses the explicit deferred Windows publisher-signing route; required signing remains the workflow default until an eligible provider is available.
 
 ## Credentials
 
@@ -17,6 +17,6 @@ Configure repository variables `APPLE_SIGNING_IDENTITY`, `APPLE_TEAM_ID`, `APPLE
 5. Submit the signed DMG separately for notarization, require Accepted, staple and validate its ticket, assess it with Gatekeeper, and verify the app mounted from it.
 6. Extract the updater archive and apply the same app checks. Upload only after the checks pass. Always remove temporary keychain and API-key material.
 
-No local trust bypass, quarantine removal or ad-hoc fallback establishes acceptance. A successful authentication check alone is not notarization. Existing public releases are unchanged; actual results are recorded in [validation](VALIDATION.md).
+No local trust bypass, quarantine removal or ad-hoc fallback establishes acceptance. A successful authentication check alone is not notarization. Older release assets are not overwritten. Published 0.6.0 results are recorded in [validation](VALIDATION.md).
 
 Sources: [Apple Developer ID](https://developer.apple.com/help/account/certificates/create-developer-id-certificates), [Apple notarization](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution), [Tauri macOS signing](https://v2.tauri.app/distribute/sign/macos/).
