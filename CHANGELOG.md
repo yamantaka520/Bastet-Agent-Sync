@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — 0.6.0 cross-OS conversation handoff and sync performance
+
+- Avoid repeated compression of unchanged native captures, coalesce overlapping cloud listings and throttle routine progress notifications while preserving final counters. See [sync controls](docs/SYNC_CONTROL.md) for cache and validation boundaries.
+- Prepare received versions in separate managed profiles, track continued edits as descendants of the received snapshot, and preserve concurrent branches. Default agent stores are no longer import targets.
+- Add saved project mappings, provider-specific path translation, version/branch details and scoped POSIX/PowerShell continuation commands for Codex, Claude Code, Pi and Grok. New receiving computers can select an agent before its default data folder exists.
+- Reject cross-platform filename and case/Unicode/path collisions in native and portable payloads before restoration.
+- Add OS-to-OS fixture exchange and return checks for macOS, Windows and Linux, plus optional installed-provider read checks. See [handoff contract](docs/CROSS_OS_HANDOFF.md) and [validation](docs/VALIDATION.md) for measured results and remaining gates. Agy remains database recovery; full model continuation is not implied.
+
 ## Unreleased — macOS Developer ID signing
 
 - Add isolated Apple Silicon and Intel Developer ID signing and notarization workflows, reused by release packaging. Require signed, notarized and Gatekeeper-accepted app, DMG and updater contents before upload.

@@ -1,5 +1,6 @@
 import type { Locale } from "./i18n";
 import { spaceErrorText } from "./space-errors";
+import { projectError } from "./project-errors";
 
 const rows = {
   "zh-Hant": [
@@ -166,6 +167,8 @@ const rows = {
 export const syncDisplay = rows;
 export function issueText(code: string, locale: Locale) {
   const t = rows[locale];
+  const project = projectError(code, locale);
+  if (project) return project;
   const spaceError = spaceErrorText(code, locale);
   if (spaceError) return spaceError;
   if (code === "session_conflict") return t[18];

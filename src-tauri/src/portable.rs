@@ -76,8 +76,15 @@ fn safe_value(v: &serde_json::Value) -> bool {
         _ => false,
     }
 }
+fn portable_relative(path: &str) -> bool {
+    crate::portable_paths::path_is_portable(path)
+}
+fn paths_do_not_collide<'a>(paths: impl Iterator<Item = &'a String>) -> bool {
+    crate::portable_paths::paths_do_not_collide(paths.map(String::as_str))
+}
+
 fn allowed(path: &str) -> bool {
-    if !crate::native_sessions::safe_relative(path) {
+    if !portable_relative(path) {
         return false;
     }
     if ["config.toml", "settings.json"].contains(&path) {
@@ -156,6 +163,9 @@ impl Package {
             {
                 return Err("portable_unsafe".into());
             }
+        }
+        if !paths_do_not_collide(self.files.keys()) {
+            return Err("portable_unsafe".into());
         }
         Ok(())
     }
@@ -631,6 +641,7 @@ mod tests {
         for (path, text) in [
             ("../escape.md", "text"),
             ("skills/x/auth.md", "text"),
+            ("skills/x/bad?.md", "text"),
             ("settings.json", "{\"apiKey\":\"private\"}"),
             ("skills/x/SKILL.md", "Bearer synthetic"),
         ] {
@@ -641,6 +652,63 @@ mod tests {
                 ..Default::default()
             };
             assert!(p.validate().is_err(), "{path}");
+        }
+    }
+    #[test]
+    fn portable_paths_keep_unicode_but_reject_windows_forbidden_names() {
+        assert!(allowed("skills/猫/説明.md"));
+        for path in [
+            "skills/cat/a<b.md",
+            "skills/cat/a>b.md",
+            "skills/cat/a\"b.md",
+            "skills/cat/a|b.md",
+            "skills/cat/a?b.md",
+            "skills/cat/a*b.md",
+            "skills/cat/a\u{1f}b.md",
+            "skills/cat/CON.md",
+        ] {
+            assert!(!allowed(path), "{path:?}");
+        }
+        assert!(!allowed(&format!("skills/cat/{}.md", "a".repeat(253))));
+
+        let root = tempfile::tempdir().unwrap();
+        write(root.path(), "skills/猫/説明.md", "portable");
+        #[cfg(unix)]
+        write(root.path(), "skills/猫/bad?.md", "unsupported on Windows");
+        let package = capture(
+            "codex",
+            root.path(),
+            &Options {
+                skills: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(package.files["skills/猫/説明.md"], "portable");
+        #[cfg(unix)]
+        assert_eq!(
+            package.excluded["skills/猫/bad?.md"],
+            "unsupported_or_sensitive_path"
+        );
+    }
+    #[test]
+    fn received_packages_reject_case_unicode_and_file_directory_aliases() {
+        for paths in [
+            vec!["skills/Cat/a.md", "skills/cat/a.md"],
+            vec!["skills/Σ/a.md", "skills/ς/a.md"],
+            vec!["skills/caf\u{e9}/a.md", "skills/cafe\u{301}/a.md"],
+            vec!["skills/a.md", "skills/A.md/child.txt"],
+        ] {
+            let package = Package {
+                schema: 1,
+                agent: "codex".into(),
+                files: paths
+                    .iter()
+                    .map(|path| ((*path).into(), "text".into()))
+                    .collect(),
+                ..Default::default()
+            };
+            assert!(package.validate().is_err(), "{paths:?}");
         }
     }
     #[cfg(unix)]

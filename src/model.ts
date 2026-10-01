@@ -7,6 +7,7 @@ export type Settings = {
   deviceName: string;
   selectedAgents: string[];
   customPaths: Record<string, string>;
+  projectMappings?: { source: string; target: string }[];
   folder: string;
   direction: "bidirectional" | "upload" | "download";
   schedule: "near-realtime" | "interval" | "manual";
@@ -35,6 +36,7 @@ export const defaults = (locale: Locale): Settings => ({
   deviceName: "",
   selectedAgents: [],
   customPaths: {},
+  projectMappings: [],
   folder: "",
   direction: "bidirectional",
   schedule: "near-realtime",

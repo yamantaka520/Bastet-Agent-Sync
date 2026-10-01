@@ -5,7 +5,11 @@ use crate::sync::{
     storage, Direction, Replica,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::BTreeMap,
+    path::Path,
+    sync::{Arc, Condvar, Mutex},
+};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Binding {
@@ -555,9 +559,20 @@ mod tests {
 pub struct CachedObjects<'a, R> {
     pub remote: &'a R,
     pub root: &'a Path,
-    revisions: std::sync::Mutex<BTreeMap<(String, String), Option<String>>>,
+    listings: Mutex<Listings>,
     downloads: [std::sync::Mutex<()>; 16],
     fresh: Option<String>,
+}
+#[derive(Default)]
+struct Listings {
+    revisions: BTreeMap<(String, String), Option<String>>,
+    generations: BTreeMap<String, u64>,
+    in_flight: BTreeMap<String, Arc<ListFlight>>,
+}
+struct ListFlight {
+    generation: u64,
+    result: Mutex<Option<Result<Vec<String>>>>,
+    ready: Condvar,
 }
 #[derive(Serialize, Deserialize)]
 struct Cached {
@@ -570,7 +585,7 @@ impl<'a, R: Objects> CachedObjects<'a, R> {
         Ok(Self {
             remote,
             root,
-            revisions: Default::default(),
+            listings: Default::default(),
             downloads: Default::default(),
             fresh: None,
         })
@@ -585,21 +600,93 @@ impl<R> CachedObjects<'_, R> {
 }
 impl<R: Objects> Objects for CachedObjects<'_, R> {
     fn ids(&self, folder: &str) -> Result<Vec<String>> {
-        let revisions = self.remote.revisions(folder)?;
-        let mut known = self.revisions.lock().map_err(|_| "cloud_cache_busy")?;
-        known.retain(|(f, _), _| f != folder);
-        known.extend(
-            revisions
-                .iter()
-                .map(|(id, revision)| ((folder.to_string(), id.clone()), revision.clone())),
-        );
-        Ok(revisions.into_iter().map(|(id, _)| id).collect())
+        loop {
+            let (flight, leader) = {
+                let mut listings = self.listings.lock().map_err(|_| "cloud_cache_busy")?;
+                if let Some(flight) = listings.in_flight.get(folder) {
+                    (Arc::clone(flight), false)
+                } else {
+                    let flight = Arc::new(ListFlight {
+                        generation: *listings.generations.get(folder).unwrap_or(&0),
+                        result: Mutex::new(None),
+                        ready: Condvar::new(),
+                    });
+                    listings
+                        .in_flight
+                        .insert(folder.into(), Arc::clone(&flight));
+                    (flight, true)
+                }
+            };
+            if leader {
+                // A remote panic must wake followers before it propagates to the worker.
+                let (result, panic) =
+                    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        self.remote.revisions(folder)
+                    })) {
+                        Ok(result) => (result, None),
+                        Err(panic) => (Err("cloud_list_panicked".into()), Some(panic)),
+                    };
+                let mut listings = self.listings.lock().map_err(|_| "cloud_cache_busy")?;
+                let current = *listings.generations.get(folder).unwrap_or(&0) == flight.generation;
+                if current {
+                    if let Ok(revisions) = &result {
+                        listings.revisions.retain(|(f, _), _| f != folder);
+                        listings
+                            .revisions
+                            .extend(revisions.iter().map(|(id, revision)| {
+                                ((folder.to_string(), id.clone()), revision.clone())
+                            }));
+                    }
+                }
+                if listings
+                    .in_flight
+                    .get(folder)
+                    .is_some_and(|f| Arc::ptr_eq(f, &flight))
+                {
+                    listings.in_flight.remove(folder);
+                }
+                let ids = result.map(|revisions| revisions.into_iter().map(|(id, _)| id).collect());
+                *flight.result.lock().map_err(|_| "cloud_cache_busy")? = Some(ids.clone());
+                flight.ready.notify_all();
+                drop(listings);
+                if let Some(panic) = panic {
+                    std::panic::resume_unwind(panic);
+                }
+                if current {
+                    return ids;
+                }
+            } else {
+                let mut result = flight.result.lock().map_err(|_| "cloud_cache_busy")?;
+                while result.is_none() {
+                    result = flight.ready.wait(result).map_err(|_| "cloud_cache_busy")?;
+                }
+                let ids = result.as_ref().expect("checked above").clone();
+                drop(result);
+                if *self
+                    .listings
+                    .lock()
+                    .map_err(|_| "cloud_cache_busy")?
+                    .generations
+                    .get(folder)
+                    .unwrap_or(&0)
+                    == flight.generation
+                {
+                    return ids;
+                }
+            }
+        }
     }
     fn allocate(&self) -> Result<String> {
         self.remote.allocate()
     }
     fn put(&self, folder: &str, id: &str, key: &SpaceKey, bundle: &Bundle) -> Result<()> {
-        self.remote.put(folder, id, key, bundle)
+        self.remote.put(folder, id, key, bundle)?;
+        let mut listings = self.listings.lock().map_err(|_| "cloud_cache_busy")?;
+        let generation = listings.generations.entry(folder.into()).or_default();
+        *generation = generation.wrapping_add(1);
+        listings.revisions.remove(&(folder.into(), id.into()));
+        listings.in_flight.remove(folder);
+        Ok(())
     }
     fn get(&self, folder: &str, id: &str, space: &str, key: &SpaceKey) -> Result<Bundle> {
         if self.fresh.as_deref() == Some(id) {
@@ -614,9 +701,10 @@ impl<R: Objects> Objects for CachedObjects<'_, R> {
             .lock()
             .map_err(|_| "cloud_cache_busy")?;
         let rev = self
-            .revisions
+            .listings
             .lock()
             .map_err(|_| "cloud_cache_busy")?
+            .revisions
             .get(&(folder.to_string(), id.to_string()))
             .cloned()
             .flatten();
@@ -755,5 +843,210 @@ mod cache_tests {
         cache.get("folder", "object", "space", &key).unwrap();
         cache.get("folder", "object", "space", &key).unwrap();
         assert_eq!(remote.0.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn overlapping_lists_share_one_request_but_later_list_refreshes_revision() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Barrier,
+        };
+        struct ListingRemote {
+            calls: AtomicUsize,
+            revision: AtomicUsize,
+            gate: (Mutex<bool>, Condvar),
+        }
+        impl Objects for ListingRemote {
+            fn ids(&self, _: &str) -> Result<Vec<String>> {
+                unreachable!()
+            }
+            fn revisions(&self, _: &str) -> Result<Vec<(String, Option<String>)>> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                let mut open = self.gate.0.lock().unwrap();
+                while !*open {
+                    open = self.gate.1.wait(open).unwrap();
+                }
+                Ok(vec![(
+                    "object".into(),
+                    Some(self.revision.load(Ordering::SeqCst).to_string()),
+                )])
+            }
+            fn allocate(&self) -> Result<String> {
+                unreachable!()
+            }
+            fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+                unreachable!()
+            }
+            fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+                proof_bundle(space)
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let remote = ListingRemote {
+            calls: AtomicUsize::new(0),
+            revision: AtomicUsize::new(1),
+            gate: (Mutex::new(false), Condvar::new()),
+        };
+        let cache = CachedObjects::new(&remote, root.path()).unwrap();
+        let start = Barrier::new(9);
+        std::thread::scope(|scope| {
+            let threads: Vec<_> = (0..8)
+                .map(|_| {
+                    scope.spawn(|| {
+                        start.wait();
+                        assert_eq!(cache.ids("folder").unwrap(), ["object"]);
+                    })
+                })
+                .collect();
+            start.wait();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            let overlapped = loop {
+                let followers = cache
+                    .listings
+                    .lock()
+                    .unwrap()
+                    .in_flight
+                    .get("folder")
+                    .map(Arc::strong_count)
+                    .unwrap_or(0);
+                if followers == 9 {
+                    break true;
+                }
+                if std::time::Instant::now() >= deadline {
+                    break false;
+                }
+                std::thread::yield_now();
+            };
+            *remote.gate.0.lock().unwrap() = true;
+            remote.gate.1.notify_all();
+            for thread in threads {
+                thread.join().unwrap();
+            }
+            assert!(overlapped, "list callers did not overlap");
+        });
+        assert_eq!(remote.calls.load(Ordering::SeqCst), 1);
+        remote.revision.store(2, Ordering::SeqCst);
+        cache.ids("folder").unwrap();
+        assert_eq!(remote.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            cache
+                .listings
+                .lock()
+                .unwrap()
+                .revisions
+                .get(&("folder".into(), "object".into())),
+            Some(&Some("2".into()))
+        );
+    }
+
+    #[test]
+    fn own_write_invalidates_an_in_flight_listing() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        struct WritingRemote {
+            calls: AtomicUsize,
+            revision: AtomicUsize,
+            gate: (Mutex<bool>, Condvar),
+        }
+        impl Objects for WritingRemote {
+            fn ids(&self, _: &str) -> Result<Vec<String>> {
+                unreachable!()
+            }
+            fn revisions(&self, _: &str) -> Result<Vec<(String, Option<String>)>> {
+                let old = self.revision.load(Ordering::SeqCst);
+                if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                    let mut open = self.gate.0.lock().unwrap();
+                    while !*open {
+                        open = self.gate.1.wait(open).unwrap();
+                    }
+                }
+                Ok(vec![("object".into(), Some(old.to_string()))])
+            }
+            fn allocate(&self) -> Result<String> {
+                unreachable!()
+            }
+            fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+                self.revision.store(2, Ordering::SeqCst);
+                Ok(())
+            }
+            fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+                proof_bundle(space)
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let remote = WritingRemote {
+            calls: AtomicUsize::new(0),
+            revision: AtomicUsize::new(1),
+            gate: (Mutex::new(false), Condvar::new()),
+        };
+        let cache = CachedObjects::new(&remote, root.path()).unwrap();
+        let key = SpaceKey::generate().unwrap();
+        std::thread::scope(|scope| {
+            let list = scope.spawn(|| cache.ids("folder").unwrap());
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while remote.calls.load(Ordering::SeqCst) == 0 {
+                if std::time::Instant::now() >= deadline {
+                    *remote.gate.0.lock().unwrap() = true;
+                    remote.gate.1.notify_all();
+                    panic!("first list did not start");
+                }
+                std::thread::yield_now();
+            }
+            cache
+                .put("folder", "object", &key, &proof_bundle("space").unwrap())
+                .unwrap();
+            *remote.gate.0.lock().unwrap() = true;
+            remote.gate.1.notify_all();
+            assert_eq!(list.join().unwrap(), ["object"]);
+        });
+        assert_eq!(remote.calls.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            cache
+                .listings
+                .lock()
+                .unwrap()
+                .revisions
+                .get(&("folder".into(), "object".into())),
+            Some(&Some("2".into()))
+        );
+    }
+
+    #[test]
+    fn own_write_preserves_unrelated_cached_download() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        struct TwoObjects(AtomicUsize);
+        impl Objects for TwoObjects {
+            fn ids(&self, _: &str) -> Result<Vec<String>> {
+                unreachable!()
+            }
+            fn revisions(&self, _: &str) -> Result<Vec<(String, Option<String>)>> {
+                Ok(vec![
+                    ("old".into(), Some("1".into())),
+                    ("new".into(), Some("1".into())),
+                ])
+            }
+            fn allocate(&self) -> Result<String> {
+                unreachable!()
+            }
+            fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+                Ok(())
+            }
+            fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                proof_bundle(space)
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let remote = TwoObjects(AtomicUsize::new(0));
+        let key = SpaceKey::generate().unwrap();
+        let cache = CachedObjects::new(&remote, root.path()).unwrap();
+        cache.ids("folder").unwrap();
+        cache.get("folder", "old", "space", &key).unwrap();
+        cache
+            .put("folder", "new", &key, &proof_bundle("space").unwrap())
+            .unwrap();
+        cache.get("folder", "old", "space", &key).unwrap();
+        assert_eq!(remote.0.load(Ordering::SeqCst), 1);
+        cache.get("folder", "new", "space", &key).unwrap();
+        assert_eq!(remote.0.load(Ordering::SeqCst), 2);
     }
 }

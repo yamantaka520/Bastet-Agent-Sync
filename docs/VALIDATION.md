@@ -1,5 +1,21 @@
 # Validation
 
+## 0.6.0 sync performance — local acceptance, 2026-10-02
+
+- Integrated Rust suite: **123 passed, 3 explicit optional tests ignored**. Strict Clippy, formatting, diff checks and 25 Markdown documents passed. The explicit synthetic produce → continue → verify handoff also passed after these changes. Frontend code was unchanged by this performance pass; its preceding 49-test result is recorded below.
+- Native capture counters: Claude Code, Grok and Agy each compressed once on initial publication, zero additional times on an unchanged second cycle, and once more after a child-file, companion-file or committed WAL change. Changed content retained its causal parent. Unchanged captures left the journal unchanged; missing root or segment baselines cannot take the cache shortcut. Full stable capture still occurs; this is not an mtime-only shortcut.
+- Cloud fixture counters: eight overlapping listing requests produced one remote listing. A later request refreshed the revision; a concurrent upload invalidated the stale listing and forced a retry. Uploading one object retained unrelated cached downloads. Existing revision, restart-cache and fresh proof tests passed.
+- Progress fixture: 10,000 routine updates inside one reporting interval produced no additional callback after the initial stage callback; completion emitted the exact count. Scope exit flushed partial byte counts. Routine callbacks are limited to 100 ms intervals; stage/body/completion events remain immediate.
+- No real-account throughput, latency or CPU percentage improvement is claimed. Changes are local and unreleased; the previous main-push approval remains unresolved. No active agent store or installed application was replaced.
+
+## 0.6.0 cross-OS handoff — local acceptance, 2026-10-01
+
+- Local focused fixtures cover project mapping, preserved historical text, managed-profile continuation, causal ancestry, pristine-profile no-loop behavior and portable filenames. The frontend adds mapping, branch details and scoped continuation commands in all five locales.
+- Integrated local checks passed: 117 Rust tests (3 explicit optional tests ignored), 49 frontend tests, TypeScript/Vite build, strict Clippy, formatting, actionlint, 25 Markdown documents and 3 release-asset tests. The explicit synthetic produce → continue → return fixture passed separately.
+- Official installed readers passed on restored synthetic profiles: Codex 0.159.2 `thread/read`, Claude Agent SDK 0.3.276 session/message readers, Pi 0.85.1 SessionManager and Grok 1.0.13 transcript export. Agy passed SQLite integrity only. These checks did not call a model.
+- Real OS artifact-exchange results remain pending CI. Six directed source/target combinations each require a return to the original OS; Codex, Claude and Pi readers are mandatory on each receiving runner. Grok remains optional in CI. A defined matrix is not evidence that its jobs passed.
+- Native model continuation, complete external dependencies and restored-profile Agy continuation remain separate gates. See [contract](CROSS_OS_HANDOFF.md). No active user agent store has been imported into or overwritten.
+
 ## macOS Developer ID signing — integration, 2026-10-01
 
 - The user switched scope to Apple signing/notarization and deferred Windows signing. The supplied Developer ID certificate matches its private key. A local probe signed successfully with an Apple-rooted chain, secure timestamp, expected team and hardened runtime; strict codesign verification passed. Temporary keychain state was restored afterward.

@@ -2,6 +2,10 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
+## 0.6.0 source preview
+
+The unreleased source adds cross-OS project mapping and managed conversation handoff. Save the source-to-local project paths, synchronize, pause and choose **Continue restored version**. Continued edits sync back with their parent version; concurrent branches remain separate. Default agent stores are not overwritten. Agy remains database recovery. Installers linked below still refer to the published release. [Workflow and limits](../../CROSS_OS_HANDOFF.md).
+
 ## 0.5.0
 
 0.5.0 syncs local conversations and Agent Memory OS. Select sources, save and Start; manual JSONL export is unnecessary. Claude/Claude Code share local coding history; Codex/Work share local rollout storage. Agy uses SQLite snapshots; Grok and Pi use native session files.

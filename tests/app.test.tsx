@@ -26,6 +26,39 @@ afterEach(() => {
   api.invoke.mockReset();
 });
 describe("locale and native setup contracts", () => {
+  it("can select a receiving agent before its default profile exists", async () => {
+    api.native = true;
+    const s = { ...defaults("en"), deviceName: "Receiving computer" };
+    api.invoke.mockImplementation(async (command: string) =>
+      command === "bootstrap"
+        ? {
+            settings: s,
+            agents: [
+              {
+                id: "codex",
+                path: "/missing-profile",
+                detected: false,
+                custom: false,
+              },
+            ],
+            trayAvailable: true,
+          }
+        : undefined,
+    );
+    render(<App />);
+    await screen.findByText("/missing-profile");
+    const checkbox = screen.getByRole("checkbox", {
+      name: "Codex",
+    }) as HTMLInputElement;
+    expect(checkbox.disabled).toBe(false);
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole("button", { name: "Save setup" }));
+    await waitFor(() =>
+      expect(api.invoke).toHaveBeenCalledWith("save_settings", {
+        settings: { ...s, selectedAgents: ["codex"] },
+      }),
+    );
+  });
   it("keeps all five locales complete and chooses regional Chinese", () => {
     for (const locale of Object.keys(languages) as (keyof typeof languages)[]) {
       expect(Object.keys(messages[locale]).sort()).toEqual(

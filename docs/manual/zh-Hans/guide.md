@@ -2,6 +2,10 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
+## 0.6.0 源码预览
+
+尚未发布的源码加入跨系统项目路径映射与对话版本接续。保存来源与本机的项目映射后同步，暂停并选择“继续已恢复的版本”。接续内容会带着父版本同步回去，双边分支分别保留，不覆盖原有 Agent 数据。Agy 仍为数据库恢复。下方下载链接仍指向已发布版本。[操作与限制](../../CROSS_OS_HANDOFF.md)。
+
 ## 0.5.0
 
 0.5.0 支持本地对话与 Agent Memory OS 同步。勾选来源、保存后启动，无需手动导出 JSONL。Claude／Claude Code 共用本地编程对话；Codex／Work 共用本地记录。Agy 使用 SQLite 快照；Grok、Pi 使用原生对话文件。

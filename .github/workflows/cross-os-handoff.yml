@@ -1,0 +1,108 @@
+name: Cross-OS conversation handoff
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  produce:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { system: macos, os: macos-latest }
+          - { system: windows, os: windows-latest }
+          - { system: linux, os: ubuntu-24.04 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/cross-os-setup
+      - name: Create encrypted native conversation fixture
+        shell: bash
+        env:
+          BASTET_HANDOFF_MODE: produce
+          BASTET_HANDOFF_OUTPUT: ${{ runner.temp }}/handoff-out
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib cross_os_handoff_exchange -- --ignored --nocapture
+      - uses: actions/upload-artifact@v4
+        with:
+          name: handoff-${{ matrix.system }}
+          path: ${{ runner.temp }}/handoff-out
+          if-no-files-found: error
+          retention-days: 7
+  continue:
+    needs: produce
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { source: macos, target: windows, os: windows-latest }
+          - { source: macos, target: linux, os: ubuntu-24.04 }
+          - { source: windows, target: macos, os: macos-latest }
+          - { source: windows, target: linux, os: ubuntu-24.04 }
+          - { source: linux, target: macos, os: macos-latest }
+          - { source: linux, target: windows, os: windows-latest }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/cross-os-setup
+      - uses: actions/download-artifact@v4
+        with:
+          name: handoff-${{ matrix.source }}
+          path: ${{ runner.temp }}/handoff-in
+      - name: Restore on another OS, append a turn and publish its child
+        shell: bash
+        env:
+          BASTET_HANDOFF_MODE: continue
+          BASTET_HANDOFF_INPUT: ${{ runner.temp }}/handoff-in
+          BASTET_HANDOFF_OUTPUT: ${{ runner.temp }}/handoff-out
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib cross_os_handoff_exchange -- --ignored --nocapture
+      - name: Install pinned official conversation readers
+        shell: bash
+        run: npm install --prefix "${{ runner.temp }}/handoff-readers" --no-audit --no-fund @openai/codex@0.159.2 @earendil-works/pi-coding-agent@0.85.1 @anthropic-ai/claude-agent-sdk@0.3.276
+      - name: Read restored conversations with official readers
+        shell: bash
+        run: |
+          export PATH="${{ runner.temp }}/handoff-readers/node_modules/.bin:$PATH"
+          python scripts/test_native_continuation.py \
+            --root "${{ runner.temp }}/handoff-out" \
+            --manifest "${{ runner.temp }}/handoff-out/manifest.json" \
+            --pi-module "${{ runner.temp }}/handoff-readers/node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js" \
+            --claude-sdk-module "${{ runner.temp }}/handoff-readers/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs" \
+            --require-agents codex,claude-code,pi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: handoff-${{ matrix.source }}-${{ matrix.target }}
+          path: ${{ runner.temp }}/handoff-out
+          if-no-files-found: error
+          retention-days: 7
+  return:
+    needs: continue
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { source: macos, target: windows, os: macos-latest }
+          - { source: macos, target: linux, os: macos-latest }
+          - { source: windows, target: macos, os: windows-latest }
+          - { source: windows, target: linux, os: windows-latest }
+          - { source: linux, target: macos, os: ubuntu-24.04 }
+          - { source: linux, target: windows, os: ubuntu-24.04 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/cross-os-setup
+      - uses: actions/download-artifact@v4
+        with:
+          name: handoff-${{ matrix.source }}-${{ matrix.target }}
+          path: ${{ runner.temp }}/handoff-in
+      - name: Verify returned history and causal ancestry on the original OS
+        shell: bash
+        env:
+          BASTET_HANDOFF_MODE: verify
+          BASTET_HANDOFF_INPUT: ${{ runner.temp }}/handoff-in
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --lib cross_os_handoff_exchange -- --ignored --nocapture

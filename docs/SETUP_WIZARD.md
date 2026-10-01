@@ -44,7 +44,7 @@ On another computer, configure authorization, select the same accessible folder,
 
 Fixture tests cover per-step reload, mode persistence, malformed-record restart, cancelled export, failure/retry, stable key/proof IDs, joining a space, rejected wrong recovery keys and frontend completion gates. These are not Google consent or physical-device tests. Native UI smoke and CI results are recorded in [Validation](VALIDATION.md).
 
-Real-account macOS consent and selected transfers have been exercised; three-platform interactive credential-store checks and physical two-computer recovery remain incomplete. Google Picker remains pending. Background scheduling and additive local conversation restoration are implemented within the [current adapter scope](NATIVE_SESSIONS.md). The wizard's final check verifies setup; it does not transfer Agent data.
+Real-account macOS consent and selected transfers have been exercised; three-platform interactive credential-store checks and physical two-computer recovery remain incomplete. Google Picker remains pending. Background scheduling and managed local conversation handoff are implemented in 0.6.0 source within the [current adapter scope](NATIVE_SESSIONS.md). The wizard's final check verifies setup; it does not transfer Agent data.
 
 Primary setup reference: [Google Drive desktop OAuth setup](https://developers.google.com/workspace/drive/api/quickstart/python). Encryption and API boundaries: [Cloud security contract](CLOUD_SECURITY.md).
 

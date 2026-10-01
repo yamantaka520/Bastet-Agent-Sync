@@ -1,5 +1,7 @@
 # Bastet Agent Sync — 需求與接續設計
 
+2026-10-01 原始碼進度（0.6.0，尚未發布）：已加入專案路徑對應、獨立接續資料目錄、父版本追蹤與接續內容回傳；預設 Agent 儲存區不再作為匯入目標。分支分別保留，Agy 仍為資料庫還原。實作與驗證界線見 [跨系統接續](docs/CROSS_OS_HANDOFF.md) 及 [驗證紀錄](docs/VALIDATION.md)。此段不代表所有原始需求或全部 Agent 的實機模型接續已完成。
+
 狀態（0.5.0）：新增同步控制中心、可設定並行與頻寬／時段、歷史／裝置回報、衝突比較、空間量測及可預覽勾選的設定／技能同步。Agy／Grok 依使用者指示完成不依賴第二台電腦的驗收；不宣稱已完成實機跨電腦接續。下列需求與歷史段落保留，現況以 [控制中心](docs/SYNC_CONTROL.md)、[適配器](docs/NATIVE_SESSIONS.md) 與 [驗證](docs/VALIDATION.md) 為準。
 
 GitHub 儲存庫：https://github.com/yamantaka520/Bastet-Agent-Sync

@@ -18,6 +18,8 @@ A local-first desktop companion for synchronizing supported local agent conversa
 
 > **0.5.1 — encrypted-space fix.** Sync continues for the configured space when a cloud folder contains other encrypted spaces, with a partial warning. Strict key proof and malformed-data checks remain; occupied sync folders require the original recovery kit. Includes the 0.5.0 sync control center. [Download](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.5.1) · [Current support](docs/NATIVE_SESSIONS.md) · [Control center](docs/SYNC_CONTROL.md) · [Evidence](docs/VALIDATION.md).
 
+Unreleased 0.6.0 source adds [cross-OS project mapping and managed conversation handoff](docs/CROSS_OS_HANDOFF.md). Continued edits retain causal ancestry and concurrent branches. The download above remains 0.5.1 until the new version is published.
+
 The desktop includes a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 
 ## ✨ Current workflow

@@ -126,6 +126,9 @@ pub struct Replica {
     _lock: File,
 }
 impl Replica {
+    pub(crate) fn device_id(&self) -> &str {
+        &self.identity.device
+    }
     pub fn open(root: &Path, space: &str) -> Result<Self> {
         if !bundle::token(space) {
             return Err("invalid_space".into());
@@ -656,6 +659,13 @@ impl Replica {
     }
 }
 impl ExportBatch<'_> {
+    /// The batch was built from fully validated local objects and history.
+    pub(crate) fn baseline(&self, stream: &Stream, id: &str) -> Option<&Bundle> {
+        self.objects
+            .get(id)
+            .filter(|bundle| bundle.snapshot.stream == *stream)
+    }
+
     pub(crate) fn export_from(
         &mut self,
         stream: Stream,

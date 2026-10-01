@@ -906,6 +906,37 @@ details summary {
   background: #f3f3eb;
   padding: 10px;
 }
+.project-mappings fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.project-mappings .form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.project-mappings label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.project-mappings input {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 800px) {
+  .project-mappings .form-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+@media (max-width: 480px) {
+  .project-mappings .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .diff-columns code {
   overflow-wrap: anywhere;
 }

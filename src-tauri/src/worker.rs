@@ -496,7 +496,7 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
                 }
             } else {
                 match &task.path {
-                    Some(source) => crate::native_sessions::cycle(
+                    Some(source) => crate::native_sessions::cycle_with_mappings(
                         &root.join(format!("sessions-{}-{}", task.canonical, binding.space)),
                         binding,
                         key,
@@ -507,6 +507,7 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
                         &task.canonical,
                         source,
                         direction,
+                        &settings.project_mappings,
                         || worker.stopped(),
                     ),
                     None => Err("source_missing".into()),
@@ -1056,10 +1057,12 @@ mod tests {
         let codex = temp.path().join("codex");
         let pi = temp.path().join("pi");
         std::fs::create_dir_all(codex.join("sessions")).unwrap();
-        std::fs::create_dir_all(pi.join("sessions/project")).unwrap();
+        std::fs::create_dir_all(pi.join("sessions/--project--")).unwrap();
+        let local_project = temp.path().join("local-project");
+        std::fs::create_dir_all(&local_project).unwrap();
         std::fs::write(codex.join(format!("sessions/rollout-{id}.jsonl")), format!("{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"{id}\",\"cwd\":\"/project\"}}}}\n")).unwrap();
         std::fs::write(
-            pi.join(format!("sessions/project/2026-{id}.jsonl")),
+            pi.join(format!("sessions/--project--/2026-{id}.jsonl")),
             format!(
                 "{{\"type\":\"session\",\"version\":3,\"id\":\"{id}\",\"cwd\":\"/project\"}}\n"
             ),
@@ -1069,6 +1072,10 @@ mod tests {
             selected_agents: ["codex", "chatgpt-work", "pi", "agent-memory-os", "agy"]
                 .map(str::to_string)
                 .to_vec(),
+            project_mappings: vec![crate::project_mapping::Mapping {
+                source: "/project".into(),
+                target: local_project.to_string_lossy().into_owned(),
+            }],
             ..Default::default()
         };
         let agents = ["codex", "chatgpt-work", "pi"].map(|id| crate::model::Agent {
@@ -1155,6 +1162,8 @@ mod tests {
         .unwrap();
         assert_eq!(restored.0.received, 3);
         assert_eq!(restored.1, 3);
+        // Downloads prepare managed profiles, never write into default agent stores.
+        assert!(other_agents.iter().all(|a| !Path::new(&a.path).exists()));
         assert_eq!(other_memory.lock().unwrap().1.get(), 1);
         assert_eq!(
             sync_sources(

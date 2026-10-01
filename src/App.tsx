@@ -15,6 +15,8 @@ import WorkerStatus, {
   phaseText,
 } from "./WorkerStatus";
 import PortablePanel from "./PortablePanel";
+import ProjectMappings from "./ProjectMappings";
+import { projectError } from "./project-errors";
 import OperationsPanel, { ResourceControls } from "./OperationsPanel";
 import TrafficStatus from "./TrafficStatus";
 import MemoryPanel from "./MemoryPanel";
@@ -135,7 +137,11 @@ export default function App() {
       setCheckingStart(false);
     }
   }
-  const errorText = error ? (t[error as keyof typeof t] ?? t.error) : "";
+  const errorText = error
+    ? (projectError(error, settings.locale) ??
+      t[error as keyof typeof t] ??
+      t.error)
+    : "";
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -299,6 +305,12 @@ export default function App() {
           disabled={!native || busy || running || !loaded}
           onChange={(value) => change("resources", value)}
         />
+        <ProjectMappings
+          locale={settings.locale}
+          value={settings.projectMappings}
+          disabled={!native || busy || running || !loaded}
+          onChange={(value) => change("projectMappings", value)}
+        />
         <CloudPanel
           native={native}
           locale={settings.locale}
@@ -412,9 +424,7 @@ export default function App() {
                       <input
                         type="checkbox"
                         aria-label={names[a.id]}
-                        disabled={
-                          !native || !a.detected || busy || !loaded || running
-                        }
+                        disabled={!native || busy || !loaded || running}
                         checked={settings.selectedAgents.includes(a.id)}
                         onChange={(e) =>
                           change(

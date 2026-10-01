@@ -12,16 +12,21 @@ use crate::{
 use base64::{engine::general_purpose::STANDARD, Engine};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs,
-    io::Read,
-    path::{Component, Path, PathBuf},
+    io::{Read, Write},
+    path::{Path, PathBuf},
 };
 use tauri::Manager;
 const MAX_RAW: u64 = 512 * 1024 * 1024;
 const MAX_PACKED: u64 = 384 * 1024 * 1024;
 const PART_SIZE: usize = 23 * 1024 * 1024;
+#[cfg(test)]
+std::thread_local! {
+    static ENCODE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Manifest {
@@ -51,35 +56,99 @@ struct Journal {
     bases: BTreeMap<String, String>,
     #[serde(default)]
     stamps: BTreeMap<String, String>,
+    #[serde(default)]
+    content: BTreeMap<String, ContentBaseline>,
+}
+#[derive(Serialize, Deserialize)]
+struct ContentBaseline {
+    fingerprint: String,
+    bundle: String,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Handoff {
+    // The path is a new, explicitly restored profile, never an active default store.
+    path: PathBuf,
+    agent: String,
+    session: String,
+    main_file: String,
+    cwd: String,
+    stream_profile: String,
+    base: String,
+    fingerprint: String,
+}
+#[derive(Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Handoffs {
+    version: u32,
+    entries: Vec<Handoff>,
+}
+fn manifest_fingerprint(m: &Manifest) -> Result<String> {
+    Ok(bundle::hash(json(&m.files)?.as_bytes()))
+}
+fn manifest_content_fingerprint(m: &Manifest) -> Result<String> {
+    // Include session metadata as well as every captured file and companion.
+    struct Hasher(Sha256);
+    impl Write for Hasher {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0.update(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let mut hasher = Hasher(Sha256::new());
+    serde_json::to_writer(&mut hasher, m).map_err(|_| "session_invalid")?;
+    Ok(format!("{:x}", hasher.0.finalize()))
+}
+fn handoffs_path(root: &Path) -> PathBuf {
+    root.join("native-handoffs.json")
+}
+fn load_handoffs(root: &Path) -> Result<Handoffs> {
+    let p = handoffs_path(root);
+    if !p.exists() {
+        return Ok(Handoffs {
+            version: 1,
+            entries: vec![],
+        });
+    }
+    let registry: Handoffs = serde_json::from_slice(&storage::read(&p, 8 * 1024 * 1024)?)
+        .map_err(|_| "sync_journal_invalid")?;
+    if registry.version != 1 || registry.entries.len() > 4096 {
+        return Err("sync_journal_invalid".into());
+    }
+    Ok(registry)
+}
+fn save_handoffs(root: &Path, registry: &Handoffs) -> Result<()> {
+    storage::replace(&handoffs_path(root), json(registry)?.as_bytes())
+}
+fn main_file(m: &Manifest) -> Result<String> {
+    m.files
+        .keys()
+        .find(|path| match m.agent.as_str() {
+            "grok" => path.ends_with("/updates.jsonl"),
+            "claude" | "claude-code" => path.ends_with(".jsonl") && !path.contains("/subagents/"),
+            "agy" => path.ends_with(".db"),
+            _ => path.ends_with(".jsonl"),
+        })
+        .cloned()
+        .ok_or_else(|| "session_invalid".into())
 }
 fn json<T: Serialize>(v: &T) -> Result<String> {
     serde_json::to_string(v).map_err(|_| "session_invalid".into())
 }
 pub(crate) fn safe_relative(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() < 2048
-        && !value.contains(['\\', ':', '\0'])
-        && Path::new(value)
-            .components()
-            .all(|c| matches!(c, Component::Normal(_)))
-        && value.split('/').all(|p| {
-            !p.is_empty()
-                && p != "."
-                && p != ".."
-                && !p.ends_with([' ', '.'])
-                && ![
-                    "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6",
-                    "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7",
-                    "LPT8", "LPT9",
-                ]
-                .contains(
-                    &p.split('.')
-                        .next()
-                        .unwrap_or("")
-                        .to_ascii_uppercase()
-                        .as_str(),
-                )
-        })
+    crate::portable_paths::path_is_portable(value)
+}
+fn manifest_paths_safe(m: &Manifest) -> bool {
+    m.files.keys().all(|path| allowed(&m.agent, path))
+        && crate::portable_paths::paths_do_not_collide(m.files.keys().map(String::as_str))
+}
+fn paths_overlap(a: &Path, b: &Path) -> bool {
+    let a = fs::canonicalize(a).unwrap_or_else(|_| a.to_path_buf());
+    let b = fs::canonicalize(b).unwrap_or_else(|_| b.to_path_buf());
+    a.starts_with(&b) || b.starts_with(&a)
 }
 fn allowed(agent: &str, path: &str) -> bool {
     if !safe_relative(path) {
@@ -99,102 +168,22 @@ fn allowed(agent: &str, path: &str) -> bool {
                 && bundle::token(parts[1].trim_end_matches(".db"))
         }
         "grok" => {
-            parts.len() == 4
-                && parts[0] == "sessions"
-                && bundle::token(parts[2])
-                && [
-                    "summary.json",
-                    "updates.jsonl",
-                    "chat_history.jsonl",
-                    "plan.json",
-                    "signals.json",
-                    "rewind_points.jsonl",
-                ]
-                .contains(&parts[3])
+            parts[0] == "sessions"
+                && ((parts.len() == 3 && parts[2] == ".cwd")
+                    || (parts.len() == 4
+                        && bundle::token(parts[2])
+                        && [
+                            "summary.json",
+                            "updates.jsonl",
+                            "chat_history.jsonl",
+                            "plan.json",
+                            "signals.json",
+                            "rewind_points.jsonl",
+                        ]
+                        .contains(&parts[3])))
         }
         _ => false,
     }
-}
-fn ensure_directory(path: &Path) -> Result<()> {
-    if path.is_dir() {
-        return storage::directory(path);
-    }
-    if let Some(parent) = path.parent() {
-        if parent != path {
-            ensure_directory(parent)?;
-        }
-    }
-    storage::directory(path)
-}
-/// Add missing sessions only. Different existing bytes are a conflict, never a replacement.
-fn install_missing(m: &Manifest, home: &Path) -> Result<usize> {
-    // The same session may already have moved to an archive or a mapped project.
-    // Do not introduce a second native file carrying an active session's identity.
-    let dirs = match m.agent.as_str() {
-        "claude" | "claude-code" => vec!["projects"],
-        "agy" => vec!["conversations"],
-        "codex" | "chatgpt-work" => vec!["sessions", "archived_sessions"],
-        _ => vec!["sessions"],
-    };
-    for dir in dirs {
-        let root = home.join(dir);
-        if !root.is_dir() {
-            continue;
-        }
-        let mut existing = vec![];
-        walk(&root, 8, &mut existing)?;
-        for p in existing {
-            let same_id = p
-                .file_name()
-                .and_then(|s| s.to_str())
-                .is_some_and(|s| s.contains(&m.session))
-                || (m.agent == "grok"
-                    && p.components().any(|c| c.as_os_str() == m.session.as_str()));
-            if same_id {
-                let relative = p
-                    .strip_prefix(home)
-                    .map_err(|_| "unsafe_store")?
-                    .to_str()
-                    .ok_or("unsafe_store")?
-                    .replace('\\', "/");
-                if !m.files.contains_key(&relative) {
-                    return Err("session_conflict".into());
-                }
-            }
-        }
-    }
-    let mut files = Vec::new();
-    for (relative, text) in &m.files {
-        if !allowed(&m.agent, relative) {
-            return Err("session_invalid".into());
-        }
-        let path = home.join(relative);
-        let mut ancestor = path.parent();
-        while let Some(p) = ancestor {
-            if let Ok(meta) = fs::symlink_metadata(p) {
-                if meta.file_type().is_symlink() || !meta.is_dir() {
-                    return Err("unsafe_store".into());
-                }
-            }
-            if p == home {
-                break;
-            }
-            ancestor = p.parent();
-        }
-        let bytes = STANDARD.decode(text).map_err(|_| "session_invalid")?;
-        if path.exists() {
-            if storage::read(&path, MAX_RAW)? != bytes {
-                return Err("session_conflict".into());
-            }
-        } else {
-            files.push((path, bytes));
-        }
-    }
-    for (path, bytes) in &files {
-        ensure_directory(path.parent().ok_or("unsafe_store")?)?;
-        storage::immutable(path, bytes)?;
-    }
-    Ok(usize::from(!files.is_empty()))
 }
 fn children(root: &Path) -> Result<Vec<PathBuf>> {
     storage::directory(root)?;
@@ -279,6 +268,11 @@ fn sqlite_snapshot(path: &Path, staging: &Path) -> Result<Vec<u8>> {
     storage::read(tmp.path(), MAX_RAW)
 }
 fn encode(manifest: &Manifest) -> Result<String> {
+    #[cfg(test)]
+    ENCODE_CALLS.with(|calls| calls.set(calls.get() + 1));
+    if !manifest_paths_safe(manifest) {
+        return Err("session_invalid".into());
+    }
     if manifest.files.values().map(|s| s.len() as u64).sum::<u64>() > MAX_RAW - 1024 * 1024 {
         return Err("session_limit".into());
     }
@@ -310,7 +304,7 @@ fn decode(text: &str) -> Result<Manifest> {
         || !bundle::token(&m.session)
         || m.files.is_empty()
         || m.files.len() > 2048
-        || m.files.keys().any(|p| !allowed(&m.agent, p))
+        || !manifest_paths_safe(&m)
     {
         return Err("session_invalid".into());
     }
@@ -321,6 +315,51 @@ fn decode(text: &str) -> Result<Manifest> {
 struct Parts {
     sha256: String,
     ids: Vec<String>,
+}
+fn cached_native_baseline_complete(
+    batch: &crate::sync::ExportBatch<'_>,
+    stream: &Stream,
+    id: &str,
+) -> bool {
+    let Some(root) = batch.baseline(stream, id) else {
+        return false;
+    };
+    if !root.snapshot.files.contains_key("session.json") {
+        return false;
+    }
+    if root.snapshot.files.contains_key("session.gz.b64") {
+        return !root.snapshot.files.contains_key("session.parts.json");
+    }
+    let Some(parts) = root.snapshot.files.get("session.parts.json") else {
+        return false;
+    };
+    let Ok(parts) = serde_json::from_str::<Parts>(&parts.content) else {
+        return false;
+    };
+    if parts.ids.is_empty() || parts.ids.len() > 64 || !bundle::is_hash(&parts.sha256) {
+        return false;
+    }
+    let mut hash = Sha256::new();
+    let mut packed_len = 0u64;
+    for (i, part_id) in parts.ids.iter().enumerate() {
+        let part_stream = Stream {
+            agent: stream.agent.clone(),
+            profile: stream.profile.clone(),
+            conversation: format!("{}-p{i}", stream.conversation),
+        };
+        let Some(part) = batch.baseline(&part_stream, part_id) else {
+            return false;
+        };
+        let Some(content) = part.snapshot.files.get("session.part.b64") else {
+            return false;
+        };
+        packed_len += content.content.len() as u64;
+        if packed_len > MAX_PACKED * 4 / 3 + 4 {
+            return false;
+        }
+        hash.update(content.content.as_bytes());
+    }
+    format!("{:x}", hash.finalize()) == parts.sha256
 }
 fn publish(
     m: &Manifest,
@@ -549,7 +588,11 @@ fn capture_grok(root: &Path, directory: &Path) -> Result<Manifest> {
             let v: serde_json::Value =
                 serde_json::from_slice(&bytes).map_err(|_| "session_invalid")?;
             if name == "summary.json" {
-                cwd = v["cwd"].as_str().unwrap_or("").into();
+                cwd = v["info"]["cwd"]
+                    .as_str()
+                    .or_else(|| v["cwd"].as_str())
+                    .unwrap_or("")
+                    .into();
             }
         }
         files.insert(
@@ -564,6 +607,34 @@ fn capture_grok(root: &Path, directory: &Path) -> Result<Manifest> {
     if !directory.join("updates.jsonl").is_file() || !directory.join("summary.json").is_file() {
         return Err("session_invalid".into());
     }
+    let group = directory
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        .ok_or("session_invalid")?;
+    if group != crate::project_mapping::grok_group_for_cwd(&cwd) {
+        return Err("session_format_unsupported".into());
+    }
+    let marker = directory.parent().ok_or("session_invalid")?.join(".cwd");
+    if crate::project_mapping::grok_long_cwd(&cwd) && !marker.is_file() {
+        return Err("session_format_unsupported".into());
+    }
+    if marker.exists() && crate::project_mapping::grok_long_cwd(&cwd) {
+        let bytes = stable(&marker)?;
+        if bytes != cwd.as_bytes() {
+            return Err("session_invalid".into());
+        }
+        let relative = marker
+            .strip_prefix(root)
+            .map_err(|_| "session_invalid")?
+            .to_str()
+            .ok_or("session_invalid")?
+            .replace('\\', "/");
+        if !allowed("grok", &relative) {
+            return Err("session_invalid".into());
+        }
+        files.insert(relative, STANDARD.encode(bytes));
+    }
     Ok(Manifest {
         version: 1,
         agent: "grok".into(),
@@ -572,8 +643,182 @@ fn capture_grok(root: &Path, directory: &Path) -> Result<Manifest> {
         files,
     })
 }
+fn capture_handoff(h: &Handoff, staging: &Path) -> Result<Manifest> {
+    if !safe_relative(&h.main_file) || !allowed(&h.agent, &h.main_file) {
+        return Err("sync_journal_invalid".into());
+    }
+    let metadata = fs::symlink_metadata(&h.path).map_err(|_| "source_missing")?;
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("unsafe_store".into());
+    }
+    let file = h.path.join(&h.main_file);
+    safe_profile_file(&h.path, &h.main_file)?;
+    let m = if h.agent == "grok" {
+        capture_grok(&h.path, file.parent().ok_or("session_invalid")?)?
+    } else {
+        capture_file(&h.agent, &h.path, &file, staging)?
+    };
+    if m.session != h.session || m.agent != h.agent {
+        return Err("session_conflict".into());
+    }
+    if m.cwd != h.cwd {
+        return Err("project_mapping_required".into());
+    }
+    for relative in m.files.keys() {
+        safe_profile_file(&h.path, relative)?;
+    }
+    Ok(m)
+}
+fn safe_profile_file(root: &Path, relative: &str) -> Result<()> {
+    if !safe_relative(relative) {
+        return Err("unsafe_store".into());
+    }
+    let mut path = root.to_path_buf();
+    let components = relative.split('/').collect::<Vec<_>>();
+    for (index, component) in components.iter().enumerate() {
+        path.push(component);
+        let metadata = fs::symlink_metadata(&path).map_err(|_| "source_missing")?;
+        if metadata.file_type().is_symlink()
+            || (index + 1 < components.len() && !metadata.is_dir())
+            || (index + 1 == components.len() && !metadata.is_file())
+        {
+            return Err("unsafe_store".into());
+        }
+    }
+    Ok(())
+}
+fn profile_files(
+    base: &Path,
+    root: &Path,
+    depth: usize,
+    files: &mut BTreeSet<String>,
+) -> Result<()> {
+    if depth == 0 {
+        return Err("session_limit".into());
+    }
+    for entry in fs::read_dir(root).map_err(|_| "source_unreadable")? {
+        let path = entry.map_err(|_| "source_unreadable")?.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|_| "source_unreadable")?;
+        if metadata.file_type().is_symlink() {
+            return Err("unsafe_store".into());
+        }
+        if metadata.is_dir() {
+            profile_files(base, &path, depth - 1, files)?;
+        } else if metadata.is_file() {
+            let relative = path.strip_prefix(base).map_err(|_| "unsafe_store")?;
+            files.insert(relative.to_string_lossy().replace('\\', "/"));
+        } else {
+            return Err("unsafe_store".into());
+        }
+        if files.len() > 2048 {
+            return Err("session_limit".into());
+        }
+    }
+    Ok(())
+}
+fn publish_handoffs(
+    root: &Path,
+    agent: &str,
+    batch: &mut crate::sync::ExportBatch<'_>,
+    status: &mut SourceStatus,
+    stop: &impl Fn() -> bool,
+) -> Result<()> {
+    let mut registry = load_handoffs(root)?;
+    for index in 0..registry.entries.len() {
+        if registry.entries[index].agent != agent {
+            continue;
+        }
+        if stop() {
+            return Err("sync_paused".into());
+        }
+        let result: Result<()> = (|| {
+            let h = &registry.entries[index];
+            let manifest = capture_handoff(h, root)?;
+            let fingerprint = manifest_fingerprint(&manifest)?;
+            if fingerprint == h.fingerprint {
+                status.captured += 1;
+                return Ok(());
+            }
+            let conversation = bundle::hash(manifest.session.as_bytes());
+            let mut journal = Journal {
+                node: h.stream_profile.clone(),
+                bases: BTreeMap::from([(conversation, h.base.clone())]),
+                stamps: BTreeMap::new(),
+                content: BTreeMap::new(),
+            };
+            let id = publish(&manifest, batch, &mut journal, PART_SIZE)?;
+            let entry = &mut registry.entries[index];
+            entry.base = id;
+            entry.fingerprint = fingerprint;
+            save_handoffs(root, &registry)?;
+            status.captured += 1;
+            Ok(())
+        })();
+        if let Err(code) = result {
+            *status.issues.entry(code).or_default() += 1;
+        }
+    }
+    Ok(())
+}
+fn auto_prepare(
+    root: &Path,
+    bundle: &bundle::Bundle,
+    incoming: &Manifest,
+    mappings: &[crate::project_mapping::Mapping],
+) -> Result<usize> {
+    if bundle.snapshot.stream.agent == "agy" {
+        // A copied database is recoverable data, not a verified standalone CLI profile.
+        return Ok(0);
+    }
+    if incoming.agent != bundle.snapshot.stream.agent
+        || bundle::hash(incoming.session.as_bytes()) != bundle.snapshot.stream.conversation
+    {
+        return Err("session_invalid".into());
+    }
+    crate::project_mapping::validate_provider_group(incoming)?;
+    if usable_cwd(&incoming.cwd, mappings).is_none() {
+        return Err("project_mapping_required".into());
+    }
+    let manifest = crate::project_mapping::transform_manifest(incoming, mappings)?;
+    crate::project_mapping::validate_provider_group(&manifest)?;
+    let destination = root.join("managed-profiles").join(&bundle.id);
+    let registry = load_handoffs(root)?;
+    if let Some(h) = registry.entries.iter().find(|h| h.base == bundle.id) {
+        capture_handoff(h, root)?;
+        return Ok(0);
+    }
+    if let Some(h) = registry.entries.iter().find(|h| h.path == destination) {
+        capture_handoff(h, root)?;
+        return Ok(0);
+    }
+    if destination.exists() {
+        // Recover the narrow crash window after the profile rename but before
+        // the registry write, provided the new profile is still pristine.
+        storage::directory(&destination)?;
+        let mut found = BTreeSet::new();
+        profile_files(&destination, &destination, 8, &mut found)?;
+        if found != manifest.files.keys().cloned().collect() {
+            return Err("session_conflict".into());
+        }
+        for (relative, encoded) in &manifest.files {
+            if !allowed(&manifest.agent, relative)
+                || safe_profile_file(&destination, relative).is_err()
+                || storage::read(&destination.join(relative), MAX_RAW)?
+                    != STANDARD.decode(encoded).map_err(|_| "session_invalid")?
+            {
+                return Err("session_conflict".into());
+            }
+        }
+    } else {
+        storage::directory(&root.join("managed-profiles"))?;
+        restore_manifest(&manifest, &destination)?;
+    }
+    register_handoff(root, bundle, &manifest, &destination)?;
+    Ok(1)
+}
 // Explicit dependencies keep the native cycle fixture-testable without a Tauri runtime.
 #[allow(clippy::too_many_arguments)]
+#[cfg(test)]
 pub fn cycle(
     root: &Path,
     binding: &Binding,
@@ -584,7 +829,40 @@ pub fn cycle(
     direction: Direction,
     stop: impl Fn() -> bool,
 ) -> Result<SourceStatus> {
+    cycle_with_mappings(
+        root,
+        binding,
+        key,
+        remote,
+        agent,
+        source,
+        direction,
+        &[],
+        stop,
+    )
+}
+#[allow(clippy::too_many_arguments)]
+pub fn cycle_with_mappings(
+    root: &Path,
+    binding: &Binding,
+    key: &SpaceKey,
+    remote: &impl Objects,
+    agent: &str,
+    source: &Path,
+    direction: Direction,
+    mappings: &[crate::project_mapping::Mapping],
+    stop: impl Fn() -> bool,
+) -> Result<SourceStatus> {
+    crate::project_mapping::validate_mappings(mappings)?;
     storage::directory(root)?;
+    if paths_overlap(source, root)
+        || load_handoffs(root)?
+            .entries
+            .iter()
+            .any(|h| paths_overlap(source, &h.path))
+    {
+        return Err("overlapping_folder".into());
+    }
     let replica = Replica::open(&root.join("replica"), &binding.space)?;
     let jp = root.join("native-journal.json");
     let mut journal: Journal = if jp.exists() {
@@ -601,11 +879,12 @@ pub fn cycle(
         state: "complete".into(),
         ..Default::default()
     };
+    let mut missing_source = false;
     crate::progress::stage("scan", None);
     if !matches!(direction, Direction::Download) {
         let mut batch = replica.export_batch()?;
         if !source.is_dir() {
-            status.issues.insert("source_missing".into(), 1);
+            missing_source = true;
         } else {
             let sub = match agent {
                 "claude" | "claude-code" => "projects",
@@ -661,7 +940,30 @@ pub fn cycle(
                     } else {
                         capture_file(agent, source, &p, root)?
                     };
-                    publish(&m, &mut batch, &mut journal, PART_SIZE)?;
+                    let content_fingerprint = manifest_content_fingerprint(&m)?;
+                    let conversation = bundle::hash(m.session.as_bytes());
+                    let stream = Stream {
+                        agent: m.agent.clone(),
+                        profile: journal.node.clone(),
+                        conversation: conversation.clone(),
+                    };
+                    if journal.content.get(&stamp_key).is_some_and(|cached| {
+                        cached.fingerprint == content_fingerprint
+                            && journal.bases.get(&conversation) == Some(&cached.bundle)
+                            && cached_native_baseline_complete(&batch, &stream, &cached.bundle)
+                    }) {
+                        // Stable capture still ran, including SQLite WAL and companion files.
+                        // The validated baseline lets us avoid gzip and part construction.
+                        return Ok(());
+                    }
+                    let id = publish(&m, &mut batch, &mut journal, PART_SIZE)?;
+                    journal.content.insert(
+                        stamp_key.clone(),
+                        ContentBaseline {
+                            fingerprint: content_fingerprint,
+                            bundle: id,
+                        },
+                    );
                     journal.stamps.insert(stamp_key, stamp);
                     storage::replace(&jp, json(&journal)?.as_bytes())?;
                     Ok(())
@@ -674,6 +976,10 @@ pub fn cycle(
                 }
             }
         }
+        // Explicitly restored profiles have their own baseline and are never
+        // scanned as part of the default agent store. Edits form a new child
+        // snapshot of the bundle the user restored.
+        publish_handoffs(root, agent, &mut batch, &mut status, &stop)?;
     }
     if stop() {
         return Err("sync_paused".into());
@@ -703,7 +1009,7 @@ pub fn cycle(
         crate::progress::stage("restore", None);
         for b in all.values().filter(|b| {
             b.snapshot.stream.agent == agent
-                && b.snapshot.stream.profile != journal.node
+                && b.snapshot.device != replica.device_id()
                 && !parents.contains(&b.id)
                 && b.snapshot.files.contains_key("session.json")
         }) {
@@ -719,7 +1025,7 @@ pub fn cycle(
                 {
                     return Err("session_invalid".into());
                 }
-                install_missing(&m, source)
+                auto_prepare(root, b, &m, mappings)
             })();
             match result {
                 Ok(n) => status.restored += n,
@@ -728,6 +1034,9 @@ pub fn cycle(
                 }
             }
         }
+    }
+    if missing_source && status.captured == 0 && status.restored == 0 {
+        status.issues.insert("source_missing".into(), 1);
     }
     if !status.issues.is_empty() {
         status.state = "partial".into();
@@ -744,6 +1053,38 @@ pub struct Received {
     session: String,
     cwd: String,
     local_saved_at: Option<u64>,
+    parent_ids: Vec<String>,
+    origin_device: String,
+    generation: usize,
+    branch_count: usize,
+    managed_profile: Option<String>,
+    mapped_cwd: Option<String>,
+}
+fn usable_cwd(cwd: &str, mappings: &[crate::project_mapping::Mapping]) -> Option<String> {
+    if cwd.is_empty() {
+        return None;
+    }
+    let mapped = crate::project_mapping::remap_path(cwd, mappings)
+        .ok()
+        .flatten();
+    let candidate = mapped.unwrap_or_else(|| cwd.to_owned());
+    Path::new(&candidate).is_dir().then_some(candidate)
+}
+fn generation(id: &str, all: &BTreeMap<String, bundle::Bundle>, depth: usize) -> usize {
+    if depth > all.len() {
+        return 0;
+    }
+    all.get(id)
+        .map(|bundle| {
+            1 + bundle
+                .snapshot
+                .parents
+                .iter()
+                .map(|parent| generation(parent, all, depth + 1))
+                .max()
+                .unwrap_or(0)
+        })
+        .unwrap_or(0)
 }
 fn native_root(app: &tauri::AppHandle) -> Result<(PathBuf, String)> {
     let root = app
@@ -766,6 +1107,8 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
     tauri::async_runtime::spawn_blocking(move || {
         let (root, space) = native_root(&app)?;
         let mut entries = vec![];
+        let settings =
+            crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
         for agent in crate::model::AGENTS
             .iter()
             .filter(|a| **a != "agent-memory-os")
@@ -776,6 +1119,7 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
             }
             let replica = Replica::open(&p.join("replica"), &space)?;
             let all = replica.transport_bundles()?;
+            let handoffs = load_handoffs(&p)?;
             let parents: std::collections::BTreeSet<_> = all
                 .values()
                 .flat_map(|b| b.snapshot.parents.iter().cloned())
@@ -787,6 +1131,18 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
                 if let Some(meta) = b.snapshot.files.get("session.json") {
                     let v: serde_json::Value =
                         serde_json::from_str(&meta.content).map_err(|_| "session_invalid")?;
+                    let managed = handoffs
+                        .entries
+                        .iter()
+                        .find(|h| h.base == b.id && capture_handoff(h, &p).is_ok());
+                    let branch_count = all
+                        .values()
+                        .filter(|other| {
+                            other.snapshot.stream == b.snapshot.stream
+                                && !parents.contains(&other.id)
+                                && other.snapshot.files.contains_key("session.json")
+                        })
+                        .count();
                     entries.push(Received {
                         id: b.id.clone(),
                         agent: agent.to_string(),
@@ -801,6 +1157,19 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
                         .and_then(|m| m.modified().ok())
                         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                         .map(|d| d.as_secs()),
+                        parent_ids: b.snapshot.parents.clone(),
+                        origin_device: b.snapshot.device.clone(),
+                        generation: generation(&b.id, &all, 0),
+                        branch_count,
+                        managed_profile: managed.map(|h| h.path.to_string_lossy().into_owned()),
+                        mapped_cwd: managed
+                            .and_then(|h| Path::new(&h.cwd).is_dir().then(|| h.cwd.clone()))
+                            .or_else(|| {
+                                usable_cwd(
+                                    v["cwd"].as_str().unwrap_or(""),
+                                    &settings.project_mappings,
+                                )
+                            }),
                     });
                 }
             }
@@ -811,6 +1180,7 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
     .map_err(|_| "store_unavailable".to_string())?
 }
 /// Restore into a NEW child profile. Never replace a session in an existing/live store.
+#[cfg(test)]
 pub fn restore(
     bundle: &bundle::Bundle,
     all: &BTreeMap<String, bundle::Bundle>,
@@ -821,6 +1191,13 @@ pub fn restore(
     if m.agent != bundle.snapshot.stream.agent
         || bundle::hash(m.session.as_bytes()) != bundle.snapshot.stream.conversation
     {
+        return Err("session_invalid".into());
+    }
+    restore_manifest(&m, destination)?;
+    Ok(m)
+}
+fn restore_manifest(m: &Manifest, destination: &Path) -> Result<()> {
+    if !manifest_paths_safe(m) {
         return Err("session_invalid".into());
     }
     if destination.exists() {
@@ -839,9 +1216,39 @@ pub fn restore(
         let bytes = STANDARD.decode(text).map_err(|_| "session_invalid")?;
         storage::immutable(&path, &bytes)?;
     }
+    let mut identities = BTreeSet::new();
+    for relative in m.files.keys() {
+        let canonical =
+            fs::canonicalize(stage.path().join(relative)).map_err(|_| "unsafe_store")?;
+        if !identities.insert(canonical) {
+            return Err("session_invalid".into());
+        }
+    }
     // Unique child name and atomic rename keep partially restored profiles invisible.
     fs::rename(stage.path(), destination).map_err(|_| "restore_destination_exists")?;
-    Ok(m)
+    Ok(())
+}
+fn register_handoff(
+    root: &Path,
+    bundle: &bundle::Bundle,
+    manifest: &Manifest,
+    destination: &Path,
+) -> Result<()> {
+    let mut registry = load_handoffs(root)?;
+    if registry.entries.iter().any(|h| h.path == destination) {
+        return Err("restore_destination_exists".into());
+    }
+    registry.entries.push(Handoff {
+        path: destination.to_path_buf(),
+        agent: manifest.agent.clone(),
+        session: manifest.session.clone(),
+        main_file: main_file(manifest)?,
+        cwd: manifest.cwd.clone(),
+        stream_profile: bundle.snapshot.stream.profile.clone(),
+        base: bundle.id.clone(),
+        fingerprint: manifest_fingerprint(manifest)?,
+    });
+    save_handoffs(root, &registry)
 }
 #[tauri::command]
 pub async fn restore_received_session(
@@ -861,6 +1268,15 @@ pub async fn restore_received_session(
             return Ok(None);
         };
         let (root, space) = native_root(&app)?;
+        let settings =
+            crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
+        if paths_overlap(&folder, &root)
+            || crate::detect(Some(&settings))
+                .iter()
+                .any(|source| paths_overlap(&folder, Path::new(&source.path)))
+        {
+            return Err("overlapping_folder".into());
+        }
         let replica = Replica::open(
             &root
                 .join(format!("sessions-{agent}-{space}"))
@@ -869,8 +1285,35 @@ pub async fn restore_received_session(
         )?;
         let all = replica.transport_bundles()?;
         let b = all.get(&id).ok_or("session_invalid")?;
+        b.validate()?;
+        let incoming = unpack(b, &all)?;
+        if incoming.agent != agent
+            || bundle::hash(incoming.session.as_bytes()) != b.snapshot.stream.conversation
+        {
+            return Err("session_invalid".into());
+        }
+        let manifest = if agent == "agy" {
+            incoming
+        } else {
+            crate::project_mapping::validate_provider_group(&incoming)?;
+            if usable_cwd(&incoming.cwd, &settings.project_mappings).is_none() {
+                return Err("project_mapping_required".into());
+            }
+            let mapped =
+                crate::project_mapping::transform_manifest(&incoming, &settings.project_mappings)?;
+            crate::project_mapping::validate_provider_group(&mapped)?;
+            mapped
+        };
         let target = folder.join(format!("Bastet-{agent}-{}", uuid::Uuid::new_v4()));
-        restore(b, &all, &target)?;
+        restore_manifest(&manifest, &target)?;
+        if agent != "agy" {
+            register_handoff(
+                &root.join(format!("sessions-{agent}-{space}")),
+                b,
+                &manifest,
+                &target,
+            )?;
+        }
         Ok(Some(target.to_string_lossy().into()))
     })
     .await
@@ -972,6 +1415,21 @@ pub async fn review_received_session(
 mod tests {
     use super::*;
     use std::cell::{Cell, RefCell};
+    use std::collections::BTreeSet;
+    use std::io::Write;
+    #[derive(Serialize, Deserialize)]
+    struct ExchangeCase {
+        agent: String,
+        profile: String,
+        session: String,
+        marker: String,
+        cwd: String,
+        head: String,
+    }
+    #[derive(Serialize, Deserialize)]
+    struct ExchangeManifest {
+        cases: Vec<ExchangeCase>,
+    }
     struct Remote(RefCell<BTreeMap<String, bundle::Bundle>>, Cell<usize>);
     impl Objects for Remote {
         fn ids(&self, _: &str) -> Result<Vec<String>> {
@@ -1003,21 +1461,24 @@ mod tests {
                 write(root,&format!("sessions/2026/09/05/rollout-{id}.jsonl"),format!("{{\"type\":\"session_meta\",\"payload\":{{\"id\":\"{id}\",\"cwd\":\"/project\"}}}}\n{{\"type\":\"response_item\",\"payload\":{{\"text\":\"fixture\"}}}}\n").as_bytes());
             }
             "claude" | "claude-code" => {
-                write(root,&format!("projects/project/{id}.jsonl"),format!("{{\"type\":\"user\",\"sessionId\":\"{id}\",\"cwd\":\"/project\",\"message\":{{\"role\":\"user\",\"content\":\"fixture\"}}}}\n").as_bytes());
+                write(root,&format!("projects/-project/{id}.jsonl"),format!("{{\"type\":\"user\",\"sessionId\":\"{id}\",\"cwd\":\"/project\",\"message\":{{\"role\":\"user\",\"content\":\"fixture\"}}}}\n").as_bytes());
             }
             "pi" => {
-                write(root,&format!("sessions/project/2026-{id}.jsonl"),format!("{{\"type\":\"session\",\"version\":3,\"id\":\"{id}\",\"cwd\":\"/project\"}}\n").as_bytes());
+                write(root,&format!("sessions/--project--/2026-{id}.jsonl"),format!("{{\"type\":\"session\",\"version\":3,\"id\":\"{id}\",\"cwd\":\"/project\"}}\n").as_bytes());
             }
             "grok" => {
+                let group = crate::project_mapping::grok_group_for_cwd("/project");
                 write(
                     root,
-                    &format!("sessions/project/{id}/updates.jsonl"),
-                    b"{\"sessionUpdate\":\"user_message_chunk\"}\n",
+                    &format!("sessions/{group}/{id}/updates.jsonl"),
+                    format!("{}\n", serde_json::json!({"method":"session/update","params":{"sessionId":id,"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":"fixture"}}}})).as_bytes(),
                 );
                 write(
                     root,
-                    &format!("sessions/project/{id}/summary.json"),
-                    b"{\"cwd\":\"/project\"}",
+                    &format!("sessions/{group}/{id}/summary.json"),
+                    serde_json::json!({"info":{"id":id,"cwd":"/project"}})
+                        .to_string()
+                        .as_bytes(),
                 );
             }
             "agy" => {
@@ -1028,6 +1489,167 @@ mod tests {
             _ => unreachable!(),
         }
         write(root, "auth.json", b"secret-must-not-travel");
+    }
+    #[test]
+    fn full_capture_skips_compression_only_for_unchanged_validated_baseline() {
+        for agent in ["claude-code", "grok", "agy"] {
+            let temp = tempfile::tempdir().unwrap();
+            let home = temp.path().join("home");
+            fixture(agent, &home);
+            let root = temp.path().join("sync");
+            let binding = Binding {
+                folder: "folder".into(),
+                space: "space".into(),
+                proof: "proof".into(),
+            };
+            let key = SpaceKey::generate().unwrap();
+            let remote = Remote(
+                RefCell::new(BTreeMap::from([(
+                    "proof".into(),
+                    queue::proof_bundle("space").unwrap(),
+                )])),
+                Cell::new(0),
+            );
+            ENCODE_CALLS.with(|calls| calls.set(0));
+            let first = cycle(
+                &root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &home,
+                Direction::Upload,
+                || false,
+            )
+            .unwrap();
+            assert_eq!(first.published, 1, "{agent}: {:?}", first.issues);
+            assert_eq!(ENCODE_CALLS.with(Cell::get), 1, "{agent}");
+            let journal_path = root.join("native-journal.json");
+            let first_journal = fs::read(&journal_path).unwrap();
+            let journal: Journal = serde_json::from_slice(&first_journal).unwrap();
+            let base = journal.bases.values().next().unwrap().clone();
+            let second = cycle(
+                &root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &home,
+                Direction::Upload,
+                || false,
+            )
+            .unwrap();
+            assert_eq!(second.captured, 1, "{agent}: {:?}", second.issues);
+            assert_eq!(second.published, 0, "{agent}");
+            assert_eq!(ENCODE_CALLS.with(Cell::get), 1, "{agent}");
+            assert_eq!(fs::read(&journal_path).unwrap(), first_journal, "{agent}");
+
+            let session = "019f0000-0000-7000-8000-000000000001";
+            let mut agy_connection = None;
+            match agent {
+                "claude-code" => {
+                    write(
+                        &home,
+                        &format!("projects/-project/{session}/subagents/child.jsonl"),
+                        b"{\"type\":\"user\",\"message\":{\"content\":\"new companion\"}}\n",
+                    );
+                }
+                "grok" => {
+                    let group = crate::project_mapping::grok_group_for_cwd("/project");
+                    write(
+                        &home,
+                        &format!("sessions/{group}/{session}/summary.json"),
+                        serde_json::json!({"info":{"id":session,"cwd":"/project"},"summary":"changed companion"})
+                            .to_string()
+                            .as_bytes(),
+                    );
+                }
+                "agy" => {
+                    let file = home.join(format!("conversations/{session}.db"));
+                    let connection = rusqlite::Connection::open(file).unwrap();
+                    connection
+                        .execute_batch(
+                            "PRAGMA journal_mode=WAL; INSERT INTO steps VALUES(2,X'0304');",
+                        )
+                        .unwrap();
+                    agy_connection = Some(connection);
+                }
+                _ => unreachable!(),
+            }
+            let changed = cycle(
+                &root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &home,
+                Direction::Upload,
+                || false,
+            )
+            .unwrap();
+            assert_eq!(changed.published, 1, "{agent}: {:?}", changed.issues);
+            assert_eq!(ENCODE_CALLS.with(Cell::get), 2, "{agent}");
+            let all = Replica::open(&root.join("replica"), "space")
+                .unwrap()
+                .transport_bundles()
+                .unwrap();
+            let child = all
+                .values()
+                .find(|b| b.snapshot.parents == vec![base.clone()])
+                .unwrap();
+            assert_eq!(child.snapshot.stream.agent, agent);
+            drop(agy_connection);
+        }
+    }
+    #[test]
+    fn missing_cached_baseline_never_skips_compression() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        fixture("claude-code", &home);
+        let root = temp.path().join("sync");
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = SpaceKey::generate().unwrap();
+        let remote = Remote(
+            RefCell::new(BTreeMap::from([(
+                "proof".into(),
+                queue::proof_bundle("space").unwrap(),
+            )])),
+            Cell::new(0),
+        );
+        ENCODE_CALLS.with(|calls| calls.set(0));
+        cycle(
+            &root,
+            &binding,
+            &key,
+            &remote,
+            "claude-code",
+            &home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        let journal: Journal =
+            serde_json::from_slice(&fs::read(root.join("native-journal.json")).unwrap()).unwrap();
+        let base = journal.bases.values().next().unwrap();
+        fs::remove_file(root.join("replica/objects").join(format!("{base}.json"))).unwrap();
+        let result = cycle(
+            &root,
+            &binding,
+            &key,
+            &remote,
+            "claude-code",
+            &home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(ENCODE_CALLS.with(Cell::get), 2);
+        assert_eq!(result.issues.get("unknown_baseline"), Some(&1));
+        assert_eq!(result.published, 0);
     }
     #[test]
     #[ignore = "requires installed Grok and explicit synthetic fixture root; never reads default profiles"]
@@ -1181,8 +1803,14 @@ mod tests {
             )
             .unwrap();
             assert_eq!(r.received, 1);
-            assert_eq!(r.restored, 1);
+            // The synthetic cwd is intentionally absent on the receiving
+            // device. The snapshot remains available until a project mapping
+            // is configured; Agy is database recovery only.
+            assert_eq!(r.restored, 0);
             assert_eq!(r.available, 1);
+            if agent != "agy" {
+                assert_eq!(r.issues.get("project_mapping_required"), Some(&1));
+            }
             let rep = Replica::open(&b.join("replica"), "space").unwrap();
             let all = rep.transport_bundles().unwrap();
             let snapshot = all
@@ -1216,6 +1844,464 @@ mod tests {
                 0
             );
         }
+    }
+    #[test]
+    fn managed_handoff_roundtrip_keeps_causal_parents_and_original_files() {
+        use std::io::Write;
+        let temp = tempfile::tempdir().unwrap();
+        let a_home = temp.path().join("a-home");
+        let b_home = temp.path().join("b-home");
+        let a_root = temp.path().join("a-sync");
+        let b_root = temp.path().join("b-sync");
+        fixture("pi", &a_home);
+        fs::create_dir_all(&b_home).unwrap();
+        let original = fs::read(
+            a_home.join("sessions/--project--/2026-019f0000-0000-7000-8000-000000000001.jsonl"),
+        )
+        .unwrap();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = SpaceKey::generate().unwrap();
+        let remote = Remote(
+            RefCell::new(BTreeMap::from([(
+                "proof".into(),
+                queue::proof_bundle("space").unwrap(),
+            )])),
+            Cell::new(0),
+        );
+        cycle(
+            &a_root,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &a_home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        cycle(
+            &b_root,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &b_home,
+            Direction::Download,
+            || false,
+        )
+        .unwrap();
+        let b_replica = Replica::open(&b_root.join("replica"), "space").unwrap();
+        let b_all = b_replica.transport_bundles().unwrap();
+        let base = b_all
+            .values()
+            .find(|b| b.snapshot.files.contains_key("session.json"))
+            .unwrap()
+            .clone();
+        let base_manifest = unpack(&base, &b_all).unwrap();
+        drop(b_replica);
+        let b_profile = temp.path().join("b-branch");
+        restore_manifest(&base_manifest, &b_profile).unwrap();
+        register_handoff(&b_root, &base, &base_manifest, &b_profile).unwrap();
+        let branch_file = b_profile.join(main_file(&base_manifest).unwrap());
+        assert_eq!(
+            cycle(
+                &b_root,
+                &binding,
+                &key,
+                &remote,
+                "pi",
+                &temp.path().join("empty"),
+                Direction::Upload,
+                || false
+            )
+            .unwrap()
+            .published,
+            0
+        );
+        fs::create_dir_all(temp.path().join("empty")).unwrap();
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&branch_file)
+            .unwrap()
+            .write_all(b"{\"type\":\"message\",\"message\":\"B turn\"}\n")
+            .unwrap();
+        cycle(
+            &b_root,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &temp.path().join("empty"),
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        let b_after = Replica::open(&b_root.join("replica"), "space")
+            .unwrap()
+            .transport_bundles()
+            .unwrap();
+        let b_head = b_after
+            .values()
+            .find(|b| {
+                b.snapshot.parents == vec![base.id.clone()]
+                    && b.snapshot.files.contains_key("session.json")
+            })
+            .unwrap()
+            .clone();
+        assert_eq!(b_head.snapshot.stream, base.snapshot.stream);
+        assert_eq!(
+            cycle(
+                &b_root,
+                &binding,
+                &key,
+                &remote,
+                "pi",
+                &temp.path().join("empty"),
+                Direction::Upload,
+                || false
+            )
+            .unwrap()
+            .published,
+            0
+        );
+
+        cycle(
+            &a_root,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &a_home,
+            Direction::Download,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read(
+                a_home.join("sessions/--project--/2026-019f0000-0000-7000-8000-000000000001.jsonl")
+            )
+            .unwrap(),
+            original
+        );
+        let a_all = Replica::open(&a_root.join("replica"), "space")
+            .unwrap()
+            .transport_bundles()
+            .unwrap();
+        let a_b_head = a_all.get(&b_head.id).unwrap();
+        let b_manifest = unpack(a_b_head, &a_all).unwrap();
+        let a_profile = temp.path().join("a-branch");
+        restore_manifest(&b_manifest, &a_profile).unwrap();
+        register_handoff(&a_root, a_b_head, &b_manifest, &a_profile).unwrap();
+        fs::OpenOptions::new()
+            .append(true)
+            .open(a_profile.join(main_file(&b_manifest).unwrap()))
+            .unwrap()
+            .write_all(b"{\"type\":\"message\",\"message\":\"A return turn\"}\n")
+            .unwrap();
+        cycle(
+            &a_root,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &a_home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        let a_after = Replica::open(&a_root.join("replica"), "space")
+            .unwrap()
+            .transport_bundles()
+            .unwrap();
+        let a_head = a_after
+            .values()
+            .find(|b| {
+                b.snapshot.parents == vec![b_head.id.clone()]
+                    && b.snapshot.files.contains_key("session.json")
+            })
+            .unwrap();
+        let final_manifest = unpack(a_head, &a_after).unwrap();
+        let final_bytes = STANDARD
+            .decode(final_manifest.files.values().next().unwrap())
+            .unwrap();
+        let final_text = std::str::from_utf8(&final_bytes).unwrap();
+        assert!(final_text.contains("B turn") && final_text.contains("A return turn"));
+        assert_eq!(
+            fs::read(
+                a_home.join("sessions/--project--/2026-019f0000-0000-7000-8000-000000000001.jsonl")
+            )
+            .unwrap(),
+            original
+        );
+        cycle(
+            &b_root,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &b_home,
+            Direction::Download,
+            || false,
+        )
+        .unwrap();
+        assert!(!fs::read(&branch_file)
+            .unwrap()
+            .windows(b"A return turn".len())
+            .any(|v| v == b"A return turn"));
+    }
+    #[test]
+    fn mapped_receive_prepares_new_profile_and_pristine_capture_does_not_loop() {
+        use std::io::Write;
+        let temp = tempfile::tempdir().unwrap();
+        let a_home = temp.path().join("a-home");
+        let b_home = temp.path().join("b-home");
+        let a_root = temp.path().join("a-sync");
+        let b_root = temp.path().join("b-sync");
+        fixture("codex", &a_home);
+        let target_project = temp.path().join("receiving-project");
+        fs::create_dir_all(&target_project).unwrap();
+        let mappings = [crate::project_mapping::Mapping {
+            source: "/project".into(),
+            target: target_project.to_string_lossy().into_owned(),
+        }];
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = SpaceKey::generate().unwrap();
+        let remote = Remote(
+            RefCell::new(BTreeMap::from([(
+                "proof".into(),
+                queue::proof_bundle("space").unwrap(),
+            )])),
+            Cell::new(0),
+        );
+        cycle(
+            &a_root,
+            &binding,
+            &key,
+            &remote,
+            "codex",
+            &a_home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        let r = cycle_with_mappings(
+            &b_root,
+            &binding,
+            &key,
+            &remote,
+            "codex",
+            &b_home,
+            Direction::Both,
+            &mappings,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(r.restored, 1, "{:?}", r.issues);
+        assert_eq!(r.published, 0);
+        assert!(!b_home.exists());
+        assert!(!r.issues.contains_key("source_missing"));
+        let registry = load_handoffs(&b_root).unwrap();
+        assert_eq!(registry.entries.len(), 1);
+        let handoff = &registry.entries[0];
+        let file = handoff.path.join(&handoff.main_file);
+        let before = fs::read(&file).unwrap();
+        assert!(std::str::from_utf8(&before)
+            .unwrap()
+            .contains(target_project.to_str().unwrap()));
+        let r = cycle_with_mappings(
+            &b_root,
+            &binding,
+            &key,
+            &remote,
+            "codex",
+            &b_home,
+            Direction::Both,
+            &mappings,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(r.published, 0);
+        assert!(!r.issues.contains_key("source_missing"));
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&file)
+            .unwrap()
+            .write_all(b"{\"type\":\"response_item\",\"payload\":{\"text\":\"B continuation\"}}\n")
+            .unwrap();
+        let remote_before = remote.0.borrow().len();
+        let stops = Cell::new(0usize);
+        assert_eq!(
+            cycle_with_mappings(
+                &b_root,
+                &binding,
+                &key,
+                &remote,
+                "codex",
+                &b_home,
+                Direction::Both,
+                &mappings,
+                || {
+                    stops.set(stops.get() + 1);
+                    stops.get() == 2
+                },
+            )
+            .err()
+            .unwrap(),
+            "sync_paused"
+        );
+        assert_eq!(remote.0.borrow().len(), remote_before);
+        let r = cycle_with_mappings(
+            &b_root,
+            &binding,
+            &key,
+            &remote,
+            "codex",
+            &b_home,
+            Direction::Both,
+            &mappings,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(r.published, 1, "{:?}", r.issues);
+        let replica = Replica::open(&b_root.join("replica"), "space").unwrap();
+        let all = replica.transport_bundles().unwrap();
+        let child = all.values().find(|b| {
+            b.snapshot.parents == vec![handoff.base.clone()]
+                && b.snapshot.files.contains_key("session.json")
+        });
+        // The in-memory entry predates publication; the persisted registry advances.
+        assert!(child.is_some());
+        let registry = load_handoffs(&b_root).unwrap();
+        assert_eq!(registry.entries[0].base, child.unwrap().id);
+        assert_eq!(
+            fs::read(&file).unwrap().len(),
+            before.len()
+                + b"{\"type\":\"response_item\",\"payload\":{\"text\":\"B continuation\"}}\n".len()
+        );
+    }
+    #[test]
+    fn concurrent_restored_edits_keep_two_causal_heads() {
+        let t = tempfile::tempdir().unwrap();
+        let agent = "codex";
+        let session = "019f0000-0000-7000-8000-000000000001";
+        let a_home = t.path().join("a-home");
+        let a_project = t.path().join("a-project");
+        fs::create_dir_all(&a_project).unwrap();
+        let original_cwd = a_project.to_string_lossy().into_owned();
+        cross_fixture(agent, &a_home, &original_cwd, session, "base turn");
+        let original_file = a_home.join(cross_relative(agent, &original_cwd, session));
+        let original = fs::read(&original_file).unwrap();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = SpaceKey::generate().unwrap();
+        let remote = Remote(
+            RefCell::new(BTreeMap::from([(
+                "proof".into(),
+                queue::proof_bundle("space").unwrap(),
+            )])),
+            Cell::new(0),
+        );
+        let a_root = t.path().join("a-sync");
+        cycle(
+            &a_root,
+            &binding,
+            &key,
+            &remote,
+            agent,
+            &a_home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        let a_all = Replica::open(&a_root.join("replica"), "space")
+            .unwrap()
+            .transport_bundles()
+            .unwrap();
+        let base = cross_head(&a_all, agent).id.clone();
+        for branch in ["b", "c"] {
+            let root = t.path().join(format!("{branch}-sync"));
+            let missing_home = t.path().join(format!("{branch}-home"));
+            let project = t.path().join(format!("{branch}-project"));
+            fs::create_dir_all(&project).unwrap();
+            let mappings = [crate::project_mapping::Mapping {
+                source: original_cwd.clone(),
+                target: project.to_string_lossy().into_owned(),
+            }];
+            let result = cycle_with_mappings(
+                &root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &missing_home,
+                Direction::Download,
+                &mappings,
+                || false,
+            )
+            .unwrap();
+            assert_eq!(result.restored, 1, "{branch}: {:?}", result.issues);
+        }
+        for (branch, marker) in [("b", "B offline turn"), ("c", "C offline turn")] {
+            let root = t.path().join(format!("{branch}-sync"));
+            let missing_home = t.path().join(format!("{branch}-home"));
+            let project = t.path().join(format!("{branch}-project"));
+            let mappings = [crate::project_mapping::Mapping {
+                source: original_cwd.clone(),
+                target: project.to_string_lossy().into_owned(),
+            }];
+            let handoff = load_handoffs(&root).unwrap();
+            append_cross_turn(&handoff.entries[0], marker);
+            cycle_with_mappings(
+                &root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &missing_home,
+                Direction::Upload,
+                &mappings,
+                || false,
+            )
+            .unwrap();
+        }
+        let result = cycle(
+            &a_root,
+            &binding,
+            &key,
+            &remote,
+            agent,
+            &a_home,
+            Direction::Download,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(result.restored, 2, "{:?}", result.issues);
+        assert_eq!(fs::read(&original_file).unwrap(), original);
+        let all = Replica::open(&a_root.join("replica"), "space")
+            .unwrap()
+            .transport_bundles()
+            .unwrap();
+        let heads = all
+            .values()
+            .filter(|b| {
+                b.snapshot.parents == vec![base.clone()]
+                    && b.snapshot.files.contains_key("session.json")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(heads.len(), 2);
+        assert_eq!(heads[0].snapshot.stream, heads[1].snapshot.stream);
+        assert_eq!(load_handoffs(&a_root).unwrap().entries.len(), 2);
     }
     #[test]
     fn segmented_history_waits_for_every_part_and_reuses_unchanged_parts() {
@@ -1261,12 +2347,29 @@ mod tests {
         for b in all.values() {
             assert_eq!(key.open("space", &key.seal(b).unwrap()).unwrap(), *b);
         }
+        let stream = root.snapshot.stream.clone();
+        let batch = replica.export_batch().unwrap();
+        assert!(cached_native_baseline_complete(&batch, &stream, &id));
+        drop(batch);
+        fs::remove_file(
+            t.path()
+                .join("replica/objects")
+                .join(format!("{}.json", parts.ids[0])),
+        )
+        .unwrap();
+        let mut batch = replica.export_batch().unwrap();
+        assert!(!cached_native_baseline_complete(&batch, &stream, &id));
+        assert_eq!(
+            publish(&m, &mut batch, &mut journal, 64).unwrap_err(),
+            "unknown_baseline"
+        );
     }
     #[test]
     fn changing_and_malformed_sessions_report_partial_without_losing_good_ones() {
         let t = tempfile::tempdir().unwrap();
-        fixture("pi", t.path());
-        write(t.path(), "sessions/project/bad.jsonl", b"{incomplete");
+        let source = t.path().join("source");
+        fixture("pi", &source);
+        write(&source, "sessions/project/bad.jsonl", b"{incomplete");
         let binding = Binding {
             folder: "f".into(),
             space: "s".into(),
@@ -1286,7 +2389,7 @@ mod tests {
             &key,
             &remote,
             "pi",
-            t.path(),
+            &source,
             Direction::Upload,
             || false,
         )
@@ -1317,23 +2420,79 @@ mod tests {
         );
     }
     #[test]
-    fn conflicting_native_file_is_never_replaced_and_credentials_are_rejected() {
+    fn divergent_active_file_is_never_replaced_and_credentials_are_rejected() {
         let t = tempfile::tempdir().unwrap();
-        fixture("pi", t.path());
-        let mut paths = vec![];
-        walk(&t.path().join("sessions"), 4, &mut paths).unwrap();
-        let m = capture_file("pi", t.path(), &paths[0], t.path()).unwrap();
-        assert_eq!(install_missing(&m, t.path()).unwrap(), 0);
-        fs::write(&paths[0], b"active edits").unwrap();
-        assert_eq!(
-            install_missing(&m, t.path()).unwrap_err(),
-            "session_conflict"
+        let a_home = t.path().join("a-home");
+        let b_home = t.path().join("b-home");
+        fixture("codex", &a_home);
+        fixture("codex", &b_home);
+        let file =
+            b_home.join("sessions/2026/09/05/rollout-019f0000-0000-7000-8000-000000000001.jsonl");
+        let changed = [
+            fs::read(&file).unwrap(),
+            b"{\"type\":\"response_item\",\"payload\":{\"text\":\"local divergent turn\"}}\n"
+                .to_vec(),
+        ]
+        .concat();
+        fs::write(&file, &changed).unwrap();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = SpaceKey::generate().unwrap();
+        let remote = Remote(
+            RefCell::new(BTreeMap::from([(
+                "proof".into(),
+                queue::proof_bundle("space").unwrap(),
+            )])),
+            Cell::new(0),
         );
-        assert_eq!(fs::read(&paths[0]).unwrap(), b"active edits");
+        cycle(
+            &t.path().join("a-sync"),
+            &binding,
+            &key,
+            &remote,
+            "codex",
+            &a_home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        let project = t.path().join("project");
+        fs::create_dir_all(&project).unwrap();
+        let mappings = [crate::project_mapping::Mapping {
+            source: "/project".into(),
+            target: project.to_string_lossy().into_owned(),
+        }];
+        let result = cycle_with_mappings(
+            &t.path().join("b-sync"),
+            &binding,
+            &key,
+            &remote,
+            "codex",
+            &b_home,
+            Direction::Download,
+            &mappings,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(result.restored, 1, "{:?}", result.issues);
+        assert_eq!(fs::read(&file).unwrap(), changed);
+        assert_eq!(
+            load_handoffs(&t.path().join("b-sync"))
+                .unwrap()
+                .entries
+                .len(),
+            1
+        );
+        let mut paths = vec![];
+        walk(&a_home.join("sessions"), 4, &mut paths).unwrap();
+        let m = capture_file("codex", &a_home, &paths[0], t.path()).unwrap();
         let mut bad = m;
         bad.files = BTreeMap::from([("auth.json".into(), STANDARD.encode("credential"))]);
-        assert!(decode(&encode(&bad).unwrap()).is_err());
-        assert!(install_missing(&bad, t.path()).is_err());
+        assert!(encode(&bad).is_err());
+        assert!(restore_manifest(&bad, &t.path().join("bad-profile")).is_err());
     }
     #[test]
     fn traversal_and_symlinks_cannot_enter_restored_profiles() {
@@ -1353,6 +2512,395 @@ mod tests {
             let p = write(t.path(), "secret", b"secret");
             std::os::unix::fs::symlink(p, t.path().join("link")).unwrap();
             assert!(stable(&t.path().join("link")).is_err());
+        }
+    }
+    fn cross_relative(agent: &str, cwd: &str, session: &str) -> String {
+        let normalized = cwd.replace('\\', "/");
+        match agent {
+            "codex" => format!("sessions/2026/10/01/rollout-{session}.jsonl"),
+            "claude-code" => {
+                let group = cwd
+                    .chars()
+                    .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                    .collect::<String>();
+                format!("projects/{group}/{session}.jsonl")
+            }
+            "pi" => {
+                let group = normalized.trim_start_matches('/').replace(['/', ':'], "-");
+                format!("sessions/--{group}--/2026-{session}.jsonl")
+            }
+            "grok" => {
+                let group = crate::project_mapping::grok_group_for_cwd(cwd);
+                format!("sessions/{group}/{session}/updates.jsonl")
+            }
+            "agy" => format!("conversations/{session}.db"),
+            _ => unreachable!(),
+        }
+    }
+    fn cross_fixture(agent: &str, profile: &Path, cwd: &str, session: &str, marker: &str) {
+        let relative = cross_relative(agent, cwd, session);
+        let timestamp = "2026-10-01T00:00:00Z";
+        match agent {
+            "codex" => {
+                let lines = [
+                    serde_json::json!({"timestamp":timestamp,"type":"session_meta","payload":{"id":session,"timestamp":timestamp,"cwd":cwd,"originator":"codex_cli_rs","cli_version":"0.120.0","source":"cli","model_provider":"openai","git":null}}),
+                    serde_json::json!({"timestamp":timestamp,"type":"event_msg","payload":{"type":"user_message","message":marker,"images":[],"local_images":[],"text_elements":[]}}),
+                    serde_json::json!({"timestamp":timestamp,"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":marker}]}}),
+                ];
+                write(
+                    profile,
+                    &relative,
+                    format!(
+                        "{}\n",
+                        lines
+                            .iter()
+                            .map(serde_json::Value::to_string)
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                    .as_bytes(),
+                );
+            }
+            "pi" => {
+                let lines = [
+                    serde_json::json!({"type":"session","version":3,"id":session,"cwd":cwd,"timestamp":timestamp}),
+                    serde_json::json!({"type":"message","id":"m1","parentId":null,"timestamp":timestamp,"message":{"role":"user","content":[{"type":"text","text":marker}],"timestamp":1790812800000_i64}}),
+                ];
+                write(
+                    profile,
+                    &relative,
+                    format!(
+                        "{}\n",
+                        lines
+                            .iter()
+                            .map(serde_json::Value::to_string)
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                    .as_bytes(),
+                );
+            }
+            "claude-code" => {
+                let line = serde_json::json!({"type":"user","sessionId":session,"cwd":cwd,"uuid":"019f0000-0000-7000-8000-000000000100","parentUuid":null,"isSidechain":false,"timestamp":timestamp,"message":{"role":"user","content":marker}});
+                write(profile, &relative, format!("{line}\n").as_bytes());
+            }
+            "grok" => {
+                let update = serde_json::json!({"method":"session/update","params":{"sessionId":session,"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":marker}}}});
+                write(profile, &relative, format!("{update}\n").as_bytes());
+                write(
+                    profile,
+                    &relative.replace("updates.jsonl", "summary.json"),
+                    serde_json::json!({"info":{"id":session,"cwd":cwd},"created_at":1790812800,"updated_at":1790812800,"num_messages":1,"session_summary":"fixture","current_model_id":"grok-code-fast"})
+                        .to_string()
+                        .as_bytes(),
+                );
+                write(profile, &relative.replace("updates.jsonl", "chat_history.jsonl"), format!("{{\"type\":\"user\",\"content\":[{{\"type\":\"text\",\"text\":\"{marker}\"}}]}}\n").as_bytes());
+                if crate::project_mapping::grok_long_cwd(cwd) {
+                    write(
+                        profile,
+                        &relative.replace(&format!("/{session}/updates.jsonl"), "/.cwd"),
+                        cwd.as_bytes(),
+                    );
+                }
+            }
+            "agy" => {
+                let file = write(profile, &relative, b"");
+                let db = rusqlite::Connection::open(file).unwrap();
+                db.execute_batch("CREATE TABLE trajectory_meta(trajectory_id TEXT PRIMARY KEY); CREATE TABLE steps(idx INTEGER PRIMARY KEY, data BLOB);").unwrap();
+                db.execute("INSERT INTO trajectory_meta VALUES (?1)", [session])
+                    .unwrap();
+                db.execute("INSERT INTO steps VALUES (1, ?1)", [marker.as_bytes()])
+                    .unwrap();
+            }
+            _ => unreachable!(),
+        }
+    }
+    fn cross_key() -> SpaceKey {
+        SpaceKey::recover("bas1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA").unwrap()
+    }
+    fn cross_remote(input: Option<&Path>, agent: &str, key: &SpaceKey) -> Remote {
+        let mut objects =
+            BTreeMap::from([("proof".into(), queue::proof_bundle("cross-os").unwrap())]);
+        if let Some(input) = input {
+            for entry in fs::read_dir(input.join("objects").join(agent)).unwrap() {
+                let path = entry.unwrap().path();
+                let bundle = key.open("cross-os", &fs::read(path).unwrap()).unwrap();
+                objects.insert(bundle.id.clone(), bundle);
+            }
+        }
+        Remote(RefCell::new(objects), Cell::new(0))
+    }
+    fn cross_output(
+        output: &Path,
+        agent: &str,
+        key: &SpaceKey,
+        all: &BTreeMap<String, bundle::Bundle>,
+    ) {
+        let folder = output.join("objects").join(agent);
+        fs::create_dir_all(&folder).unwrap();
+        for bundle in all.values() {
+            storage::immutable(
+                &folder.join(format!("{}.sealed", bundle.id)),
+                &key.seal(bundle).unwrap(),
+            )
+            .unwrap();
+        }
+    }
+    fn cross_head<'a>(
+        all: &'a BTreeMap<String, bundle::Bundle>,
+        agent: &str,
+    ) -> &'a bundle::Bundle {
+        let parents = all
+            .values()
+            .flat_map(|b| b.snapshot.parents.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        all.values()
+            .filter(|b| {
+                b.snapshot.stream.agent == agent
+                    && b.snapshot.files.contains_key("session.json")
+                    && !parents.contains(&b.id)
+            })
+            .max_by_key(|b| b.snapshot.parents.len())
+            .unwrap()
+    }
+    #[test]
+    #[ignore = "requires explicit BASTET_HANDOFF_MODE and temporary artifact directories"]
+    fn cross_os_handoff_exchange() {
+        let mode = std::env::var("BASTET_HANDOFF_MODE").expect("produce, continue or verify mode");
+        let output = std::env::var_os("BASTET_HANDOFF_OUTPUT").map(PathBuf::from);
+        let input = std::env::var_os("BASTET_HANDOFF_INPUT").map(PathBuf::from);
+        let key = cross_key();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "cross-os".into(),
+            proof: "proof".into(),
+        };
+        let session = "019f0000-0000-7000-8000-000000000001";
+        let agents = ["codex", "claude-code", "pi", "grok", "agy"];
+        let marker_a = "BASTET_CROSS_OS_A";
+        let marker_b = "BASTET_CROSS_OS_B";
+        match mode.as_str() {
+            "produce" => {
+                let output = output.expect("BASTET_HANDOFF_OUTPUT");
+                fs::create_dir_all(&output).unwrap();
+                let temp = tempfile::tempdir().unwrap();
+                let mut cases = vec![];
+                for agent in agents {
+                    let profile_relative = format!("profiles/{agent}");
+                    let profile = output.join(&profile_relative);
+                    let project = output.join("projects").join(agent);
+                    fs::create_dir_all(&project).unwrap();
+                    let cwd = project.to_string_lossy().into_owned();
+                    cross_fixture(agent, &profile, &cwd, session, marker_a);
+                    let remote = cross_remote(None, agent, &key);
+                    let root = temp.path().join(format!("sync-{agent}"));
+                    let result = cycle(
+                        &root,
+                        &binding,
+                        &key,
+                        &remote,
+                        agent,
+                        &profile,
+                        Direction::Upload,
+                        || false,
+                    )
+                    .unwrap();
+                    assert_eq!(result.captured, 1, "{agent}: {:?}", result.issues);
+                    let all = Replica::open(&root.join("replica"), "cross-os")
+                        .unwrap()
+                        .transport_bundles()
+                        .unwrap();
+                    cross_output(&output, agent, &key, &all);
+                    cases.push(ExchangeCase {
+                        agent: agent.into(),
+                        profile: profile_relative,
+                        session: session.into(),
+                        marker: marker_a.into(),
+                        cwd,
+                        head: cross_head(&all, agent).id.clone(),
+                    });
+                }
+                fs::write(
+                    output.join("manifest.json"),
+                    json(&ExchangeManifest { cases }).unwrap(),
+                )
+                .unwrap();
+            }
+            "continue" | "verify" => {
+                let input = input.expect("BASTET_HANDOFF_INPUT");
+                let old: ExchangeManifest =
+                    serde_json::from_slice(&fs::read(input.join("manifest.json")).unwrap())
+                        .unwrap();
+                let temp = tempfile::tempdir().unwrap();
+                let mut cases = vec![];
+                for prior in old.cases {
+                    let agent = prior.agent.as_str();
+                    let remote = cross_remote(Some(&input), agent, &key);
+                    let root = temp.path().join(format!("sync-{agent}"));
+                    let home = temp.path().join(format!("active-{agent}"));
+                    fs::create_dir_all(&home).unwrap();
+                    let active = home.join("active-sentinel");
+                    fs::write(&active, b"untouched active store").unwrap();
+                    let project = if mode == "continue" {
+                        output
+                            .as_ref()
+                            .expect("BASTET_HANDOFF_OUTPUT")
+                            .join("projects")
+                            .join(agent)
+                    } else {
+                        temp.path().join("projects").join(agent)
+                    };
+                    fs::create_dir_all(&project).unwrap();
+                    let cwd = project.to_string_lossy().into_owned();
+                    let mappings = [crate::project_mapping::Mapping {
+                        source: prior.cwd.clone(),
+                        target: cwd.clone(),
+                    }];
+                    let result = cycle_with_mappings(
+                        &root,
+                        &binding,
+                        &key,
+                        &remote,
+                        agent,
+                        &home,
+                        Direction::Download,
+                        &mappings,
+                        || false,
+                    )
+                    .unwrap();
+                    assert_eq!(fs::read(&active).unwrap(), b"untouched active store");
+                    let all = Replica::open(&root.join("replica"), "cross-os")
+                        .unwrap()
+                        .transport_bundles()
+                        .unwrap();
+                    let head = cross_head(&all, agent).clone();
+                    if mode == "verify" {
+                        if agent != "agy" {
+                            assert_eq!(head.id, prior.head);
+                            assert_eq!(head.snapshot.parents.len(), 1);
+                            assert!(all.contains_key(&head.snapshot.parents[0]));
+                            assert_eq!(result.restored, 1, "{agent}: {:?}", result.issues);
+                            let handoff = load_handoffs(&root).unwrap();
+                            let m = capture_handoff(&handoff.entries[0], &root).unwrap();
+                            let content = m
+                                .files
+                                .values()
+                                .flat_map(|v| STANDARD.decode(v).unwrap())
+                                .collect::<Vec<_>>();
+                            assert!(content
+                                .windows(marker_a.len())
+                                .any(|v| v == marker_a.as_bytes()));
+                            assert!(content
+                                .windows(marker_b.len())
+                                .any(|v| v == marker_b.as_bytes()));
+                        } else {
+                            assert_eq!(result.restored, 0);
+                        }
+                        continue;
+                    }
+                    let output = output.as_ref().unwrap();
+                    fs::create_dir_all(output.join("profiles")).unwrap();
+                    let profile_relative = format!("profiles/{agent}");
+                    let profile = output.join(&profile_relative);
+                    if agent == "agy" {
+                        let m = unpack(&head, &all).unwrap();
+                        restore_manifest(&m, &profile).unwrap();
+                        cross_output(output, agent, &key, &all);
+                        cases.push(ExchangeCase {
+                            agent: prior.agent,
+                            profile: profile_relative,
+                            session: prior.session,
+                            marker: marker_a.into(),
+                            cwd: prior.cwd,
+                            head: prior.head,
+                        });
+                        continue;
+                    }
+                    assert_eq!(result.restored, 1, "{agent}: {:?}", result.issues);
+                    let handoff = load_handoffs(&root).unwrap();
+                    assert_eq!(handoff.entries.len(), 1);
+                    let h = &handoff.entries[0];
+                    append_cross_turn(h, marker_b);
+                    cycle_with_mappings(
+                        &root,
+                        &binding,
+                        &key,
+                        &remote,
+                        agent,
+                        &home,
+                        Direction::Upload,
+                        &mappings,
+                        || false,
+                    )
+                    .unwrap();
+                    let after = Replica::open(&root.join("replica"), "cross-os")
+                        .unwrap()
+                        .transport_bundles()
+                        .unwrap();
+                    let child = cross_head(&after, agent);
+                    assert_eq!(child.snapshot.parents, vec![prior.head.clone()]);
+                    let edited =
+                        capture_handoff(&load_handoffs(&root).unwrap().entries[0], &root).unwrap();
+                    restore_manifest(&edited, &profile).unwrap();
+                    cross_output(output, agent, &key, &after);
+                    cases.push(ExchangeCase {
+                        agent: prior.agent,
+                        profile: profile_relative,
+                        session: prior.session,
+                        marker: marker_b.into(),
+                        cwd,
+                        head: child.id.clone(),
+                    });
+                }
+                if mode == "continue" {
+                    let output = output.unwrap();
+                    fs::write(
+                        output.join("manifest.json"),
+                        json(&ExchangeManifest { cases }).unwrap(),
+                    )
+                    .unwrap();
+                }
+            }
+            _ => panic!("invalid BASTET_HANDOFF_MODE"),
+        }
+    }
+    fn append_cross_turn(h: &Handoff, marker: &str) {
+        let file = h.path.join(&h.main_file);
+        if h.agent == "codex" {
+            writeln!(
+                fs::OpenOptions::new().append(true).open(&file).unwrap(),
+                "{}",
+                serde_json::json!({"timestamp":"2026-10-01T00:01:00Z","type":"event_msg","payload":{"type":"user_message","message":marker,"images":[],"local_images":[],"text_elements":[]}})
+            ).unwrap();
+        }
+        let line = match h.agent.as_str() {
+            "codex" => {
+                serde_json::json!({"timestamp":"2026-10-01T00:01:00Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":marker}]}})
+            }
+            "pi" => {
+                serde_json::json!({"type":"message","id":"m2","parentId":"m1","timestamp":"2026-10-01T00:01:00Z","message":{"role":"user","content":[{"type":"text","text":marker}],"timestamp":1790812860000_i64}})
+            }
+            "claude-code" => {
+                serde_json::json!({"type":"user","sessionId":h.session,"cwd":h.cwd,"uuid":"019f0000-0000-7000-8000-000000000101","parentUuid":"019f0000-0000-7000-8000-000000000100","isSidechain":false,"timestamp":"2026-10-01T00:01:00Z","message":{"role":"user","content":marker}})
+            }
+            "grok" => {
+                serde_json::json!({"method":"session/update","params":{"sessionId":h.session,"update":{"sessionUpdate":"user_message_chunk","content":{"type":"text","text":marker}}}})
+            }
+            _ => unreachable!(),
+        };
+        writeln!(
+            fs::OpenOptions::new().append(true).open(&file).unwrap(),
+            "{line}"
+        )
+        .unwrap();
+        if h.agent == "grok" {
+            let history = file.with_file_name("chat_history.jsonl");
+            writeln!(
+                fs::OpenOptions::new().append(true).open(history).unwrap(),
+                "{}",
+                serde_json::json!({"type":"user","content":[{"type":"text","text":marker}]})
+            )
+            .unwrap();
         }
     }
 }

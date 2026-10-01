@@ -26,6 +26,8 @@ pub struct Settings {
     pub device_name: String,
     pub selected_agents: Vec<String>,
     pub custom_paths: HashMap<String, String>,
+    #[serde(default)]
+    pub project_mappings: Vec<crate::project_mapping::Mapping>,
     pub folder: String,
     pub direction: String,
     pub schedule: String,
@@ -44,6 +46,7 @@ impl Default for Settings {
             device_name: String::new(),
             selected_agents: vec![],
             custom_paths: HashMap::new(),
+            project_mappings: Vec::new(),
             folder: String::new(),
             direction: "bidirectional".into(),
             schedule: "near-realtime".into(),
@@ -112,6 +115,7 @@ pub fn discover(
 }
 
 pub fn validate(settings: &Settings) -> Result<(), String> {
+    crate::project_mapping::validate_mappings(&settings.project_mappings)?;
     settings.resources.validate()?;
     settings.portable.validate()?;
     if settings.schema != 1 || !LOCALES.contains(&settings.locale.as_str()) {

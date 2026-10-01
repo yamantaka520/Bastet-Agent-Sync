@@ -1,0 +1,22 @@
+name: Cross-OS fixture prerequisites
+description: Build the actual desktop library against isolated handoff fixtures
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: src-tauri
+        shared-key: cross-os-handoff
+    - name: Linux native dependencies
+      if: runner.os == 'Linux'
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libayatana-appindicator3-dev librsvg2-dev patchelf
+    - shell: bash
+      run: npm ci
+    - shell: bash
+      run: npm run build

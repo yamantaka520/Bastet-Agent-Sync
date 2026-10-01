@@ -1,6 +1,6 @@
 [package]
 name = "bastet-agent-sync"
-version = "0.5.1"
+version = "0.6.0"
 description = "Bastet Agent Sync desktop companion"
 authors = ["Bastet contributors"]
 edition = "2021"
@@ -41,3 +41,5 @@ rusqlite = { version = "0.38", features = ["bundled", "backup"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 toml = "0.8"
+unicode-normalization = "0.1"
+blake3 = "1"

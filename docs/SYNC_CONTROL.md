@@ -1,5 +1,7 @@
 # 🐈 Sync control center — 0.5.0
 
+Unreleased 0.6.0 adds [project mappings and managed conversation handoff](CROSS_OS_HANDOFF.md). Prepared versions are separate from default agent stores; continued edits retain their parent snapshot and divergent heads remain separately selectable. The snapshot library shows branch/version details and scoped continuation commands.
+
 [Five-language guides](../README.md#languages) · [Adapter contract](NATIVE_SESSIONS.md) · [Evidence](VALIDATION.md)
 
 ## Progress, history and devices
@@ -49,3 +51,13 @@ Grok's source-of-truth update format was checked against its [official storage i
 A folder containing several encrypted spaces can interrupt older clients with `wrong_space_or_version`. Isolated fixtures reproduce this condition; they do not establish physical two-computer acceptance.
 
 The fixture-tested fix separates `foreign_space`, `unsupported_encryption_version` and `encrypted_space_mismatch`. The configured proof remains strict. Only structurally valid non-proof foreign objects may be skipped, producing `foreign_space_objects`. Session, AMOS and portable results remain partial; device reports show an observer warning on the attempted refresh. Foreign ciphertext cannot be authenticated without its key and is never imported. Malformed public envelopes, wrong keys for the configured space, and unsupported versions remain fatal. Device refreshes independently verify the configured proof before remote reads or writes. Cached refreshes are throttled for 60 seconds.
+
+## Unreleased 0.6.0 performance
+
+Native captures use a content fingerprint to avoid repeating gzip compression and snapshot construction when the validated local baseline and captured contents are unchanged. Claude subagent files, Grok companion files and SQLite WAL-consistent snapshots are still read; unchanged parent-file timestamps do not hide companion changes. Failed publication does not advance the content checkpoint.
+
+Overlapping requests for the same cloud listing share the in-flight request. Later calls refresh the listing; this is not a time-based cache that hides subsequent changes. Object revision checks, fresh space-key proof reads and errors remain authoritative.
+
+Routine progress callbacks are coalesced to at most one every 100 ms per source. Stage changes, body starts, completion and scope exit flush immediately, including partial byte counts when a transfer exits early. This reduces worker-status lock and clone overhead without throttling data transfer or dropping accounting updates.
+
+These optimizations are in unreleased source. Measured fixture results are in [validation](VALIDATION.md); local counters and synthetic timing do not establish throughput for a user's Google Drive account or physical computers.
