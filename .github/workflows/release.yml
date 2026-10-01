@@ -13,12 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            bundles: app,dmg
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            bundles: app,dmg
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             bundles: deb,rpm,appimage
@@ -78,6 +72,15 @@ jobs:
           path: release-assets/*
           if-no-files-found: error
           retention-days: 14
+  macos:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/macos-signing.yml
+    secrets:
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   windows:
     permissions:
       contents: read
@@ -86,7 +89,7 @@ jobs:
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
   draft:
-    needs: [build, windows]
+    needs: [build, macos, windows]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4

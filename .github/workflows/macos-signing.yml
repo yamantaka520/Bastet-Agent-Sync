@@ -1,0 +1,84 @@
+name: macOS Developer ID signed packages
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      APPLE_CERTIFICATE:
+        required: true
+      APPLE_CERTIFICATE_PASSWORD:
+        required: true
+      APPLE_API_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: macos-signing-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  macos:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: arm64
+          - target: x86_64-apple-darwin
+            arch: x86_64
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      APPLE_API_KEY: ${{ vars.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
+      APPLE_SIGNING_IDENTITY: ${{ vars.APPLE_SIGNING_IDENTITY }}
+      APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import Developer ID certificate in an isolated keychain
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: bash scripts/macos-signing.sh prepare
+      - name: Check Apple notarization and signing access
+        run: bash scripts/macos-signing.sh probe
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: macos-signed-${{ matrix.target }}
+          cache-on-failure: true
+      - run: npm ci
+      - run: npm test
+      - run: python scripts/check_docs.py
+      - run: python scripts/test_release_assets.py
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Build Developer ID app, DMG and signed updater archive
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: npx tauri build --target ${{ matrix.target }} --bundles app,dmg --config src-tauri/tauri.release.conf.json --config "$BASTET_MACOS_SIGNING_CONFIG"
+      - name: Notarize DMG and verify all distributable forms
+        run: bash scripts/macos-signing.sh finish '${{ matrix.target }}' '${{ matrix.arch }}'
+      - name: Collect verified packages
+        run: python scripts/release_assets.py collect --target '${{ matrix.target }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove temporary signing material
+        if: always()
+        run: bash scripts/macos-signing.sh cleanup

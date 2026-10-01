@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — macOS Developer ID signing
+
+- Add isolated Apple Silicon and Intel Developer ID signing and notarization workflows, reused by release packaging. Require signed, notarized and Gatekeeper-accepted app, DMG and updater contents before upload.
+- Local certificate/private-key matching, real timestamped hardened-runtime probe signing and Apple notarization API authentication passed. Full package acceptance is pending the hosted run; existing releases are unchanged. Windows signing work is deferred.
+
 ## Unreleased — Windows publisher signing
 
 - Add a reusable Windows build workflow with GitHub OIDC and Microsoft Artifact Signing. Tauri signs application and installer binaries before updater signatures are generated. Signing failures block package upload and release drafting.

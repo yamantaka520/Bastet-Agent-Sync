@@ -1,5 +1,11 @@
 # Validation
 
+## macOS Developer ID signing — integration, 2026-10-01
+
+- The user switched scope to Apple signing/notarization and deferred Windows signing. The supplied Developer ID certificate matches its private key. A local probe signed successfully with an Apple-rooted chain, secure timestamp, expected team and hardened runtime; strict codesign verification passed. Temporary keychain state was restored afterward.
+- Apple notarization API authentication passed; an empty submission history is not evidence of a notarized app. Repository credentials were installed only after explicit authorization. No credential values were added to source.
+- Full Apple Silicon and Intel package acceptance remains pending the hosted workflow. Existing public release assets were not replaced. See [macOS signing contract](MACOS_SIGNING.md).
+
 ## Windows publisher signing — signing succeeds, trust blocked, 2026-09-09
 
 - Static workflow validation with actionlint, 23 Markdown files and 3 release-asset tests passed. The workflow requires valid Authenticode signatures and timestamps for package and installed files and rejects unsigned input.
