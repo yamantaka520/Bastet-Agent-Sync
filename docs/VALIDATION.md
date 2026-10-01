@@ -4,7 +4,9 @@
 
 - The user switched scope to Apple signing/notarization and deferred Windows signing. The supplied Developer ID certificate matches its private key. A local probe signed successfully with an Apple-rooted chain, secure timestamp, expected team and hardened runtime; strict codesign verification passed. Temporary keychain state was restored afterward.
 - Apple notarization API authentication passed; an empty submission history is not evidence of a notarized app. Repository credentials were installed only after explicit authorization. No credential values were added to source.
-- Full Apple Silicon and Intel package acceptance remains pending the hosted workflow. Existing public release assets were not replaced. See [macOS signing contract](MACOS_SIGNING.md).
+- [Initial run 36878828250](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/36878828250) authenticated and signed its probes, but the runtime-flag parser incorrectly expected a separate flags line. Commit `32dcd09` reads the actual CodeDirectory line; the corrected expression was verified against the real local signed probe.
+- [Run 36879098228](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/36879098228) passed signing preflight, frontend/Rust tests, documentation and release-asset checks for both targets, then compiled and submitted both apps to Apple. Submissions `36a46a1e-0061-4bfd-b97b-c1ddb219843f` and `44f50a60-4a0a-4a0c-8170-8f3a271e2071` remain **In Progress** as of this checkpoint; no Accepted result is claimed.
+- Static actionlint, shell syntax, 24 Markdown files and 3 release-asset tests passed. DMG notarization, stapled-ticket/Gatekeeper verification and verified artifact upload remain pending Apple's app decisions. Existing public release assets were not replaced. See [macOS signing contract](MACOS_SIGNING.md).
 
 ## Windows publisher signing — signing succeeds, trust blocked, 2026-09-09
 
