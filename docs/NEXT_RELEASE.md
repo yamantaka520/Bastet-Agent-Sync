@@ -1,4 +1,18 @@
-# 🐈 0.5.0 release checklist
+# 🐈 0.6.0 release checklist
+
+Authorized 2026-10-02: complete cross-platform CI and six directed round trips, actual model/tool continuation and return, measured performance/recovery, then verified installer publication. macOS requires Developer ID signing and notarization. Windows publisher signing remains explicitly deferred; updater signatures remain required.
+
+- [x] Isolated managed profiles, project mappings, preserved branches and five locales.
+- [x] Actual Codex, Claude Code, Pi and Grok model/tool continuation with encrypted return to a fresh receiving profile.
+- [x] Optimized 200-session fixture, restart/recovery checks and isolated real-Drive measurement with cleanup.
+- [ ] Complete three-platform CI and all six OS-to-OS return checks.
+- [ ] Complete the Agy restored-profile investigation; document its actual supported boundary.
+- [ ] Verify four installer targets, signatures, macOS notarization and installer smoke checks.
+- [ ] Publish and record the final delivery evidence in BastetMind.
+
+Measured results and limitations are recorded in [validation](VALIDATION.md). Agy is currently database recovery only. The installed user application and active agent stores are not acceptance-test targets.
+
+## 0.5.0 completed checklist
 
 Authorized 2026-09-06: finish the following features, update five-language documentation and BastetMind, then publish all installer targets. Apple notarization and Windows Authenticode are explicitly excluded. The user reports macOS in-app upgrade succeeded. Agy/Grok acceptance will use installed CLIs with isolated local profiles; a second physical computer is not required for this milestone.
 

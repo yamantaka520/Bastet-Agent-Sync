@@ -54,18 +54,30 @@ jobs:
         run: |
           set -euo pipefail
           image=$(find packages -name '*.dmg' -type f)
+          hdiutil verify "$image"
+          codesign --verify --strict "$image"
+          xcrun stapler validate "$image"
+          spctl --assess --type open --context context:primary-signature "$image"
           mount="$RUNNER_TEMP/bastet-dmg"
-          hdiutil attach "$image" -nobrowse -mountpoint "$mount"
+          mkdir -p "$mount"
+          hdiutil attach -readonly -nobrowse -mountpoint "$mount" "$image"
+          trap 'hdiutil detach "$mount" >/dev/null 2>&1 || true' EXIT
+          codesign --verify --deep --strict "$mount/Bastet Agent Sync.app"
+          xcrun stapler validate "$mount/Bastet Agent Sync.app"
+          spctl --assess --type execute "$mount/Bastet Agent Sync.app"
           ditto "$mount/Bastet Agent Sync.app" "$RUNNER_TEMP/Bastet Agent Sync.app"
           hdiutil detach "$mount"
+          trap - EXIT
           codesign --verify --deep --strict "$RUNNER_TEMP/Bastet Agent Sync.app"
+          xcrun stapler validate "$RUNNER_TEMP/Bastet Agent Sync.app"
+          spctl --assess --type execute "$RUNNER_TEMP/Bastet Agent Sync.app"
           file "$RUNNER_TEMP/Bastet Agent Sync.app/Contents/MacOS/bastet-agent-sync"
           "$RUNNER_TEMP/Bastet Agent Sync.app/Contents/MacOS/bastet-agent-sync" &
           app_pid=$!
           sleep 10
           kill -0 "$app_pid"
           kill "$app_pid"
-          echo 'DMG, ad-hoc signature and native launch passed on hosted macOS'
+          echo 'Notarized Developer ID DMG, stapled app and native launch passed on hosted macOS'
       - name: Minimal Ubuntu dependency installation
         if: runner.os == 'Linux'
         shell: bash

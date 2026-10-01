@@ -60,6 +60,15 @@ impl Objects for SyntheticRemote {
     fn ids(&self, _: &str) -> Result<Vec<String>> {
         Ok(self.objects.borrow().keys().cloned().collect())
     }
+    fn revisions(&self, _: &str) -> Result<Vec<(String, Option<String>)>> {
+        // Remote IDs are immutable; their IDs stand in for stable Drive revisions.
+        Ok(self
+            .objects
+            .borrow()
+            .keys()
+            .map(|id| (id.clone(), Some(id.clone())))
+            .collect())
+    }
     fn allocate(&self) -> Result<String> {
         let n = self.next.get();
         self.next.set(n + 1);
@@ -136,6 +145,31 @@ fn measure(
     };
     (phase, result)
 }
+#[allow(clippy::too_many_arguments)]
+fn cached_cycle(
+    root: &Path,
+    binding: &Binding,
+    key: &SpaceKey,
+    remote: &SyntheticRemote,
+    cache_root: &Path,
+    source: &Path,
+    direction: Direction,
+    mappings: &[crate::project_mapping::Mapping],
+) -> Result<SourceStatus> {
+    // A new wrapper per cycle mirrors worker restart; the cache directory persists.
+    let cached = queue::CachedObjects::new(remote, cache_root)?.with_fresh_object(&binding.proof);
+    cycle_with_mappings(
+        root,
+        binding,
+        key,
+        &cached,
+        "claude-code",
+        source,
+        direction,
+        mappings,
+        || false,
+    )
+}
 fn pseudo_text(len: usize, seed: u64) -> String {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut state = seed | 1;
@@ -205,6 +239,7 @@ fn assert_child(root: &Path, index: usize, parent: &str) {
 #[serde(rename_all = "camelCase")]
 struct Evidence {
     kind: &'static str,
+    transport: &'static str,
     platform: &'static str,
     architecture: &'static str,
     sessions: usize,
@@ -222,7 +257,9 @@ fn synthetic_volume_initial_warm_append_offline_retry_and_receive() {
     let home = temp.path().join("source");
     let source_bytes = create_source(&home);
     let root = temp.path().join("sync-a");
+    let cache_a = temp.path().join("cache-a");
     let receiver_root = temp.path().join("sync-b");
+    let cache_b = temp.path().join("cache-b");
     let receiver_home = temp.path().join("empty-receiver-home");
     let receiver_project = temp.path().join("receiver-project");
     fs::create_dir_all(&receiver_project).unwrap();
@@ -235,15 +272,15 @@ fn synthetic_volume_initial_warm_append_offline_retry_and_receive() {
     let remote = SyntheticRemote::new(&key);
     let mut phases = vec![];
     let (phase, result) = measure("initial_upload", &remote, || {
-        cycle(
+        cached_cycle(
             &root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_a,
             &home,
             Direction::Upload,
-            || false,
+            &[],
         )
     });
     let result = result.unwrap();
@@ -252,33 +289,49 @@ fn synthetic_volume_initial_warm_append_offline_retry_and_receive() {
     phases.push(phase);
     let base = base_for(&root, 0);
 
-    let (phase, result) = measure("warm_unchanged", &remote, || {
-        cycle(
+    let (phase, result) = measure("cache_population", &remote, || {
+        cached_cycle(
             &root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_a,
             &home,
             Direction::Upload,
-            || false,
+            &[],
         )
     });
     assert_eq!(result.unwrap().published, 0);
     assert_eq!(phase.put_count, 0);
     phases.push(phase);
-
-    append_turn(&home, 0, "BASTET_VOLUME_APPEND");
-    let (phase, result) = measure("append_upload", &remote, || {
-        cycle(
+    let (phase, result) = measure("warm_unchanged", &remote, || {
+        cached_cycle(
             &root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_a,
             &home,
             Direction::Upload,
-            || false,
+            &[],
+        )
+    });
+    assert_eq!(result.unwrap().published, 0);
+    assert_eq!(phase.put_count, 0);
+    assert_eq!(phase.get_count, 1, "proof must be fetched fresh");
+    phases.push(phase);
+
+    append_turn(&home, 0, "BASTET_VOLUME_APPEND");
+    let (phase, result) = measure("append_upload", &remote, || {
+        cached_cycle(
+            &root,
+            &binding,
+            &key,
+            &remote,
+            &cache_a,
+            &home,
+            Direction::Upload,
+            &[],
         )
     });
     assert_eq!(result.unwrap().published, 1);
@@ -289,30 +342,30 @@ fn synthetic_volume_initial_warm_append_offline_retry_and_receive() {
     append_turn(&home, 1, "BASTET_VOLUME_OFFLINE");
     remote.fault.set(Fault::BeforePut);
     let (phase, result) = measure("offline_before_put", &remote, || {
-        cycle(
+        cached_cycle(
             &root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_a,
             &home,
             Direction::Upload,
-            || false,
+            &[],
         )
     });
     assert_eq!(result.err().unwrap(), "network_unavailable");
     assert_eq!(phase.put_count, 0);
     phases.push(phase);
     let (phase, result) = measure("restart_retry", &remote, || {
-        cycle(
+        cached_cycle(
             &root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_a,
             &home,
             Direction::Upload,
-            || false,
+            &[],
         )
     });
     assert_eq!(result.unwrap().published, 1);
@@ -322,30 +375,30 @@ fn synthetic_volume_initial_warm_append_offline_retry_and_receive() {
     append_turn(&home, 2, "BASTET_VOLUME_AMBIGUOUS");
     remote.fault.set(Fault::AfterPut);
     let (phase, result) = measure("ambiguous_commit", &remote, || {
-        cycle(
+        cached_cycle(
             &root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_a,
             &home,
             Direction::Upload,
-            || false,
+            &[],
         )
     });
     assert_eq!(result.err().unwrap(), "network_unavailable");
     assert_eq!(phase.put_count, 1);
     phases.push(phase);
     let (phase, result) = measure("restart_after_ambiguous_commit", &remote, || {
-        cycle(
+        cached_cycle(
             &root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_a,
             &home,
             Direction::Upload,
-            || false,
+            &[],
         )
     });
     assert_eq!(result.unwrap().published, 0);
@@ -357,16 +410,15 @@ fn synthetic_volume_initial_warm_append_offline_retry_and_receive() {
         target: receiver_project.to_string_lossy().into_owned(),
     }];
     let (phase, result) = measure("receiver_download_restore", &remote, || {
-        cycle_with_mappings(
+        cached_cycle(
             &receiver_root,
             &binding,
             &key,
             &remote,
-            "claude-code",
+            &cache_b,
             &receiver_home,
             Direction::Download,
             &mapping,
-            || false,
         )
     });
     let result = result.unwrap();
@@ -389,6 +441,7 @@ fn synthetic_volume_initial_warm_append_offline_retry_and_receive() {
 
     let evidence = Evidence {
         kind: "isolated_synthetic_native_sync_core",
+        transport: "production_cached_objects_over_synthetic_remote",
         platform: std::env::consts::OS,
         architecture: std::env::consts::ARCH,
         sessions: SESSIONS,

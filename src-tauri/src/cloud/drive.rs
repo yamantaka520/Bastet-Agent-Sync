@@ -312,6 +312,42 @@ impl Drive {
             .map_err(|_| "network_unavailable")?;
         serde_json::from_slice(&read(r, 65536)?).map_err(|_| "drive_invalid_response".into())
     }
+    #[cfg(test)]
+    pub(crate) fn trash_created_test_folder(
+        &self,
+        folder: &str,
+        expected_name: &str,
+    ) -> Result<()> {
+        id(folder)?;
+        let suffix = expected_name
+            .strip_prefix("Bastet-test-")
+            .ok_or("invalid_folder_name")?;
+        uuid::Uuid::parse_str(suffix).map_err(|_| "invalid_folder_name")?;
+        let original = self.metadata(folder)?;
+        if original.id != folder
+            || original.name != expected_name
+            || original.mime_type != FOLDER
+            || original.trashed
+        {
+            return Err("test_folder_identity_mismatch".into());
+        }
+        self.check_token()?;
+        let response = self
+            .client
+            .patch(format!("{}/{}", self.files_url, folder))
+            .bearer_auth(self.token.value.as_str())
+            .query(&[("fields", "id,name,mimeType,trashed")])
+            .json(&json!({"trashed":true}))
+            .timeout(crate::resources::request_timeout())
+            .send()
+            .map_err(|_| "network_unavailable")?;
+        let updated: File = serde_json::from_slice(&read(response, 65536)?)
+            .map_err(|_| "drive_invalid_response")?;
+        if updated.id != folder || updated.name != expected_name || !updated.trashed {
+            return Err("test_folder_cleanup_failed".into());
+        }
+        Ok(())
+    }
     /// Returns only after Drive acknowledges. An uncertain response requires reconciliation by ID.
     pub fn upload(
         &self,

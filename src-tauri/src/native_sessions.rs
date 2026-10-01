@@ -1,6 +1,8 @@
 //! Allowlisted session snapshots. Receiving never writes into a live agent profile.
 #[cfg(test)]
 mod perf_tests;
+#[cfg(test)]
+mod real_drive_perf_tests;
 use crate::{
     cloud::{
         crypto::SpaceKey,
@@ -2603,7 +2605,7 @@ mod tests {
                 write(
                     profile,
                     &relative.replace("updates.jsonl", "summary.json"),
-                    serde_json::json!({"info":{"id":session,"cwd":cwd},"created_at":1790812800,"updated_at":1790812800,"num_messages":1,"session_summary":"fixture","current_model_id":"grok-code-fast"})
+                    serde_json::json!({"info":{"id":session,"cwd":cwd},"created_at":timestamp,"updated_at":timestamp,"last_active_at":timestamp,"num_messages":1,"num_chat_messages":1,"next_trace_turn":1,"chat_format_version":1,"session_kind":"headless","reasoning_effort":"high","sandbox_profile":"off","session_summary":"fixture","current_model_id":"grok-4.6"})
                         .to_string()
                         .as_bytes(),
                 );
@@ -2877,6 +2879,228 @@ mod tests {
             _ => panic!("invalid BASTET_HANDOFF_MODE"),
         }
     }
+
+    /// Opt-in proof that a model's real turn in an isolated restored profile can
+    /// return to a fresh replica as a causal child of the transferred head.
+    #[test]
+    #[ignore = "requires BASTET_LIVE_RETURN_INPUT with isolated live-model fixtures"]
+    fn live_model_return_exchange() {
+        let input =
+            PathBuf::from(std::env::var_os("BASTET_LIVE_RETURN_INPUT").expect("fixture root"))
+                .canonicalize()
+                .unwrap();
+        let mut temp_roots = vec![std::env::temp_dir()];
+        #[cfg(unix)]
+        temp_roots.push(PathBuf::from("/tmp"));
+        assert!(temp_roots
+            .iter()
+            .filter_map(|root| root.canonicalize().ok())
+            .any(|root| input.starts_with(root)));
+        let mut live_cases = vec![
+            ("codex", "BASTET_LIVE_CODEX_OK", input.clone()),
+            ("claude-code", "BASTET_LIVE_CLAUDE_OK", input.clone()),
+            ("pi", "BASTET_LIVE_PI_OK", input.clone()),
+        ];
+        if let Some(grok) = std::env::var_os("BASTET_LIVE_RETURN_GROK_INPUT") {
+            live_cases.push((
+                "grok",
+                "BASTET_LIVE_GROK_OK",
+                PathBuf::from(grok).canonicalize().unwrap(),
+            ));
+        }
+        let key = cross_key();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "cross-os".into(),
+            proof: "proof".into(),
+        };
+        let temp = tempfile::tempdir().unwrap();
+        for (agent, live_marker, input) in live_cases {
+            assert!(temp_roots
+                .iter()
+                .filter_map(|root| root.canonicalize().ok())
+                .any(|root| input.starts_with(root)));
+            let manifest: ExchangeManifest =
+                serde_json::from_slice(&fs::read(input.join("manifest.json")).unwrap()).unwrap();
+            let prior = manifest.cases.iter().find(|c| c.agent == agent).unwrap();
+            assert_eq!(prior.marker, "BASTET_CROSS_OS_B");
+            let profile = input.join(&prior.profile).canonicalize().unwrap();
+            assert!(profile.starts_with(&input));
+            assert!(Path::new(&prior.cwd)
+                .canonicalize()
+                .unwrap()
+                .starts_with(&input));
+            let remote = cross_remote(Some(&input), agent, &key);
+            let b_root = temp.path().join(format!("b-sync-{agent}"));
+            let b_home = temp.path().join(format!("b-home-{agent}"));
+            let restored = cycle_with_mappings(
+                &b_root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &b_home,
+                Direction::Download,
+                &[],
+                || false,
+            )
+            .unwrap();
+            assert_eq!(restored.restored, 1, "{agent}: {:?}", restored.issues);
+            let registry = load_handoffs(&b_root).unwrap();
+            assert_eq!(registry.entries.len(), 1);
+            let handoff = &registry.entries[0];
+            assert_eq!(handoff.base, prior.head);
+            let before = capture_handoff(handoff, &b_root).unwrap();
+            let baseline = manifest_content_fingerprint(&before).unwrap();
+            assert_eq!(before.session, prior.session);
+            for relative in before.files.keys() {
+                assert!(allowed(agent, relative));
+                safe_profile_file(&profile, relative).unwrap();
+                safe_profile_file(&handoff.path, relative).unwrap();
+                fs::copy(profile.join(relative), handoff.path.join(relative)).unwrap();
+            }
+            let edited = capture_handoff(handoff, &b_root).unwrap();
+            assert_ne!(manifest_content_fingerprint(&edited).unwrap(), baseline);
+            assert_eq!(edited.session, prior.session);
+            let live = STANDARD
+                .decode(edited.files.get(&handoff.main_file).unwrap())
+                .unwrap();
+            for marker in ["BASTET_CROSS_OS_A", "BASTET_CROSS_OS_B", live_marker] {
+                assert!(
+                    live.windows(marker.len()).any(|w| w == marker.as_bytes()),
+                    "{agent}: missing {marker}"
+                );
+            }
+            assert!(
+                live_turn_has_tool_result(agent, &live),
+                "{agent}: missing tool result"
+            );
+            if agent == "grok" {
+                let history = handoff
+                    .main_file
+                    .replace("updates.jsonl", "chat_history.jsonl");
+                let bytes = STANDARD
+                    .decode(edited.files.get(&history).unwrap())
+                    .unwrap();
+                assert!(std::str::from_utf8(&bytes).unwrap().lines().any(|line| {
+                    serde_json::from_str::<serde_json::Value>(line)
+                        .is_ok_and(|record| record["type"] == "tool_result")
+                }));
+            }
+
+            let published = cycle_with_mappings(
+                &b_root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &b_home,
+                Direction::Upload,
+                &[],
+                || false,
+            )
+            .unwrap();
+            assert_eq!(published.published, 1, "{agent}: {:?}", published.issues);
+            let b_all = Replica::open(&b_root.join("replica"), "cross-os")
+                .unwrap()
+                .transport_bundles()
+                .unwrap();
+            let child = cross_head(&b_all, agent);
+            assert_eq!(child.snapshot.parents, vec![prior.head.clone()]);
+
+            let a_root = temp.path().join(format!("a-sync-{agent}"));
+            let a_home = temp.path().join(format!("a-home-{agent}"));
+            let a_project = temp.path().join(format!("a-project-{agent}"));
+            fs::create_dir_all(&a_project).unwrap();
+            let a_mappings = [crate::project_mapping::Mapping {
+                source: prior.cwd.clone(),
+                target: a_project.to_string_lossy().into_owned(),
+            }];
+            let received = cycle_with_mappings(
+                &a_root,
+                &binding,
+                &key,
+                &remote,
+                agent,
+                &a_home,
+                Direction::Download,
+                &a_mappings,
+                || false,
+            )
+            .unwrap();
+            assert_eq!(received.restored, 1, "{agent}: {:?}", received.issues);
+            let a_all = Replica::open(&a_root.join("replica"), "cross-os")
+                .unwrap()
+                .transport_bundles()
+                .unwrap();
+            assert_eq!(cross_head(&a_all, agent).id, child.id);
+            let a_registry = load_handoffs(&a_root).unwrap();
+            let returned = capture_handoff(&a_registry.entries[0], &a_root).unwrap();
+            assert_eq!(returned.session, prior.session);
+            let returned_bytes = STANDARD
+                .decode(
+                    returned
+                        .files
+                        .get(&a_registry.entries[0].main_file)
+                        .unwrap(),
+                )
+                .unwrap();
+            for marker in ["BASTET_CROSS_OS_A", "BASTET_CROSS_OS_B", live_marker] {
+                assert!(
+                    returned_bytes
+                        .windows(marker.len())
+                        .any(|w| w == marker.as_bytes()),
+                    "{agent}: missing return {marker}"
+                );
+            }
+            assert!(live_turn_has_tool_result(agent, &returned_bytes));
+            if agent == "grok" {
+                let history = a_registry.entries[0]
+                    .main_file
+                    .replace("updates.jsonl", "chat_history.jsonl");
+                let bytes = STANDARD
+                    .decode(returned.files.get(&history).unwrap())
+                    .unwrap();
+                assert!(std::str::from_utf8(&bytes).unwrap().lines().any(|line| {
+                    serde_json::from_str::<serde_json::Value>(line)
+                        .is_ok_and(|record| record["type"] == "tool_result")
+                }));
+            }
+            println!(
+                "LIVE_RETURN_PASS {agent} session={} parent={} child={}",
+                prior.session, prior.head, child.id
+            );
+        }
+    }
+
+    fn live_turn_has_tool_result(agent: &str, bytes: &[u8]) -> bool {
+        std::str::from_utf8(bytes).unwrap().lines().any(|line| {
+            let Ok(record) = serde_json::from_str::<serde_json::Value>(line) else {
+                return false;
+            };
+            match agent {
+                "codex" => {
+                    record["type"] == "response_item"
+                        && record["payload"]["type"] == "custom_tool_call_output"
+                }
+                "claude-code" => {
+                    record["type"] == "user"
+                        && record["message"]["content"]
+                            .as_array()
+                            .is_some_and(|parts| {
+                                parts.iter().any(|part| part["type"] == "tool_result")
+                            })
+                }
+                "pi" => record["type"] == "message" && record["message"]["role"] == "toolResult",
+                "grok" => {
+                    record["method"] == "session/update"
+                        && record["params"]["update"]["sessionUpdate"] == "tool_call_update"
+                        && !record["params"]["update"]["rawOutput"].is_null()
+                }
+                _ => false,
+            }
+        })
+    }
     fn append_cross_turn(h: &Handoff, marker: &str) {
         let file = h.path.join(&h.main_file);
         if h.agent == "codex" {
@@ -2914,6 +3138,14 @@ mod tests {
                 serde_json::json!({"type":"user","content":[{"type":"text","text":marker}]})
             )
             .unwrap();
+            let summary = file.with_file_name("summary.json");
+            let mut value: serde_json::Value =
+                serde_json::from_slice(&fs::read(&summary).unwrap()).unwrap();
+            value["updated_at"] = "2026-10-01T00:01:00Z".into();
+            value["last_active_at"] = "2026-10-01T00:01:00Z".into();
+            value["num_messages"] = 2.into();
+            value["num_chat_messages"] = 2.into();
+            fs::write(summary, value.to_string()).unwrap();
         }
     }
 }

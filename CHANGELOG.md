@@ -3,6 +3,7 @@
 ## Unreleased — 0.6.0 cross-OS conversation handoff and sync performance
 
 - Avoid repeated compression of unchanged native captures, coalesce overlapping cloud listings and throttle routine progress notifications while preserving final counters. See [sync controls](docs/SYNC_CONTROL.md) for cache and validation boundaries.
+- Verify isolated real-Drive upload, cache reuse, append and receive/restore with synthetic sessions, plus actual Pi, Claude Code, Codex and Grok model/tool continuation and encrypted return. Measurements and remaining provider/platform gates are recorded in [validation](docs/VALIDATION.md).
 - Prepare received versions in separate managed profiles, track continued edits as descendants of the received snapshot, and preserve concurrent branches. Default agent stores are no longer import targets.
 - Add saved project mappings, provider-specific path translation, version/branch details and scoped POSIX/PowerShell continuation commands for Codex, Claude Code, Pi and Grok. New receiving computers can select an agent before its default data folder exists.
 - Reject cross-platform filename and case/Unicode/path collisions in native and portable payloads before restoration.

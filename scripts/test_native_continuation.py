@@ -181,6 +181,13 @@ def grok_read(binary: str, profile: Path, session: str, marker: str,
         summary = json.loads(summaries[0].read_text(encoding="utf-8"))
         if not same_working_directory(summary.get("info", {}).get("cwd"), expected_cwd):
             raise AssertionError("Grok summary retained the old working directory")
+    listed = subprocess.run(
+        [binary, "sessions", "list"], cwd=expected_cwd or sandbox,
+        env=isolated_environment(sandbox, profile),
+        capture_output=True, text=True, timeout=20, check=True,
+    )
+    if session not in listed.stdout:
+        raise AssertionError("Grok sessions list did not discover the restored session")
     result = subprocess.run(
         [binary, "export", session], cwd=sandbox,
         env=isolated_environment(sandbox, profile),

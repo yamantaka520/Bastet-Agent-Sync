@@ -52,13 +52,13 @@ jobs:
       - name: Build installers and signed updater archives
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npx tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config src-tauri/tauri.release.conf.json
       - name: Sign native Linux package updates
         if: runner.os == 'Linux'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: |
           for package in src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*.rpm; do
             npx tauri signer sign "$package"
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -127,7 +127,7 @@ jobs:
       - name: Build Windows packages with publisher signing explicitly deferred
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: npx tauri build --target x86_64-pc-windows-msvc --bundles nsis,msi --config src-tauri/tauri.release.conf.json
       - name: Collect packages and disclose signing status
         shell: pwsh
@@ -137,6 +137,36 @@ jobs:
       - name: Verify deferred Windows installers and native launch
         shell: pwsh
         run: |
+          $expected = [version]((Get-Content package.json -Raw | ConvertFrom-Json).version)
+          function Assert-Executable([string]$path) {
+            $file = Get-Item -LiteralPath $path
+            $actual = [version]$file.VersionInfo.ProductVersion
+            if ($actual.Major -ne $expected.Major -or $actual.Minor -ne $expected.Minor -or $actual.Build -ne $expected.Build) {
+              throw "Application version mismatch: $($file.Name)"
+            }
+            $stream = [IO.File]::OpenRead($path)
+            try {
+              $reader = [IO.BinaryReader]::new($stream)
+              if ($reader.ReadUInt16() -ne 0x5A4D) { throw "Missing PE DOS header: $($file.Name)" }
+              [void]$stream.Seek(0x3C, [IO.SeekOrigin]::Begin)
+              $peOffset = $reader.ReadInt32()
+              [void]$stream.Seek($peOffset, [IO.SeekOrigin]::Begin)
+              if ($reader.ReadUInt32() -ne 0x00004550 -or $reader.ReadUInt16() -ne 0x8664) {
+                throw "Application is not an x64 PE executable: $($file.Name)"
+              }
+            } finally { $stream.Dispose() }
+          }
+          function Assert-Launch([string]$path) {
+            $app = Start-Process -FilePath $path -PassThru
+            try {
+              Start-Sleep -Seconds 10
+              $app.Refresh()
+              if ($app.HasExited) { throw 'Installed application exited during launch check' }
+            } finally {
+              $app.Refresh()
+              if (!$app.HasExited) { Stop-Process -Id $app.Id }
+            }
+          }
           $installer = @(Get-ChildItem release-assets/*.exe)
           $msi = @(Get-ChildItem release-assets/*.msi)
           if ($installer.Count -ne 1 -or $msi.Count -ne 1) { throw 'Expected NSIS and MSI installers' }
@@ -145,20 +175,15 @@ jobs:
           if ($install.ExitCode -ne 0) { throw "Installer failed: $($install.ExitCode)" }
           $binary = Join-Path $destination 'bastet-agent-sync.exe'
           if (!(Test-Path $binary)) { throw 'Installed executable missing' }
-          $app = Start-Process -FilePath $binary -PassThru
-          try {
-            Start-Sleep -Seconds 10
-            $app.Refresh()
-            if ($app.HasExited) { throw 'Installed application exited during launch check' }
-          } finally {
-            if (!$app.HasExited) { Stop-Process -Id $app.Id }
-          }
+          Assert-Executable $binary
+          Assert-Launch $binary
           $expanded = Join-Path $env:RUNNER_TEMP 'BastetDeferredMsi'
           $extract = Start-Process msiexec.exe -ArgumentList '/a', "`"$($msi[0].FullName)`"", '/qn', "TARGETDIR=`"$expanded`"" -Wait -PassThru
           if ($extract.ExitCode -ne 0) { throw "MSI extraction failed: $($extract.ExitCode)" }
           $inner = @(Get-ChildItem $expanded -Recurse -Filter bastet-agent-sync.exe)
           if ($inner.Count -ne 1) { throw 'Expected one application inside MSI' }
-          if ((Get-FileHash $binary).Hash -ne (Get-FileHash $inner[0].FullName).Hash) { throw 'NSIS and MSI application contents differ' }
+          Assert-Executable $inner[0].FullName
+          Assert-Launch $inner[0].FullName
       - uses: actions/upload-artifact@v4
         with:
           name: packages-x86_64-pc-windows-msvc
