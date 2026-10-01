@@ -822,9 +822,9 @@ mod tests {
 
         let deep = target
             .path()
-            .join("a".repeat(75))
-            .join("b".repeat(75))
-            .join("c".repeat(75));
+            .join("測".repeat(12))
+            .join("試".repeat(12))
+            .join("案".repeat(12));
         fs::create_dir_all(&deep).unwrap();
         let mut short = one(
             "grok",

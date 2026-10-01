@@ -53,6 +53,16 @@ def isolated_environment(sandbox: Path, profile: Path) -> dict[str, str]:
     return environment
 
 
+def same_working_directory(actual: object, expected: str) -> bool:
+    """Compare existing native directories, including Windows separators/case/prefixes."""
+    if not isinstance(actual, str) or not Path(actual).is_absolute():
+        return False
+    try:
+        return os.path.samefile(actual, expected)
+    except (OSError, ValueError):
+        return False
+
+
 def codex_read(binary: str, profile: Path, session: str, marker: str,
                sandbox: Path, expected_cwd: str | None) -> None:
     environment = isolated_environment(sandbox, profile)
@@ -98,10 +108,11 @@ def codex_read(binary: str, profile: Path, session: str, marker: str,
                 continue
             if "error" in response:
                 raise AssertionError(f"Codex thread/read rejected fixture: {response['error']}")
-            result = json.dumps(response.get("result", {}), ensure_ascii=False)
+            data = response.get("result", {})
+            result = json.dumps(data, ensure_ascii=False)
             if marker not in result:
                 raise AssertionError("Codex thread/read omitted fixture marker")
-            if expected_cwd and expected_cwd not in result:
+            if expected_cwd and not same_working_directory(data.get("thread", {}).get("cwd"), expected_cwd):
                 raise AssertionError("Codex thread/read omitted mapped working directory")
             return
         raise AssertionError("Codex thread/read timed out")
@@ -131,7 +142,7 @@ process.stdout.write(JSON.stringify({cwd: manager.getCwd(), entries: manager.get
     )
     if marker not in result.stdout:
         raise AssertionError("Pi SessionManager omitted fixture marker")
-    if expected_cwd and json.loads(result.stdout)["cwd"] != expected_cwd:
+    if expected_cwd and not same_working_directory(json.loads(result.stdout)["cwd"], expected_cwd):
         raise AssertionError("Pi SessionManager retained the old working directory")
 
 
@@ -155,7 +166,7 @@ process.stdout.write(JSON.stringify({ sessions, messages }));
     matching = [item for item in data["sessions"] if item["sessionId"] == session]
     if len(matching) != 1:
         raise AssertionError("Claude SDK listSessions did not find the restored session")
-    if expected_cwd and matching[0].get("cwd") != expected_cwd:
+    if expected_cwd and not same_working_directory(matching[0].get("cwd"), expected_cwd):
         raise AssertionError("Claude SDK listSessions retained the old working directory")
     if marker not in json.dumps(data["messages"], ensure_ascii=False):
         raise AssertionError("Claude SDK getSessionMessages omitted fixture marker")
@@ -168,7 +179,7 @@ def grok_read(binary: str, profile: Path, session: str, marker: str,
         raise AssertionError(f"expected one Grok session summary, found {len(summaries)}")
     if expected_cwd:
         summary = json.loads(summaries[0].read_text(encoding="utf-8"))
-        if summary.get("info", {}).get("cwd") != expected_cwd:
+        if not same_working_directory(summary.get("info", {}).get("cwd"), expected_cwd):
             raise AssertionError("Grok summary retained the old working directory")
     result = subprocess.run(
         [binary, "export", session], cwd=sandbox,
