@@ -77,7 +77,7 @@ PY
   local info
   info="$(codesign -dv --verbose=4 "$state/probe" 2>&1)"
   grep -Fxq "TeamIdentifier=$APPLE_TEAM_ID" <<< "$info" || { echo 'Probe team mismatch' >&2; exit 1; }
-  grep -Eq '^flags=.*\(runtime\)' <<< "$info" || { echo 'Probe lacks hardened runtime' >&2; exit 1; }
+  grep -Eq '^CodeDirectory .*flags=0x[[:xdigit:]]+\(([^)]*,)?runtime(,[^)]*)?\)' <<< "$info" || { echo 'Probe lacks hardened runtime' >&2; exit 1; }
   grep -Eq '^Timestamp=' <<< "$info" || { echo 'Probe lacks secure timestamp' >&2; exit 1; }
   rm -f "$state/probe" "$state/probe.c" "$state/notary-history.json"
 }
@@ -90,7 +90,7 @@ verify_app() {
   grep -Eq '^Authority=Developer ID Application:' <<< "$info" || { echo 'Application lacks Developer ID authority' >&2; exit 1; }
   grep -Fxq "TeamIdentifier=$APPLE_TEAM_ID" <<< "$info" || { echo 'Application team mismatch' >&2; exit 1; }
   grep -Eq '^Timestamp=' <<< "$info" || { echo 'Application lacks secure timestamp' >&2; exit 1; }
-  grep -Eq '^flags=.*\(runtime\)' <<< "$info" || { echo 'Application lacks hardened runtime' >&2; exit 1; }
+  grep -Eq '^CodeDirectory .*flags=0x[[:xdigit:]]+\(([^)]*,)?runtime(,[^)]*)?\)' <<< "$info" || { echo 'Application lacks hardened runtime' >&2; exit 1; }
   actual="$(lipo -archs "$app/Contents/MacOS/bastet-agent-sync")"
   [[ "$actual" == "$arch" ]] || { echo "Application architecture mismatch: $actual" >&2; exit 1; }
   xcrun stapler validate "$app"
