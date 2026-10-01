@@ -65,6 +65,10 @@ jobs:
         run: npm install --prefix "${{ runner.temp }}/handoff-readers" --no-audit --no-fund @openai/codex@0.159.2 @earendil-works/pi-coding-agent@0.85.1 @anthropic-ai/claude-agent-sdk@0.3.276
       - name: Read restored conversations with official readers
         shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: |
           export PATH="${{ runner.temp }}/handoff-readers/node_modules/.bin:$PATH"
           python scripts/test_native_continuation.py \
