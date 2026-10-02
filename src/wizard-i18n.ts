@@ -85,6 +85,8 @@ export const wizardMessages = {
     complete: "Setup completed",
     completeHint:
       "Drive setup is complete. Select Agent Memory OS and press Start to synchronize memory; other sources have separate support limits.",
+    completeHintStore:
+      "Drive setup is complete. Select a supported agent and start syncing. Available data depends on each source's support limits.",
     back: "Back",
     next: "Next",
     done: "Completed",
@@ -195,6 +197,8 @@ export const wizardMessages = {
     complete: "設定已完成",
     completeHint:
       "Drive 設定已完成。勾選 Agent Memory OS 後按啟動可同步記憶；其他來源依各自支援程度處理。",
+    completeHintStore:
+      "Drive 設定已完成。選取支援的 Agent 後即可啟動同步；可同步的資料依各來源支援程度而定。",
     back: "上一步",
     next: "下一步",
     done: "已完成",
@@ -300,6 +304,8 @@ export const wizardMessages = {
     complete: "设置已完成",
     completeHint:
       "Drive 设置已完成。勾选 Agent Memory OS 后按启动可同步记忆；其他来源依各自支持程度处理。",
+    completeHintStore:
+      "Drive 设置已完成。选择支持的 Agent 后即可启动同步；可同步的数据取决于各来源的支持范围。",
     back: "上一步",
     next: "下一步",
     done: "已完成",
@@ -409,6 +415,8 @@ export const wizardMessages = {
     complete: "設定が完了しました",
     completeHint:
       "Drive 設定が完了しました。Agent Memory OS を選択して同期を開始できます。他のソースには個別の制限があります。",
+    completeHintStore:
+      "Drive の設定が完了しました。対応する Agent を選択して同期を開始できます。同期できるデータは各ソースの対応範囲によって異なります。",
     back: "戻る",
     next: "次へ",
     done: "完了",
@@ -525,6 +533,8 @@ export const wizardMessages = {
     complete: "설정 완료",
     completeHint:
       "Drive 설정이 완료되었습니다. Agent Memory OS를 선택하고 시작하세요. 다른 소스에는 개별 지원 제한이 있습니다.",
+    completeHintStore:
+      "Drive 설정이 완료되었습니다. 지원되는 Agent를 선택하고 동기화를 시작하세요. 동기화할 수 있는 데이터는 소스별 지원 범위에 따라 다릅니다.",
     back: "이전",
     next: "다음",
     done: "완료",

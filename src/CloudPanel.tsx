@@ -46,10 +46,12 @@ function transientWizardReadError(error: unknown) {
 export default function CloudPanel({
   native,
   locale,
+  storeChannel = false,
   onChange,
 }: {
   native: boolean;
   locale: Locale;
+  storeChannel?: boolean | null;
   onChange?: (view: WizardView | null) => void;
 }) {
   const t = wizardMessages[locale];
@@ -530,7 +532,11 @@ export default function CloudPanel({
                       {w.complete && (
                         <p className="wizard-complete">✓ {t.complete}</p>
                       )}
-                      <p>{t.completeHint}</p>
+                      {storeChannel !== null && (
+                        <p>
+                          {storeChannel ? t.completeHintStore : t.completeHint}
+                        </p>
+                      )}
                       <button
                         disabled={
                           unavailable || !w.recoverySaved || !w.proofVerified

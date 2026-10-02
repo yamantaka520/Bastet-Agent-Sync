@@ -364,6 +364,7 @@ export default function App() {
         <CloudPanel
           native={native}
           locale={settings.locale}
+          storeChannel={loaded ? !memorySyncAvailable : null}
           onChange={setCloud}
         />
         {memorySyncAvailable && (

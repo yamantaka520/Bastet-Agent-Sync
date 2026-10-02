@@ -10,6 +10,8 @@ use super::{
 use crate::sync::{bundle::hash, storage};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+#[cfg(feature = "mac-app-store")]
+use std::{fs::OpenOptions, io::Write, path::Path};
 use tauri::{Manager, State};
 use zeroize::Zeroizing;
 #[derive(Serialize)]
@@ -27,6 +29,34 @@ fn root(app: &tauri::AppHandle) -> Result<PathBuf> {
         .map_err(|_| "store_unavailable")?;
     std::fs::create_dir_all(&p).map_err(|_| "store_unavailable")?;
     Ok(p)
+}
+/// NSSavePanel authorizes its selected file, not an arbitrary temporary sibling.
+/// Keep recovery exports exclusive and private without requiring parent access.
+#[cfg(feature = "mac-app-store")]
+fn save_recovery_file(path: &Path, bytes: &[u8]) -> Result<()> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    match options.open(path) {
+        Ok(mut file) => {
+            file.write_all(bytes)
+                .map_err(|_| "recovery_export_failed")?;
+            file.sync_all().map_err(|_| "recovery_export_failed")?;
+            Ok(())
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            if storage::read(path, 16384)? == bytes {
+                Ok(())
+            } else {
+                Err("immutable_collision".into())
+            }
+        }
+        Err(_) => Err("recovery_export_failed".into()),
+    }
 }
 fn build_config() -> Result<ClientConfig> {
     let c = ClientConfig {
@@ -349,6 +379,9 @@ pub async fn wizard_execute(
                     .add_filter("JSON", &["json"])
                     .save_file();
                 if let Some(path) = chosen {
+                    #[cfg(feature = "mac-app-store")]
+                    save_recovery_file(&path, &bytes)?;
+                    #[cfg(not(feature = "mac-app-store"))]
                     storage::immutable(&path, &bytes)?;
                     let verified = Zeroizing::new(storage::read(&path, 16384)?);
                     wizard::RecoveryKit::parse(&verified)?;
@@ -446,6 +479,32 @@ pub async fn wizard_execute(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_recovery_export_writes_only_selected_file_and_never_replaces_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("recovery.json");
+        save_recovery_file(&path, b"fixture-secret").unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"fixture-secret");
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 1);
+        save_recovery_file(&path, b"fixture-secret").unwrap();
+        assert_eq!(
+            save_recovery_file(&path, b"different").unwrap_err(),
+            "immutable_collision"
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), b"fixture-secret");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+            let alias = dir.path().join("alias.json");
+            std::os::unix::fs::symlink(&path, &alias).unwrap();
+            assert!(save_recovery_file(&alias, b"fixture-secret").is_err());
+        }
+    }
     #[test]
     fn first_authorization_bypasses_saved_login_but_reconnect_preserves_store_errors() {
         assert_eq!(

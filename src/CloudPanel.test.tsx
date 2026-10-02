@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import CloudPanel, { type WizardView } from "./CloudPanel";
+import type { Locale } from "./i18n";
 import { wizardMessages } from "./wizard-i18n";
 
 const invoke = vi.hoisted(() => vi.fn());
@@ -37,6 +38,39 @@ afterEach(() => {
   cleanup();
   invoke.mockReset();
   vi.useRealTimers();
+});
+
+it("shows Store completion guidance without Agent Memory OS in every locale", async () => {
+  const completeView: WizardView = {
+    ...view,
+    wizard: {
+      ...view.wizard,
+      page: 4,
+      clientId: "fixture-client",
+      authorized: true,
+      folderId: "fixture-folder",
+      folderName: "Fixture folder",
+      binding: {
+        folder: "fixture-folder",
+        space: "fixture-space",
+        proof: "proof",
+      },
+      recoverySaved: true,
+      proofVerified: true,
+      complete: true,
+    },
+  };
+  invoke.mockResolvedValue(completeView);
+  for (const locale of Object.keys(wizardMessages) as Locale[]) {
+    const t = wizardMessages[locale];
+    const panel = render(<CloudPanel native locale={locale} storeChannel />);
+    await act(async () => {});
+    expect(screen.getByText(t.completeHintStore)).toBeTruthy();
+    expect(t.completeHintStore).not.toContain("Agent Memory OS");
+    panel.rerender(<CloudPanel native locale={locale} storeChannel={false} />);
+    expect(screen.getByText(t.completeHint)).toBeTruthy();
+    panel.unmount();
+  }
 });
 
 it("recovers a busy startup read promptly without showing a stale generic error", async () => {
