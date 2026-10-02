@@ -79,13 +79,23 @@ unset TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD
 unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_API_KEY APPLE_API_ISSUER APPLE_API_KEY_PATH
 unset APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD
 export APPLE_SIGNING_IDENTITY="$BASTET_STORE_APP_IDENTITY"
-npm run tauri build -- --ci --bundles app --target universal-apple-darwin --features mac-app-store \
-  --config src-tauri/tauri.appstore.conf.json --config "$state/prepared/tauri.profile.conf.json"
+(umask 022; npm run tauri build -- --ci --bundles app --target universal-apple-darwin --features mac-app-store \
+  --config src-tauri/tauri.appstore.conf.json --config "$state/prepared/tauri.profile.conf.json")
 
 app="$CARGO_TARGET_DIR/universal-apple-darwin/release/bundle/macos/Bastet Agent Sync.app"
 [[ -d "$app" && -s "$app/Contents/embedded.provisionprofile" ]] || { echo 'Signed app or embedded profile is missing' >&2; exit 1; }
 cmp -s "$BASTET_STORE_PROFILE" "$app/Contents/embedded.provisionprofile" || { echo 'Embedded profile differs from input' >&2; exit 1; }
+
+# Tauri may copy the private preparation files with mode 0600, and an
+# inherited restrictive umask can leave the whole app inaccessible after
+# installation. Normalize the app first, then sign its final contents.
+python3 scripts/mac-app-store-prep.py --normalize-app "$app"
+keychain_args=()
+if [[ -n "${BASTET_STORE_KEYCHAIN:-}" ]]; then keychain_args=(--keychain "$BASTET_STORE_KEYCHAIN"); fi
+(umask 022; codesign --force --sign "$BASTET_STORE_APP_IDENTITY" "${keychain_args[@]}" \
+  --options runtime --timestamp --entitlements "$state/prepared/Entitlements.plist" "$app")
 codesign --verify --deep --strict "$app"
+python3 scripts/mac-app-store-prep.py --check-app "$app"
 python3 - "$app" "$state/prepared/Entitlements.plist" <<'PY'
 import os, plistlib, subprocess, sys
 from pathlib import Path
@@ -110,8 +120,6 @@ if archs != {'arm64', 'x86_64'}:
 PY
 
 pkg="$state/Bastet Agent Sync.pkg"
-keychain_args=()
-if [[ -n "${BASTET_STORE_KEYCHAIN:-}" ]]; then keychain_args=(--keychain "$BASTET_STORE_KEYCHAIN"); fi
 xcrun productbuild --sign "$BASTET_STORE_INSTALLER_IDENTITY" "${keychain_args[@]}" --component "$app" /Applications "$pkg"
 pkgutil --check-signature "$pkg" > "$state/pkg-signature.txt"
 python3 - "$state/pkg-signature.txt" <<'PY'

@@ -2,7 +2,9 @@
 
 ## Unreleased — Mac App Store preparation
 
-- Retry transient setup-state lock contention at startup without leaving a stale error; preserve genuine startup and action failures.
+- Normalize Store package permissions before final signing, check embedded privacy-manifest contents, and pass Apple server-side package validation. Add the candidate privacy manifest and source-based assessment; save age-rating and unpublished privacy drafts. Upload and App Review remain pending.
+
+- Retry transient setup-state lock contention at startup without leaving a stale error; preserve genuine startup and action failures. Read-only snapshot and operations views also retry short file-lock contention and show localized busy/setup guidance in all five locales.
 
 - Add an opt-in `mac-app-store` build that omits direct updater/plugin commands, uses a separate Keychain service, and presents Store update guidance in all five locales. The first Store release excludes Agent Memory OS in backend and UI by explicit product decision; the default direct-download channel retains existing updater and AMOS behavior.
 - Implement security-scoped picker bookmarks, scoped reads for worker and restore flows, and same-path handoff reauthorization. Build and verify the universal Store-signed `.app` and `.pkg` at version `0.6.0` build `1`; this is a local candidate only.

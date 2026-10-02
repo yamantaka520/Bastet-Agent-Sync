@@ -7,6 +7,7 @@ import { formatBytes } from "./TrafficStatus";
 import type { SyncStatus } from "./WorkerStatus";
 import type { SourceStatus } from "./NativeSessions";
 import { spaceErrorText } from "./space-errors";
+import { localReadError, retryBusyRead } from "./local-read";
 export type Resources = {
   parallel: number;
   uploadKib: number;
@@ -218,7 +219,7 @@ export default function OperationsPanel({
     measuredAt: number;
   } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
   const date = (n: number) => new Date(n * 1000).toLocaleString(locale);
   const state = (s: string) =>
     ({
@@ -229,11 +230,11 @@ export default function OperationsPanel({
     })[s] ?? s;
   async function act(fn: () => Promise<void>) {
     setBusy(true);
-    setError(false);
+    setError("");
     try {
       await fn();
-    } catch {
-      setError(true);
+    } catch (error) {
+      setError(localReadError(error, locale) ?? t.error);
     } finally {
       setBusy(false);
     }
@@ -241,18 +242,18 @@ export default function OperationsPanel({
   useEffect(() => {
     if (!native) return;
     let live = true;
-    invoke<typeof data>("operations_view")
+    retryBusyRead(() => invoke<typeof data>("operations_view"))
       .then((v) => {
         if (live && v && Array.isArray(v.history) && Array.isArray(v.devices))
           setData(v);
       })
-      .catch(() => {
-        if (live) setError(true);
+      .catch((error) => {
+        if (live) setError(localReadError(error, locale) ?? t.error);
       });
     return () => {
       live = false;
     };
-  }, [native, runtime?.phase]);
+  }, [native, runtime?.phase, locale]);
   return (
     <section className="panel operations-panel">
       <h2>🐈 {t.title}</h2>
@@ -285,7 +286,7 @@ export default function OperationsPanel({
           {t.resumeAt}: {date(runtime.resumeAt)}
         </p>
       )}
-      {error && <p role="alert">{t.error}</p>}
+      {error && <p role="alert">{error}</p>}
       {runtime?.observerError && (
         <p role="alert">
           {spaceErrorText(runtime.observerError, locale) ?? t.error}
@@ -296,7 +297,9 @@ export default function OperationsPanel({
         <button
           disabled={!native || busy}
           onClick={() =>
-            void act(async () => setData(await invoke("operations_view")))
+            void act(async () =>
+              setData(await retryBusyRead(() => invoke("operations_view"))),
+            )
           }
         >
           {t.refresh}

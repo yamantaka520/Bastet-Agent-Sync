@@ -78,6 +78,26 @@ it("keeps all five locale dictionaries complete", () => {
     expect(messages.every((s) => s.length > 0)).toBe(true);
   }
 });
+it("retries a snapshot read after a brief wizard lock collision", async () => {
+  invoke.mockRejectedValueOnce("sync_busy").mockResolvedValueOnce([]);
+  render(<NativeSessions native locale="en" running={false} />);
+  fireEvent.click(screen.getByText("View conversation snapshots"));
+  expect(await screen.findByText("No snapshots yet")).toBeTruthy();
+  expect(invoke.mock.calls.map(([command]) => command)).toEqual([
+    "list_received_sessions",
+    "list_received_sessions",
+  ]);
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+it("shows setup guidance and does not retry a missing Drive binding", async () => {
+  invoke.mockRejectedValue("wizard_step_required");
+  render(<NativeSessions native locale="zh-Hant" running={false} />);
+  fireEvent.click(screen.getByText(sessionMessages["zh-Hant"][2]));
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "請先完成 Google Drive 同步空間設定",
+  );
+  expect(invoke).toHaveBeenCalledTimes(1);
+});
 it("lets Store users reselect a handoff parent and refreshes the snapshot list", async () => {
   invoke.mockImplementation(async (command: string) => {
     if (command === "choose_folder") return "/original-parent";
@@ -96,7 +116,9 @@ it("lets Store users reselect a handoff parent and refreshes the snapshot list",
     ]);
   });
   view.rerender(<NativeSessions native locale="en" running={false} />);
-  expect(screen.queryByRole("button", { name: sessionMessages.en[15] })).toBeNull();
+  expect(
+    screen.queryByRole("button", { name: sessionMessages.en[15] }),
+  ).toBeNull();
 });
 
 it("groups and collapses snapshots, sorts newest first and handles old timestamps", async () => {

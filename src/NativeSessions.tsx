@@ -8,6 +8,7 @@ import type { Locale } from "./i18n";
 import { names } from "./model";
 import { syncDisplay, issueText, savedTime } from "./sync-display";
 import { projectError } from "./project-errors";
+import { localReadError, retryBusyRead } from "./local-read";
 export const sessionMessages = {
   "zh-Hant": [
     "本機對話同步",
@@ -206,7 +207,11 @@ export default function NativeSessions({
     try {
       await f();
     } catch (e) {
-      setError(projectError(String(e), locale) ?? String(e));
+      setError(
+        projectError(String(e), locale) ??
+          localReadError(e, locale) ??
+          String(e),
+      );
     } finally {
       setBusy(false);
     }
@@ -292,7 +297,11 @@ export default function NativeSessions({
         disabled={!native || running || busy}
         onClick={() =>
           void action(async () =>
-            setItems(await invoke<Snapshot[]>("list_received_sessions")),
+            setItems(
+              await retryBusyRead(() =>
+                invoke<Snapshot[]>("list_received_sessions"),
+              ),
+            ),
           )
         }
       >
@@ -306,7 +315,11 @@ export default function NativeSessions({
               void action(async () => {
                 const selected = await invoke<string | null>("choose_folder");
                 if (selected)
-                  setItems(await invoke<Snapshot[]>("list_received_sessions"));
+                  setItems(
+                    await retryBusyRead(() =>
+                      invoke<Snapshot[]>("list_received_sessions"),
+                    ),
+                  );
               })
             }
           >

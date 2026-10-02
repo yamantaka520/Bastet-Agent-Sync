@@ -16,6 +16,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "scripts/mac-app-store.entitlements.plist"
 CONFIG = ROOT / "src-tauri/tauri.conf.json"
+PRIVACY_MANIFEST = ROOT / "src-tauri/PrivacyInfo.xcprivacy"
 
 
 def fail(message):
@@ -97,20 +98,72 @@ def generate(profile, output, decoded=None):
             os.chmod(path, 0o600)
 
 
+def app_paths(app):
+    if not app.is_dir() or app.is_symlink():
+        fail("Store app bundle is missing or is a symlink")
+    yield app
+    for directory, dirs, files in os.walk(app, followlinks=False):
+        for name in dirs + files:
+            path = Path(directory) / name
+            if path.is_symlink():
+                continue
+            yield path
+
+
+def normalize_app_permissions(app):
+    """Make the signed payload readable after installation for every user."""
+    for path in app_paths(app):
+        if path.is_dir():
+            os.chmod(path, 0o755)
+        elif path.is_file():
+            executable = bool(path.stat().st_mode & 0o111)
+            os.chmod(path, 0o755 if executable else 0o644)
+
+
+def check_app_payload(app):
+    for path in app_paths(app):
+        mode = path.stat().st_mode
+        if path.is_dir() and mode & 0o005 != 0o005:
+            fail(f"Store app directory is inaccessible to non-root users: {path.relative_to(app)}")
+        if path.is_file() and mode & 0o004 != 0o004:
+            fail(f"Store app file is unreadable to non-root users: {path.relative_to(app)}")
+        if path.name.startswith("._"):
+            fail(f"AppleDouble file in Store app: {path.relative_to(app)}")
+    info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+    executable = app / "Contents/MacOS" / info["CFBundleExecutable"]
+    if not executable.is_file() or executable.stat().st_mode & 0o001 != 0o001:
+        fail("Store app executable is not accessible to non-root users")
+    embedded = app / "Contents/Resources/PrivacyInfo.xcprivacy"
+    if not embedded.is_file():
+        fail("Store app privacy manifest is missing")
+    if plistlib.loads(embedded.read_bytes()) != plistlib.loads(PRIVACY_MANIFEST.read_bytes()):
+        fail("Store app privacy manifest differs from source")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--profile", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--profile", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--normalize-app", type=Path)
+    parser.add_argument("--check-app", type=Path)
     # Fixture-only interface. The signing wrapper never passes this argument.
     parser.add_argument("--test-decoded-plist", type=Path)
     args = parser.parse_args()
     decoded = args.test_decoded_plist.read_bytes() if args.test_decoded_plist else None
     try:
-        generate(args.profile.resolve(), args.output.resolve(), decoded)
+        if args.normalize_app:
+            normalize_app_permissions(args.normalize_app)
+        elif args.check_app:
+            check_app_payload(args.check_app)
+        elif args.profile and args.output:
+            generate(args.profile.resolve(), args.output.resolve(), decoded)
+        else:
+            parser.error("provide --profile and --output, or one app operation")
     except (ValueError, OSError, subprocess.CalledProcessError, plistlib.InvalidFileException) as exc:
         print(f"Store preparation failed: {exc}", file=sys.stderr)
         return 1
-    print("Store profile and entitlements validated; local build configuration prepared")
+    if args.profile and args.output:
+        print("Store profile and entitlements validated; local build configuration prepared")
     return 0
 
 
