@@ -2,7 +2,7 @@
 
 ## Unreleased — Mac App Store preparation
 
-- Publish five-language product and privacy pages using the canonical calico logo, add the in-app policy link, save all five Store policy URLs, and enable the dedicated Google OAuth production audience after owner approval. Website ownership passes; Google brand review remains unresolved. Rebuilt Store package passes Apple validation; no Apple upload or App Review submission is implied.
+- Publish five-language product and privacy pages using the canonical calico logo, add the in-app policy link, save all five Store policy URLs, and enable the dedicated Google OAuth production audience after owner approval. Website ownership passes; the owner-authorized Google brand-review request is submitted and under review, not yet approved. Rebuilt Store package passes Apple validation; no Apple upload or App Review submission is implied.
 
 - Create a dedicated Google Cloud project and desktop OAuth client with Drive API and only `drive.file`. Embed the client in the Store candidate and verify real consent, callback and persisted credential reconnection in an isolated ad-hoc sandbox. Public/reviewer login and production-profile acceptance remain pending.
 
