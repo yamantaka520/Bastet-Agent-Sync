@@ -1,5 +1,14 @@
 # Validation
 
+## App Review submitted — 2026-10-02
+
+The macOS `0.6.0` build `1` was formally submitted to App Review. Both the authenticated website and the App Store Connect API report **WAITING_FOR_REVIEW**. The build remains `VALID`; release is **manual**, and France is excluded from the 174 available territories. This is submission receipt, not approval or public Store availability.
+
+- Completed the encryption questionnaire using the published non-OS algorithm category and France **No**. Apple saved `usesNonExemptEncryption=false` and removed the missing-export-compliance blocker. This describes the Store reporting result, not absence of encryption: the payload still uses XChaCha20-Poly1305. The source and binary were not changed for this answer. The basis is Apple's complete definition of non-standard cryptography, which includes the unpublished condition, together with the public XChaCha specification; an expired draft does not establish proprietary/unpublished cryptography. [Apple definition](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance/), [documentation table](https://developer.apple.com/help/app-store-connect/reference/app-information/export-compliance-documentation-for-encryption), [published specification](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha-03).
+- After explicit owner confirmation, published the two privacy categories (Other User Content and Other Data Types, linked for App Functionality, no tracking) and saved Content Rights as `DOES_NOT_USE_THIRD_PARTY_CONTENT` for the app-provided original materials and private file utility. Future bundled third-party content or data-flow changes require reassessment.
+- Removed the separate app-account credential requirement; the saved review notes explicitly state that cloud synchronization requires the reviewer's Google OAuth authorization. No Google password was provided. Apple's form accepted the submission; this does not establish reviewer onboarding success or waive future review feedback.
+- TestFlight testing, production-profile runtime acceptance, and Store approval remain distinct from the isolated sandbox checks. Earlier dated entries below describe preparation states that this submission supersedes.
+
 ## France excluded from first Store release — 2026-10-02
 
 - Changed only France in App Store Connect availability following the owner’s explicit instruction. The saved page reports 174 territories and France unavailable.

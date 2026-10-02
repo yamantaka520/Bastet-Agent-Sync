@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — Mac App Store preparation
+## Mac App Store — submitted 2026-10-02
+
+- Formally submit macOS `0.6.0` build `1`; Apple website and API confirm `WAITING_FOR_REVIEW`. Release remains manual with France excluded (174 territories). Complete the published non-OS encryption questionnaire, publish privacy disclosures and save the owner-confirmed content-rights answer. Review notes explicitly describe Google OAuth access. This is not Store approval or publication.
+
+Earlier preparation milestones below record their state at the time; the submission above supersedes their pending-form status.
 
 - Exclude France from the first Store release by explicit owner instruction; App Store Connect confirms 174 available territories. Encryption compliance remains open.
 
