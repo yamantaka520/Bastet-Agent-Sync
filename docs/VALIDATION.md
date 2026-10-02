@@ -1,5 +1,12 @@
 # Validation
 
+## Public product/privacy pages and production OAuth — 2026-10-02
+
+- Published [product/support](https://bastet.tw/agent-sync/) and [privacy policy](https://bastet.tw/agent-sync/privacy/) pages from `website/agent-sync/`. Both provide English HTML without JavaScript and five selectable locales. Desktop/narrow layouts, all five policy-language switches, local links, JavaScript syntax and translation-key coverage were checked. Anonymous HTTPS requests return 200 with the actual product and policy text. The header and hero use an unchanged copy of the canonical `assets/calico.png`; the deployed PNG checksum matches the source and the live browser renders it. Deployment added only the new subdirectory; the existing homepage checksum was unchanged.
+- Google Search Console automatically verified the site's ownership using the domain provider. The dedicated project's homepage, privacy URL and authorized domain were saved. With explicit owner approval, its External audience was switched from Testing to Production. The verification center reports that non-sensitive `drive.file` needs no data-access verification. Brand verification is separate: the automatic check reported inaccessible/insufficient pages and name/purpose discrepancies despite the anonymous-page evidence; an evidence-based additional-review draft is prepared, not yet submitted.
+- App Store Connect saved the policy and privacy-controls URLs in all five locales. Privacy labels remain an unpublished draft, and there is still no uploaded Apple build or App Review submission.
+- The App now offers a five-language policy link. Native builds open only the fixed public policy URL through a dedicated command; an ad-hoc sandbox copy opened that URL in the system browser. The complete frontend suite passes **62 tests**; production build, formatting and documentation checks pass. The universal Store candidate was rebuilt with this link and its dedicated OAuth client; Apple validation again returned **VERIFY SUCCEEDED with no errors**. Production-profile/TestFlight and provider capture/restore acceptance remain separate.
+
 ## Dedicated Google OAuth sandbox acceptance — 2026-10-02
 
 - The rebuilt universal Store `0.6.0` build `1` candidate includes the dedicated client and latest frontend changes. Apple server-side validation returned **VERIFY SUCCEEDED with no errors**. This does not upload the build or establish TestFlight/App Review acceptance.

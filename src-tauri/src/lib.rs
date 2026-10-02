@@ -192,6 +192,13 @@ fn save_locale(
 }
 
 #[tauri::command]
+fn open_privacy_policy() -> Result<(), String> {
+    webbrowser::open("https://bastet.tw/agent-sync/privacy/")
+        .map(|_| ())
+        .map_err(|_| "browser_open_failed".to_string())
+}
+
+#[tauri::command]
 async fn run_sync_diagnostic() -> Result<sync::diagnostic::Diagnostic, String> {
     tauri::async_runtime::spawn_blocking(sync::diagnostic::run)
         .await
@@ -206,6 +213,7 @@ macro_rules! handlers {
             choose_folder,
             save_settings,
             save_locale,
+            open_privacy_policy,
             run_sync_diagnostic,
             cloud::wizard_desktop::wizard_get,
             cloud::wizard_desktop::wizard_navigate,

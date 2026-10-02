@@ -212,6 +212,20 @@ export default function App() {
             <span>◇</span>
             <strong>{t.privacy}</strong>
             <p>{t.privacyHint}</p>
+            <a
+              href="https://bastet.tw/agent-sync/privacy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => {
+                if (!native) return;
+                event.preventDefault();
+                void invoke("open_privacy_policy").catch(() =>
+                  setError(t.error),
+                );
+              }}
+            >
+              {t.privacyPolicy}
+            </a>
           </div>
           <label className="lang">
             {t.language}

@@ -1,6 +1,6 @@
 # Mac App Store privacy assessment (candidate)
 
-Prepared 2026-10-02 against the first `mac-app-store` build. This is source-code evidence and a proposed App Store Connect response, not a published privacy label, legal export classification, or validation of the final signed binary. Recheck the archive and any added SDKs before publication.
+Prepared 2026-10-02 against the first `mac-app-store` build. This is source-code evidence and a proposed App Store Connect response, not a published privacy label or legal export classification. The subsequent public policy and signed-package checks are recorded in [validation](../VALIDATION.md). Recheck the archive and any added SDKs before publication.
 
 ## Data flow and candidate label
 
@@ -10,7 +10,7 @@ The conservative candidate for App Store Connect is **Yes, data collected**, wit
 
 Do **not** add Name, Email Address or User ID solely because the app reads them from Google's `about` endpoint for local display and account checks; this code does not transmit those returned values to Bastet or to a new destination. Do **not** add Device ID solely for the app-generated ID inside the encrypted report, or analytics/diagnostics for local journals. The account used to authorize Drive is inherently known to Google; the owner should verify Google's data role and exact final request behavior before publishing the candidate response. If the final binary or support process sends any readable contact information, diagnostics, local filenames or selected content to the developer or another service, revise the manifest and label.
 
-Apple defines collection as off-device transmission that allows the developer or a third-party partner to access data beyond servicing the request in real time, and requires data collected for app functionality to be disclosed. Apple also says data processed solely on the device is not collected. This candidate treats the readable, retained Drive metadata as collected even though no Bastet server receives it. [Apple's privacy definitions](https://developer.apple.com/app-store/app-privacy-details/) and [App Store Connect privacy workflow](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy/) govern the final questionnaire. The latter requires a publicly accessible privacy-policy URL for macOS; this repository draft is not that URL.
+Apple defines collection as off-device transmission that allows the developer or a third-party partner to access data beyond servicing the request in real time, and requires data collected for app functionality to be disclosed. Apple also says data processed solely on the device is not collected. This candidate treats the readable, retained Drive metadata as collected even though no Bastet server receives it. [Apple's privacy definitions](https://developer.apple.com/app-store/app-privacy-details/) and [App Store Connect privacy workflow](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy/) govern the final questionnaire. The latter requires a publicly accessible privacy-policy URL for macOS; the published policy is now available at [the product website](https://bastet.tw/agent-sync/privacy/), and the repository assessment remains supporting evidence.
 
 | Evidence | Source |
 | --- | --- |
@@ -40,3 +40,5 @@ Before the final responses: confirm Google/other vendor data practices for this 
 On 2026-10-02, App Store Connect saved the two proposed collection categories as an unpublished draft; no privacy policy URL or published label was asserted. The age questionnaire calculated a global 4+ rating, with regional variations. Content-rights owner confirmation remains pending.
 
 In an unsaved encryption-documentation walkthrough, selecting non-standard and non-OS standard encryption plus France distribution made Apple request both BIS CCATS approval and a French encryption declaration in one ZIP or PDF. The form was cancelled without submitting a classification or document. The [XChaCha IETF document](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha-03) is an expired draft; the standard ChaCha20-Poly1305 RFC does not establish identical status for XChaCha20. This evidence requires an applicable export-classification determination rather than an automatic exemption flag.
+
+On the same date, the public product/privacy pages were deployed and policy/control URLs were saved in all five Store locales. This supersedes the earlier missing-URL status; the privacy label itself remains unpublished.

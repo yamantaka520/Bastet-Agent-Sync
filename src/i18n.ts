@@ -75,6 +75,7 @@ const en = {
   notConnected: "Not connected",
   privacy: "Your credentials stay here.",
   privacyHint: "Discovery checks folders, not conversation contents.",
+  privacyPolicy: "Privacy policy",
   busy: "Working…",
   noFolder: "No folder selected",
   roadmapText:
@@ -161,6 +162,7 @@ const zhHant: Messages = {
   notConnected: "尚未連接",
   privacy: "憑證留在這裡。",
   privacyHint: "偵測只檢查目錄，不讀取對話內容。",
+  privacyPolicy: "隱私權政策",
   busy: "處理中…",
   noFolder: "尚未選擇資料夾",
   roadmapText:
@@ -244,6 +246,7 @@ const zhHans: Messages = {
   notConnected: "尚未连接",
   privacy: "凭据保留在这里。",
   privacyHint: "检测只检查目录，不读取对话内容。",
+  privacyPolicy: "隐私权政策",
   busy: "处理中…",
   noFolder: "尚未选择文件夹",
   roadmapText:
@@ -330,6 +333,7 @@ const ja: Messages = {
   notConnected: "未接続",
   privacy: "認証情報はこの端末に。",
   privacyHint: "フォルダーのみを確認し、会話内容は読みません。",
+  privacyPolicy: "プライバシーポリシー",
   busy: "処理中…",
   noFolder: "フォルダー未選択",
   roadmapText:
@@ -417,6 +421,7 @@ const ko: Messages = {
   notConnected: "연결 안 됨",
   privacy: "자격 증명은 이 기기에.",
   privacyHint: "폴더만 확인하며 대화 내용은 읽지 않습니다.",
+  privacyPolicy: "개인정보 처리방침",
   busy: "처리 중…",
   noFolder: "선택한 폴더 없음",
   roadmapText:
