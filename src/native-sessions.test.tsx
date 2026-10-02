@@ -78,6 +78,26 @@ it("keeps all five locale dictionaries complete", () => {
     expect(messages.every((s) => s.length > 0)).toBe(true);
   }
 });
+it("lets Store users reselect a handoff parent and refreshes the snapshot list", async () => {
+  invoke.mockImplementation(async (command: string) => {
+    if (command === "choose_folder") return "/original-parent";
+    if (command === "list_received_sessions") return [];
+    return undefined;
+  });
+  const view = render(
+    <NativeSessions native locale="en" running={false} storeChannel />,
+  );
+  expect(screen.getByText(sessionMessages.en[16])).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: sessionMessages.en[15] }));
+  await waitFor(() => {
+    expect(invoke.mock.calls.map(([command]) => command)).toEqual([
+      "choose_folder",
+      "list_received_sessions",
+    ]);
+  });
+  view.rerender(<NativeSessions native locale="en" running={false} />);
+  expect(screen.queryByRole("button", { name: sessionMessages.en[15] })).toBeNull();
+});
 
 it("groups and collapses snapshots, sorts newest first and handles old timestamps", async () => {
   invoke.mockResolvedValue([

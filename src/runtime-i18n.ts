@@ -25,6 +25,7 @@ export const runtimeMessages = {
     "Update failed. Check your connection and retry.",
     "Save pending settings before updating.",
     "No transfers have run.",
+    "This version receives updates through the Mac App Store. Open the App Store to check for updates.",
   ],
   "zh-Hant": [
     "🟢 程式運行中",
@@ -52,6 +53,7 @@ export const runtimeMessages = {
     "更新失敗，請檢查連線後重試。",
     "更新前請先儲存尚未保存的設定。",
     "尚未執行任何傳輸。",
+    "此版本透過 Mac App Store 更新。請開啟 App Store 檢查更新。",
   ],
   "zh-Hans": [
     "🟢 程序运行中",
@@ -79,6 +81,7 @@ export const runtimeMessages = {
     "更新失败，请检查连接后重试。",
     "更新前请先保存尚未保存的设置。",
     "尚未执行任何传输。",
+    "此版本通过 Mac App Store 更新。请打开 App Store 检查更新。",
   ],
   ja: [
     "🟢 アプリ実行中",
@@ -106,6 +109,7 @@ export const runtimeMessages = {
     "更新に失敗しました。接続を確認して再試行してください。",
     "更新前に設定を保存してください。",
     "転送はまだ実行されていません。",
+    "このバージョンは Mac App Store から更新されます。App Store を開いて更新を確認してください。",
   ],
   ko: [
     "🟢 앱 실행 중",
@@ -133,5 +137,6 @@ export const runtimeMessages = {
     "업데이트에 실패했습니다. 연결을 확인하고 다시 시도하세요.",
     "업데이트 전에 설정을 저장하세요.",
     "아직 전송을 실행하지 않았습니다.",
+    "이 버전은 Mac App Store를 통해 업데이트됩니다. App Store를 열어 업데이트를 확인하세요.",
   ],
 } as const;

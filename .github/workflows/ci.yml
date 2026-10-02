@@ -27,6 +27,13 @@ jobs:
       - run: npm run build
       - run: python scripts/check_docs.py
       - run: python scripts/test_release_assets.py
+      - run: python scripts/mac-app-store-test.py
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Mac App Store feature fixtures
+        if: runner.os == 'macOS'
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked --features mac-app-store
+      - name: Mac App Store feature lint
+        if: runner.os == 'macOS'
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets --features mac-app-store -- -D warnings

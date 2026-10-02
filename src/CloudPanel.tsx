@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
 import { wizardMessages } from "./wizard-i18n";
@@ -40,6 +40,9 @@ export function nextStep(w: Wizard) {
           ? 3
           : 4;
 }
+function transientWizardReadError(error: unknown) {
+  return ["sync_busy", "cloud_busy"].includes(String(error));
+}
 export default function CloudPanel({
   native,
   locale,
@@ -62,6 +65,13 @@ export default function CloudPanel({
   const [restart, setRestart] = useState(false);
   const [folderName, setFolderName] = useState("Bastet Agent Sync");
   const [folderId, setFolderId] = useState("");
+  const folderIdInitialized = useRef(false);
+  useEffect(() => {
+    if (view && !folderIdInitialized.current) {
+      folderIdInitialized.current = true;
+      setFolderId(view.wizard.folderId ?? "");
+    }
+  }, [view]);
   const [samplePassed, setSamplePassed] = useState(false);
   useEffect(() => {
     if (native)
@@ -69,30 +79,36 @@ export default function CloudPanel({
         .then((v) => {
           if (v) {
             setView(v);
-            setFolderId(v.wizard.folderId ?? "");
           }
         })
-        .catch((e) => setError(String(e)));
+        .catch((e) => {
+          // The operations panel can hold the same nonblocking wizard lock at startup.
+          // Keep loading and let the short initial poll recover from that race.
+          if (!transientWizardReadError(e)) setError(String(e));
+        });
   }, [native]);
   useEffect(() => {
     if (!native || busy) return;
     let active = true;
-    const timer = setInterval(() => {
-      void invoke<WizardView>("wizard_get")
-        .then((next) => {
-          if (active && next)
-            setView((previous) => ({
-              ...next,
-              folders: previous?.folders ?? [],
-            }));
-        })
-        .catch(() => {});
-    }, 15000);
+    const timer = setInterval(
+      () => {
+        void invoke<WizardView>("wizard_get")
+          .then((next) => {
+            if (active && next)
+              setView((previous) => ({
+                ...next,
+                folders: previous?.folders ?? next.folders,
+              }));
+          })
+          .catch(() => {});
+      },
+      view ? 15000 : 1000,
+    );
     return () => {
       active = false;
       clearInterval(timer);
     };
-  }, [native, busy]);
+  }, [native, busy, !!view]);
   async function run(work: () => Promise<WizardView | void>) {
     setBusy(true);
     setCredentialsReady(false);

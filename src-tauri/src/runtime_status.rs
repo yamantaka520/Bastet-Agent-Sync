@@ -39,7 +39,22 @@ pub async fn sync_preflight(
             .map_err(|_| "store_unavailable")?;
         let settings = crate::model::load(&root.join("settings.json"))?;
         let wizard = crate::cloud::wizard::Transaction::open(&root)?;
-        Ok(evaluate(settings.as_ref(), wizard.state.complete))
+        let preflight = evaluate(settings.as_ref(), wizard.state.complete);
+        #[cfg(feature = "mac-app-store")]
+        let mut preflight = preflight;
+        #[cfg(feature = "mac-app-store")]
+        if let Some(mut configured) = settings {
+            configured
+                .selected_agents
+                .retain(|a| a != "agent-memory-os");
+            configured.custom_paths.remove("agent-memory-os");
+            if !configured.selected_agents.is_empty() {
+                if let Err(reason) = crate::sandbox_access::settings_scopes(&root, &configured) {
+                    preflight.reasons.push(reason);
+                }
+            }
+        }
+        Ok(preflight)
     })
     .await
     .map_err(|_| "cloud_failed".to_string())?

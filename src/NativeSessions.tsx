@@ -25,6 +25,8 @@ export const sessionMessages = {
     "可接收版本",
     "逐個來源結果",
     "請在原 Agent 指定下列資料目錄，再用對話 ID 繼續；專案路徑不同時，先切換到這台電腦的專案目錄。此動作不會複製登入資訊。",
+    "重新授權接續資料夾",
+    "若先前還原的對話失去存取權，請選取當初用來還原的原始上層資料夾，然後再查看快照。",
   ],
   "zh-Hans": [
     "本地对话同步",
@@ -42,6 +44,8 @@ export const sessionMessages = {
     "可接收版本",
     "各来源结果",
     "请在原 Agent 指定下列数据目录，再用对话 ID 继续；项目路径不同时，先切换到此电脑的项目目录。此操作不复制登录信息。",
+    "重新授权接续文件夹",
+    "如果先前恢复的对话失去访问权限，请选择当初用于恢复的原始上级文件夹，然后重新查看快照。",
   ],
   en: [
     "Local conversation sync",
@@ -59,6 +63,8 @@ export const sessionMessages = {
     "Received versions",
     "Results by source",
     "Set the original agent’s data directory below and resume by session ID. Switch to this computer’s project directory when paths differ. Login credentials are not copied.",
+    "Reauthorize handoff folder",
+    "If a restored conversation loses access, select the same parent folder you originally chose for that restore, then view snapshots again.",
   ],
   ja: [
     "ローカル会話の同期",
@@ -76,6 +82,8 @@ export const sessionMessages = {
     "受信した版",
     "ソース別の結果",
     "元の Agent に以下のデータディレクトリを指定し、会話 ID で再開します。パスが異なる場合は、この端末のプロジェクトに移動してください。ログイン情報はコピーされません。",
+    "引き継ぎフォルダーを再認証",
+    "復元した会話へのアクセスが失われた場合は、復元時に選んだ元の親フォルダーを選択し、スナップショットを再表示してください。",
   ],
   ko: [
     "로컬 대화 동기화",
@@ -93,6 +101,8 @@ export const sessionMessages = {
     "수신 버전",
     "소스별 결과",
     "원래 Agent에 아래 데이터 디렉터리를 지정하고 대화 ID로 재개하세요. 경로가 다르면 이 컴퓨터의 프로젝트로 이동하세요. 로그인 정보는 복사하지 않습니다.",
+    "인계 폴더 다시 승인",
+    "복원된 대화에 접근할 수 없다면 복원할 때 선택했던 원래 상위 폴더를 다시 선택한 후 스냅샷을 확인하세요.",
   ],
 } as const;
 export type SourceStatus = {
@@ -170,11 +180,13 @@ export default function NativeSessions({
   locale,
   running,
   sources,
+  storeChannel = false,
 }: {
   native: boolean;
   locale: Locale;
   running: boolean;
   sources?: SourceStatus[];
+  storeChannel?: boolean;
 }) {
   const t = sessionMessages[locale];
   const d = syncDisplay[locale];
@@ -286,6 +298,23 @@ export default function NativeSessions({
       >
         {t[2]}
       </button>
+      {storeChannel && native && (
+        <div>
+          <button
+            disabled={running || busy}
+            onClick={() =>
+              void action(async () => {
+                const selected = await invoke<string | null>("choose_folder");
+                if (selected)
+                  setItems(await invoke<Snapshot[]>("list_received_sessions"));
+              })
+            }
+          >
+            {t[15]}
+          </button>
+          <p>{t[16]}</p>
+        </div>
+      )}
       {running && <p>{t[4]}</p>}
       {items && (
         <div className="snapshot-groups">

@@ -11,12 +11,17 @@ mod project_mapping;
 mod resources;
 mod review;
 mod runtime_status;
+mod sandbox_access;
 pub mod sync;
 mod updates;
 mod worker;
 use model::{Agent, Settings};
 use serde::Serialize;
-use std::{collections::HashMap, path::PathBuf, sync::Mutex};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -33,6 +38,7 @@ struct AppState {
 struct Bootstrap {
     settings: Option<Settings>,
     agents: Vec<Agent>,
+    memory_sync_available: bool,
     tray_available: bool,
     version: String,
     revision: String,
@@ -63,29 +69,61 @@ fn detect(settings: Option<&Settings>) -> Vec<Agent> {
         &settings.map(|s| s.custom_paths.clone()).unwrap_or_default(),
         &env,
     )
+    .into_iter()
+    .filter(|agent| model::agent_available(&agent.id))
+    .collect()
 }
 #[tauri::command]
-fn bootstrap(state: State<AppState>) -> Result<Bootstrap, String> {
+fn bootstrap(app: tauri::AppHandle, state: State<AppState>) -> Result<Bootstrap, String> {
     let settings = model::load(&state.path)?;
-    let agents = detect(settings.as_ref());
+    #[cfg(feature = "mac-app-store")]
+    let settings = settings.map(|mut settings| {
+        settings
+            .selected_agents
+            .retain(|id| id != "agent-memory-os");
+        settings.custom_paths.remove("agent-memory-os");
+        settings
+    });
+    let mut agents = detect(settings.as_ref());
+    if let Ok(config) = app.path().app_config_dir() {
+        sandbox_access::probe_agent_status(&config, &mut agents);
+    }
     Ok(Bootstrap {
         settings,
         agents,
+        memory_sync_available: !cfg!(feature = "mac-app-store"),
         tray_available: state.tray_available,
         version: app_version(),
         revision: env!("BASTET_BUILD_REVISION").into(),
     })
 }
 #[tauri::command]
-fn scan_agents(settings: Settings) -> Vec<Agent> {
-    detect(Some(&settings))
+fn scan_agents(app: tauri::AppHandle, settings: Settings) -> Vec<Agent> {
+    let mut agents = detect(Some(&settings));
+    if let Ok(config) = app.path().app_config_dir() {
+        sandbox_access::probe_agent_status(&config, &mut agents);
+    }
+    agents
 }
 #[tauri::command]
-async fn choose_folder() -> Option<String> {
-    rfd::AsyncFileDialog::new()
-        .pick_folder()
-        .await
-        .map(|f| f.path().to_string_lossy().into_owned())
+async fn choose_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    let selected = rfd::AsyncFileDialog::new().pick_folder().await;
+    let Some(folder) = selected else {
+        return Ok(None);
+    };
+    #[cfg(feature = "mac-app-store")]
+    let path = sandbox_access::grant_selected(
+        &app.path()
+            .app_config_dir()
+            .map_err(|_| "store_unavailable")?,
+        folder.path(),
+    )?;
+    #[cfg(not(feature = "mac-app-store"))]
+    let path = {
+        let _ = app;
+        folder.path().to_path_buf()
+    };
+    Ok(Some(path.to_string_lossy().into_owned()))
 }
 fn menu(app: &tauri::AppHandle, locale: &str) -> tauri::Result<Menu<tauri::Wry>> {
     let (open, quit) = match locale {
@@ -115,6 +153,13 @@ fn save_settings(
     let mut current = state.settings.lock().map_err(|_| "save_failed")?;
     // Do not overwrite a corrupted configuration through a stale UI.
     model::load(&state.path)?;
+    let config = state.path.parent().ok_or("sandbox_grant_unavailable")?;
+    let _scopes = sandbox_access::settings_scopes(config, &settings)?;
+    let _legacy_folder_scope = if settings.folder.is_empty() {
+        None
+    } else {
+        Some(sandbox_access::access(config, Path::new(&settings.folder))?)
+    };
     model::validate(&settings)?;
     model::validate_overlap(&settings, &detect(Some(&settings)))?;
     if settings.close_to_tray && !state.tray_available {
@@ -153,10 +198,53 @@ async fn run_sync_diagnostic() -> Result<sync::diagnostic::Diagnostic, String> {
         .map_err(|_| "diagnostic_failed".to_string())?
 }
 
+macro_rules! handlers {
+    ($($memory:path),* ; $($updater:path),* $(,)?) => {
+        tauri::generate_handler![
+            bootstrap,
+            scan_agents,
+            choose_folder,
+            save_settings,
+            save_locale,
+            run_sync_diagnostic,
+            cloud::wizard_desktop::wizard_get,
+            cloud::wizard_desktop::wizard_navigate,
+            cloud::wizard_desktop::wizard_restart,
+            cloud::wizard_desktop::wizard_execute,
+            cloud::desktop::wizard_cancel_login,
+            runtime_status::sync_preflight,
+            $($memory,)*
+            worker::sync_start,
+            worker::sync_status,
+            worker::sync_pause,
+            worker::sync_pause_for,
+            portable::portable_preview,
+            portable::portable_list,
+            portable::portable_compare,
+            portable::portable_restore,
+            operations::operations_view,
+            operations::storage_usage,
+            operations::clear_download_cache,
+            operations::cloud_storage_usage,
+            worker::sync_now,
+            native_sessions::list_received_sessions,
+            native_sessions::restore_received_session,
+            native_sessions::compare_received_session,
+            native_sessions::review_received_session,
+            updates::update_status,
+            $($updater,)*
+            cloud::desktop::run_crypto_diagnostic
+        ]
+    };
+}
+
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(not(feature = "mac-app-store"))]
+    let builder = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .manage(updates::Updates::default())
+        .manage(updates::Updates::default());
+    let builder = builder
         .manage(worker::Worker::default())
         .manage(cloud::desktop::CloudState::default())
         .setup(|app| {
@@ -201,45 +289,18 @@ pub fn run() {
                     api.prevent_close();
                 }
             }
-        })
-        .invoke_handler(tauri::generate_handler![
-            bootstrap,
-            scan_agents,
-            choose_folder,
-            save_settings,
-            save_locale,
-            run_sync_diagnostic,
-            cloud::wizard_desktop::wizard_get,
-            cloud::wizard_desktop::wizard_navigate,
-            cloud::wizard_desktop::wizard_restart,
-            cloud::wizard_desktop::wizard_execute,
-            cloud::desktop::wizard_cancel_login,
-            memory_adapter::inspect_memory_export,
-            runtime_status::sync_preflight,
-            amos_runtime::choose_memory_cli,
-            worker::sync_start,
-            worker::sync_status,
-            worker::sync_pause,
-            worker::sync_pause_for,
-            portable::portable_preview,
-            portable::portable_list,
-            portable::portable_compare,
-            portable::portable_restore,
-            operations::operations_view,
-            operations::storage_usage,
-            operations::clear_download_cache,
-            operations::cloud_storage_usage,
-            worker::sync_now,
-            native_sessions::list_received_sessions,
-            native_sessions::restore_received_session,
-            native_sessions::compare_received_session,
-            native_sessions::review_received_session,
-            updates::update_status,
-            updates::check_update,
-            updates::install_update,
-            updates::restart_after_update,
-            cloud::desktop::run_crypto_diagnostic
-        ])
+        });
+    #[cfg(feature = "mac-app-store")]
+    let builder = builder.invoke_handler(handlers![;]);
+    #[cfg(not(feature = "mac-app-store"))]
+    let builder = builder.invoke_handler(handlers![
+        memory_adapter::inspect_memory_export,
+        amos_runtime::choose_memory_cli;
+        updates::check_update,
+        updates::install_update,
+        updates::restart_after_update
+    ]);
+    builder
         .build(tauri::generate_context!())
         .expect("desktop runtime failed")
         .run(|_, event| {

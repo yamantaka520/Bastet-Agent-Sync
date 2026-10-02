@@ -38,6 +38,7 @@ export default function App() {
       custom: false,
     })),
   );
+  const [memorySyncAvailable, setMemorySyncAvailable] = useState(!native);
   const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
   const [cloud, setCloud] = useState<WizardView | null>(null);
   const [version, setVersion] = useState(__APP_VERSION__);
@@ -68,10 +69,32 @@ export default function App() {
       trayAvailable: boolean;
       version?: string;
       revision?: string;
+      memorySyncAvailable?: boolean;
     }>("bootstrap")
       .then((b) => {
-        if (b.settings) setSettings(b.settings);
-        setAgents(b.agents);
+        const memoryAvailable = b.memorySyncAvailable ?? true;
+        if (b.settings)
+          setSettings({
+            ...b.settings,
+            selectedAgents: memoryAvailable
+              ? b.settings.selectedAgents
+              : b.settings.selectedAgents.filter(
+                  (id) => id !== "agent-memory-os",
+                ),
+            customPaths: memoryAvailable
+              ? b.settings.customPaths
+              : Object.fromEntries(
+                  Object.entries(b.settings.customPaths).filter(
+                    ([id]) => id !== "agent-memory-os",
+                  ),
+                ),
+          });
+        setMemorySyncAvailable(memoryAvailable);
+        setAgents(
+          memoryAvailable
+            ? b.agents
+            : b.agents.filter((agent) => agent.id !== "agent-memory-os"),
+        );
         setTray(b.trayAvailable);
         setVersion(b.version ?? __APP_VERSION__);
         setRevision(b.revision ?? "");
@@ -98,16 +121,28 @@ export default function App() {
     }
   }
   async function scan(s = settings) {
-    setAgents(await invoke<Agent[]>("scan_agents", { settings: s }));
+    const found = await invoke<Agent[]>("scan_agents", { settings: s });
+    setAgents(
+      memorySyncAvailable
+        ? found
+        : found.filter((agent) => agent.id !== "agent-memory-os"),
+    );
   }
   async function choose(id?: string) {
     await action(async () => {
       const path = await invoke<string | null>("choose_folder");
       if (!path) return;
       if (id) {
+        const sourceId = !memorySyncAvailable
+          ? id === "claude"
+            ? "claude-code"
+            : id === "chatgpt-work"
+              ? "codex"
+              : id
+          : id;
         const next = {
           ...settings,
-          customPaths: { ...settings.customPaths, [id]: path },
+          customPaths: { ...settings.customPaths, [sourceId]: path },
         };
         await scan(next);
         change("customPaths", next.customPaths);
@@ -253,6 +288,7 @@ export default function App() {
           <WorkerStatus
             native={native}
             locale={settings.locale}
+            memorySyncAvailable={memorySyncAvailable}
             status={runtime}
             onStatus={setRuntime}
           />
@@ -316,11 +352,15 @@ export default function App() {
           locale={settings.locale}
           onChange={setCloud}
         />
-        <p className="panel">{wt[1]}</p>
-        <details className="panel">
-          <summary>{wt[19]}</summary>
-          <MemoryPanel native={native} locale={settings.locale} />
-        </details>
+        {memorySyncAvailable && (
+          <>
+            <p className="panel">{wt[1]}</p>
+            <details className="panel">
+              <summary>{wt[19]}</summary>
+              <MemoryPanel native={native} locale={settings.locale} />
+            </details>
+          </>
+        )}
         <section className="panel diagnostic-panel">
           <div className="section-heading">
             <div>
@@ -371,7 +411,7 @@ export default function App() {
           <section className="panel">
             <h2>{t.roadmap}</h2>
             <p className="roadmap">{t.roadmapText}</p>
-            <p>{t.pending}</p>
+            <p>{memorySyncAvailable ? t.pending : t.memoryUnavailableStore}</p>
           </section>
         ) : (
           <>
@@ -383,6 +423,12 @@ export default function App() {
                     {t.source}
                   </h2>
                   <p>{t.sourceHint}</p>
+                  {!memorySyncAvailable && loaded && (
+                    <>
+                      <p>{t.memoryUnavailableStore}</p>
+                      <p>{t.storeFolderAccess}</p>
+                    </>
+                  )}
                 </div>
                 <button
                   disabled={!native || busy || !loaded || running}
@@ -440,7 +486,11 @@ export default function App() {
                     </label>
                     <div className="agent-status">
                       <span className={a.detected ? "dot found" : "dot"} />
-                      {a.detected ? t.found : t.missing}
+                      {a.detected
+                        ? t.found
+                        : memorySyncAvailable
+                          ? t.missing
+                          : t.storeChooseFolder}
                     </div>
                     <code title={a.path}>{a.path || "—"}</code>
                     <div className="path-actions">
@@ -456,7 +506,14 @@ export default function App() {
                           onClick={() =>
                             action(async () => {
                               const customPaths = { ...settings.customPaths };
-                              delete customPaths[a.id];
+                              const sourceId = !memorySyncAvailable
+                                ? a.id === "claude"
+                                  ? "claude-code"
+                                  : a.id === "chatgpt-work"
+                                    ? "codex"
+                                    : a.id
+                                : a.id;
+                              delete customPaths[sourceId];
                               await scan({ ...settings, customPaths });
                               change("customPaths", customPaths);
                             })

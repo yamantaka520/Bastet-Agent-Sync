@@ -94,8 +94,14 @@ impl NativeStore {
         if account.is_empty() || account.len() > 256 {
             return Err("invalid_credential_id".into());
         }
-        keyring::Entry::new("tw.bastet.agent-sync", account)
-            .map_err(|_| "credential_store_unavailable".into())
+        // Store and independently distributed apps have separate configuration
+        // containers and must not silently share credentials by account name.
+        let service = if cfg!(feature = "mac-app-store") {
+            "tw.bastet.agent-sync.app-store"
+        } else {
+            "tw.bastet.agent-sync"
+        };
+        keyring::Entry::new(service, account).map_err(|_| "credential_store_unavailable".into())
     }
 }
 impl SecretStore for NativeBackend {

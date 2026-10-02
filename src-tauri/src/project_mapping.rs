@@ -173,6 +173,63 @@ pub fn validate_mappings(mappings: &[Mapping]) -> Result<()> {
     prepare(mappings).map(|_| ())
 }
 
+/// Select the one longest source prefix relevant to a received working
+/// directory, without touching unrelated destination folders. Callers then
+/// acquire that target's sandbox grant before validating or transforming it.
+#[cfg(feature = "mac-app-store")]
+pub fn relevant_mapping(path: &str, mappings: &[Mapping]) -> Result<Vec<Mapping>> {
+    if mappings.len() > 64 {
+        return Err("project_mapping_invalid".into());
+    }
+    let path = absolute(path)?;
+    let mut best: Option<(&Mapping, usize)> = None;
+    for mapping in mappings {
+        let source = absolute(&mapping.source)?;
+        if !starts_with(&path, &source) {
+            continue;
+        }
+        let len = source.components.len();
+        match best {
+            Some((old, old_len)) if old_len == len && old.target != mapping.target => {
+                return Err("project_mapping_conflict".into());
+            }
+            Some((_, old_len)) if old_len >= len => {}
+            _ => best = Some((mapping, len)),
+        }
+    }
+    Ok(best
+        .map(|(mapping, _)| vec![mapping.clone()])
+        .unwrap_or_default())
+}
+
+#[cfg(all(test, feature = "mac-app-store"))]
+mod relevant_tests {
+    use super::*;
+
+    #[test]
+    fn selects_only_longest_matching_target_without_touching_other_paths() {
+        let mappings = vec![
+            Mapping {
+                source: "/work".into(),
+                target: "/unused".into(),
+            },
+            Mapping {
+                source: "/work/project".into(),
+                target: "/selected".into(),
+            },
+            Mapping {
+                source: "/other".into(),
+                target: "/also-unused".into(),
+            },
+        ];
+        assert_eq!(
+            relevant_mapping("/work/project/src", &mappings).unwrap(),
+            vec![mappings[1].clone()]
+        );
+        assert!(relevant_mapping("/unmapped", &mappings).unwrap().is_empty());
+    }
+}
+
 /// Returns None for an unmapped path. Matching uses complete components, with
 /// case-insensitive comparison only for Windows source paths.
 pub fn remap_path(path: &str, mappings: &[Mapping]) -> Result<Option<String>> {

@@ -1,14 +1,15 @@
 //! Invoke the installed AMOS CLI, never copy or overwrite its active database.
-use crate::sync::{
-    bundle::{hash, Result, MAX_FILE},
-    storage,
-};
+use crate::sync::bundle::{hash, Result};
+#[cfg(not(feature = "mac-app-store"))]
+use crate::sync::{bundle::MAX_FILE, storage};
+use std::path::{Path, PathBuf};
+#[cfg(not(feature = "mac-app-store"))]
 use std::{
-    path::{Path, PathBuf},
     process::{Command, Stdio},
     time::{Duration, Instant},
 };
 
+#[cfg(not(feature = "mac-app-store"))]
 pub fn executable() -> Option<PathBuf> {
     let name = if cfg!(windows) {
         "agent-memory.exe"
@@ -52,6 +53,11 @@ pub fn executable() -> Option<PathBuf> {
         .into_iter()
         .find(|p| p.is_absolute() && p.is_file())
 }
+#[cfg(feature = "mac-app-store")]
+pub fn configured(_root: &Path) -> Result<PathBuf> {
+    Err("memory_unavailable_store".into())
+}
+#[cfg(not(feature = "mac-app-store"))]
 pub fn configured(root: &Path) -> Result<PathBuf> {
     let file = root.join("memory-cli.json");
     if file.exists() {
@@ -64,6 +70,7 @@ pub fn configured(root: &Path) -> Result<PathBuf> {
     }
     executable().ok_or("memory_cli_missing".into())
 }
+#[cfg(not(feature = "mac-app-store"))]
 #[tauri::command]
 pub async fn choose_memory_cli(app: tauri::AppHandle) -> Result<bool> {
     use tauri::Manager;
@@ -90,6 +97,7 @@ pub async fn choose_memory_cli(app: tauri::AppHandle) -> Result<bool> {
     )?;
     Ok(true)
 }
+#[cfg(not(feature = "mac-app-store"))]
 fn run(cli: &Path, home: &Path, action: &str, target: &Path) -> Result<()> {
     let output = tempfile::NamedTempFile::new().map_err(|_| "memory_cli_failed")?;
     let mut cmd = Command::new(cli);
@@ -143,6 +151,11 @@ fn run(cli: &Path, home: &Path, action: &str, target: &Path) -> Result<()> {
     }
     Ok(())
 }
+#[cfg(feature = "mac-app-store")]
+pub fn export(_cli: &Path, _home: &Path, _staging: &Path) -> Result<String> {
+    Err("memory_unavailable_store".into())
+}
+#[cfg(not(feature = "mac-app-store"))]
 pub fn export(cli: &Path, home: &Path, staging: &Path) -> Result<String> {
     // Missing stores are errors, not empty exports (the CLI otherwise creates a new DB).
     if !home.join("memories.db").is_file() {
@@ -176,6 +189,11 @@ pub fn fingerprint(text: &str) -> Result<String> {
     records.sort();
     Ok(hash(records.join("\n").as_bytes()))
 }
+#[cfg(feature = "mac-app-store")]
+pub fn apply(_cli: &Path, _home: &Path, _staging: &Path, _text: &str, _id: &str) -> Result<()> {
+    Err("memory_unavailable_store".into())
+}
+#[cfg(not(feature = "mac-app-store"))]
 pub fn apply(cli: &Path, home: &Path, staging: &Path, text: &str, id: &str) -> Result<()> {
     crate::memory_adapter::inspect(text)?;
     if !crate::sync::bundle::is_hash(id) || !home.join("memories.db").is_file() {
@@ -196,9 +214,28 @@ pub fn apply(cli: &Path, home: &Path, staging: &Path, text: &str, id: &str) -> R
     storage::immutable(&path, text.as_bytes())?;
     run(cli, home, "import", &path)
 }
+#[cfg(all(test, feature = "mac-app-store"))]
+mod store_tests {
+    use super::*;
+
+    #[test]
+    fn store_channel_never_reads_or_executes_memory_cli() {
+        let absent = Path::new("/definitely-not-an-amos-installation");
+        assert_eq!(configured(absent).unwrap_err(), "memory_unavailable_store");
+        assert_eq!(
+            export(absent, absent, absent).unwrap_err(),
+            "memory_unavailable_store"
+        );
+        assert_eq!(
+            apply(absent, absent, absent, "", "").unwrap_err(),
+            "memory_unavailable_store"
+        );
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(feature = "mac-app-store"))]
     #[test]
     #[ignore = "requires an installed AMOS CLI; runs only against isolated temporary homes"]
     fn installed_cli_exports_and_merges_without_manual_files() {

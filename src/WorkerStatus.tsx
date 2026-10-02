@@ -5,7 +5,7 @@ import NativeSessions, {
 } from "./NativeSessions";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Locale } from "./i18n";
+import { messages, type Locale } from "./i18n";
 import { names } from "./model";
 import { spaceErrorText } from "./space-errors";
 export type SyncStatus = {
@@ -44,6 +44,8 @@ export const workerMessages = {
     "請至少選取一個同步來源。",
     "請先暫停同步再修改設定。",
     "進階：手動封包檢查（同步不需要此步驟）",
+    "以下來源本輪略過：",
+    "已套用對話",
   ],
   "zh-Hans": [
     "Agent Memory OS：勾选后按启动即可自动同步，无需手动导入导出。仅与可信且持有同一恢复密钥的设备共享空间；包含私有记忆、删除与权限数据。",
@@ -66,6 +68,8 @@ export const workerMessages = {
     "请至少选择一个同步来源。",
     "请先暂停同步再修改设置。",
     "高级：手动封包检查（同步不需要此步骤）",
+    "本轮跳过以下来源：",
+    "已应用对话",
   ],
   en: [
     "Agent Memory OS syncs automatically after selection and Start. No manual export/import. Share this space only with trusted devices holding the same recovery key; it includes private memories, deletions and permissions.",
@@ -88,6 +92,8 @@ export const workerMessages = {
     "Select at least one source.",
     "Pause synchronization before changing settings.",
     "Advanced: manual bundle check (not needed for sync)",
+    "Skipped this cycle:",
+    "Applied conversations",
   ],
   ja: [
     "Agent Memory OS は選択して開始すると自動同期します。手動の入出力は不要です。同じ復元キーを持つ信頼できる端末とのみ共有してください。非公開の記憶、削除、権限も含まれます。",
@@ -110,6 +116,8 @@ export const workerMessages = {
     "同期するソースを選択してください。",
     "設定変更前に同期を一時停止してください。",
     "詳細：手動バンドル確認（同期には不要）",
+    "今回は以下のソースをスキップ：",
+    "適用した会話",
   ],
   ko: [
     "Agent Memory OS는 선택 후 시작하면 자동 동기화합니다. 수동 내보내기/가져오기는 필요 없습니다. 같은 복구 키를 가진 신뢰하는 장치와만 공유하세요. 비공개 기억, 삭제 및 권한도 포함됩니다.",
@@ -132,6 +140,8 @@ export const workerMessages = {
     "동기화할 소스를 선택하세요.",
     "설정 변경 전에 동기화를 일시 중지하세요.",
     "고급: 수동 묶음 검사 (동기화에 필요 없음)",
+    "이번 동기화에서 건너뛴 소스:",
+    "적용된 대화",
   ],
 } as const;
 export function phaseText(s: SyncStatus, locale: Locale) {
@@ -161,6 +171,12 @@ export function phaseText(s: SyncStatus, locale: Locale) {
 }
 export function workerError(error: string, locale: Locale) {
   const t = workerMessages[locale];
+  if (
+    error === "sandbox_reauthorize" ||
+    error === "sandbox_grant_unavailable"
+  ) {
+    return messages[locale][error];
+  }
   const spaceError = spaceErrorText(error, locale);
   if (spaceError) return spaceError;
   return (
@@ -176,11 +192,13 @@ export function workerError(error: string, locale: Locale) {
 export default function WorkerStatus({
   native,
   locale,
+  memorySyncAvailable = true,
   status,
   onStatus,
 }: {
   native: boolean;
   locale: Locale;
+  memorySyncAvailable?: boolean;
   status: SyncStatus | null;
   onStatus: (s: SyncStatus) => void;
 }) {
@@ -210,26 +228,35 @@ export default function WorkerStatus({
         locale={locale}
         running={!!status?.running}
         sources={status?.sources}
+        storeChannel={!memorySyncAvailable}
       />
-      <p>{t[0]}</p>
-      <button
-        disabled={!native || !!status?.running}
-        onClick={() => {
-          setPickerError(null);
-          void invoke("choose_memory_cli").catch((e) =>
-            setPickerError(typeof e === "string" ? e : "memory_cli_missing"),
-          );
-        }}
-      >
-        {t[16]}
-      </button>
-      {pickerError && <p role="alert">{workerError(pickerError, locale)}</p>}
+      {memorySyncAvailable && (
+        <>
+          <p>{t[0]}</p>
+          <button
+            disabled={!native || !!status?.running}
+            onClick={() => {
+              setPickerError(null);
+              void invoke("choose_memory_cli").catch((e) =>
+                setPickerError(
+                  typeof e === "string" ? e : "memory_cli_missing",
+                ),
+              );
+            }}
+          >
+            {t[16]}
+          </button>
+          {pickerError && (
+            <p role="alert">{workerError(pickerError, locale)}</p>
+          )}
+        </>
+      )}
       {status && status.phase && (
         <>
           <strong>{phaseText(status, locale)}</strong>
           <p>
-            {t[11]}: {status.published} · {t[12]}: {status.received} · {t[13]}:{" "}
-            {status.applied}
+            {t[11]}: {status.published} · {t[12]}: {status.received} ·{" "}
+            {memorySyncAvailable ? t[13] : t[21]}: {status.applied}
           </p>
           {status.lastSuccess && (
             <p>
@@ -242,7 +269,8 @@ export default function WorkerStatus({
           )}
           {status.skipped.length > 0 && (
             <p>
-              {t[10]} {status.skipped.map((id) => names[id] ?? id).join(", ")}
+              {memorySyncAvailable ? t[10] : t[20]}{" "}
+              {status.skipped.map((id) => names[id] ?? id).join(", ")}
             </p>
           )}
           {status.running && (

@@ -18,6 +18,10 @@ pub const AGENTS: [&str; 8] = [
 ];
 pub const LOCALES: [&str; 5] = ["en", "zh-Hant", "zh-Hans", "ja", "ko"];
 
+pub fn agent_available(id: &str) -> bool {
+    AGENTS.contains(&id) && !(cfg!(feature = "mac-app-store") && id == "agent-memory-os")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
@@ -72,6 +76,14 @@ pub fn discover(
     overrides: &HashMap<String, String>,
     env: &HashMap<String, String>,
 ) -> Vec<Agent> {
+    let claude_code = env
+        .get("CLAUDE_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or(home.join(".claude"));
+    let codex = env
+        .get("CODEX_HOME")
+        .map(PathBuf::from)
+        .unwrap_or(home.join(".codex"));
     let desktop = if cfg!(target_os = "macos") {
         home.join("Library/Application Support/Claude")
     } else {
@@ -79,12 +91,8 @@ pub fn discover(
     };
     let defaults = [
         desktop,
-        env.get("CLAUDE_CONFIG_DIR")
-            .map(PathBuf::from)
-            .unwrap_or(home.join(".claude")),
-        env.get("CODEX_HOME")
-            .map(PathBuf::from)
-            .unwrap_or(home.join(".codex")),
+        claude_code.clone(),
+        codex.clone(),
         home.join(".gemini/antigravity-cli"),
         env.get("GROK_HOME")
             .map(PathBuf::from)
@@ -95,20 +103,37 @@ pub fn discover(
         env.get("AGENT_MEMORY_HOME")
             .map(PathBuf::from)
             .unwrap_or(home.join(".agent-memory")),
-        env.get("CODEX_HOME")
-            .map(PathBuf::from)
-            .unwrap_or(home.join(".codex")),
+        codex,
     ];
     AGENTS
         .iter()
         .zip(defaults)
         .map(|(id, default)| {
-            let path = overrides.get(*id).map(PathBuf::from).unwrap_or(default);
+            let source_id = if cfg!(feature = "mac-app-store") {
+                match *id {
+                    "claude" => "claude-code",
+                    "chatgpt-work" => "codex",
+                    id => id,
+                }
+            } else {
+                id
+            };
+            let default = if cfg!(feature = "mac-app-store") && *id == "claude" {
+                claude_code.clone()
+            } else {
+                default
+            };
+            let path = overrides
+                .get(source_id)
+                .map(PathBuf::from)
+                .unwrap_or(default);
             Agent {
                 id: id.to_string(),
                 path: path.to_string_lossy().into_owned(),
-                detected: path.is_dir(),
-                custom: overrides.contains_key(*id),
+                // Store discovery has no durable permission until its caller
+                // resolves and starts a user-selected security scope.
+                detected: !cfg!(feature = "mac-app-store") && path.is_dir(),
+                custom: overrides.contains_key(source_id),
             }
         })
         .collect()
@@ -139,20 +164,18 @@ pub fn validate(settings: &Settings) -> Result<(), String> {
     if settings
         .selected_agents
         .iter()
-        .any(|a| !AGENTS.contains(&a.as_str()) || !seen.insert(a))
+        .any(|a| !agent_available(a) || !seen.insert(a))
     {
         return Err("invalid_settings".into());
     }
     for (id, path) in &settings.custom_paths {
-        if !AGENTS.contains(&id.as_str())
-            || !Path::new(path).is_absolute()
-            || !Path::new(path).is_dir()
-        {
+        if !agent_available(id) || !Path::new(path).is_absolute() || !Path::new(path).is_dir() {
             return Err("invalid_source".into());
         }
     }
     if !settings.folder.is_empty()
-        && (!Path::new(&settings.folder).is_absolute() || !Path::new(&settings.folder).is_dir())
+        && (!Path::new(&settings.folder).is_absolute()
+            || (!cfg!(feature = "mac-app-store") && !Path::new(&settings.folder).is_dir()))
     {
         return Err("invalid_folder".into());
     }
@@ -165,10 +188,33 @@ pub fn validate_overlap(settings: &Settings, agents: &[Agent]) -> Result<(), Str
     }
     let dest = fs::canonicalize(&settings.folder).map_err(|_| "invalid_folder")?;
     for agent in agents {
-        if let Ok(source) = fs::canonicalize(&agent.path) {
-            if source.starts_with(&dest) || dest.starts_with(&source) {
+        #[cfg(feature = "mac-app-store")]
+        let selected = settings.selected_agents.iter().any(|id| {
+            id == &agent.id
+                || (id == "claude" && agent.id == "claude-code")
+                || (id == "chatgpt-work" && agent.id == "codex")
+        });
+        #[cfg(feature = "mac-app-store")]
+        let source = if selected {
+            fs::canonicalize(&agent.path).map_err(|_| "invalid_source")?
+        } else {
+            let raw = PathBuf::from(&agent.path);
+            if !raw.is_absolute()
+                || raw
+                    .components()
+                    .any(|part| matches!(part, std::path::Component::ParentDir))
+            {
                 return Err("overlapping_folder".into());
             }
+            crate::sandbox_access::lexical_overlap_path(&raw)
+        };
+        #[cfg(not(feature = "mac-app-store"))]
+        let source = match fs::canonicalize(&agent.path) {
+            Ok(source) => source,
+            Err(_) => continue,
+        };
+        if source.starts_with(&dest) || dest.starts_with(&source) {
+            return Err("overlapping_folder".into());
         }
     }
     Ok(())
@@ -318,7 +364,8 @@ mod tests {
         paths.insert("codex".into(), custom.to_string_lossy().into_owned());
         let agents = discover(dir.path(), dir.path(), &paths, &HashMap::new());
         assert_eq!(agents.len(), 8);
-        assert!(agents[2].detected && agents[2].custom);
+        assert_eq!(agents[2].detected, !cfg!(feature = "mac-app-store"));
+        assert!(agents[2].custom);
         assert!(!agents[1].detected);
     }
     #[test]
@@ -334,6 +381,10 @@ mod tests {
             custom: false,
         }];
         let mut s = settings();
+        #[cfg(feature = "mac-app-store")]
+        {
+            s.selected_agents = vec!["codex".into()];
+        }
         for path in [dir.path(), source.as_path(), child.as_path()] {
             s.folder = path.to_string_lossy().into();
             assert!(validate_overlap(&s, &agents).is_err());
@@ -343,6 +394,7 @@ mod tests {
         s.folder = other.to_string_lossy().into();
         assert!(validate_overlap(&s, &agents).is_ok());
     }
+    #[cfg(not(feature = "mac-app-store"))]
     #[test]
     fn memory_os_home_is_discovered_and_selection_persists() {
         let d = tempfile::tempdir().unwrap();
@@ -362,6 +414,7 @@ mod tests {
             s.selected_agents
         );
     }
+    #[cfg(not(feature = "mac-app-store"))]
     #[test]
     fn environment_profile_is_detected() {
         let dir = tempfile::tempdir().unwrap();
@@ -371,5 +424,47 @@ mod tests {
             dir.path().to_string_lossy().into_owned(),
         );
         assert!(discover(dir.path(), dir.path(), &HashMap::new(), &env)[5].detected);
+    }
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_rejects_memory_source_and_custom_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = settings();
+        s.selected_agents = vec!["agent-memory-os".into()];
+        assert_eq!(validate(&s), Err("invalid_settings".into()));
+        s.selected_agents.clear();
+        s.custom_paths.insert(
+            "agent-memory-os".into(),
+            dir.path().to_string_lossy().into_owned(),
+        );
+        assert_eq!(validate(&s), Err("invalid_source".into()));
+    }
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_discovery_does_not_present_home_scan_as_authorization() {
+        let dir = tempfile::tempdir().unwrap();
+        let env = HashMap::from([(
+            "CODEX_HOME".into(),
+            dir.path().to_string_lossy().into_owned(),
+        )]);
+        let agents = discover(dir.path(), dir.path(), &HashMap::new(), &env);
+        assert!(!agents.iter().find(|a| a.id == "codex").unwrap().detected);
+    }
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_alias_cards_show_the_worker_source_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let custom = dir.path().join("custom");
+        fs::create_dir(&custom).unwrap();
+        let overrides =
+            HashMap::from([("claude-code".into(), custom.to_string_lossy().into_owned())]);
+        let agents = discover(dir.path(), dir.path(), &overrides, &HashMap::new());
+        let desktop = agents.iter().find(|a| a.id == "claude").unwrap();
+        let code = agents.iter().find(|a| a.id == "claude-code").unwrap();
+        assert_eq!(desktop.path, code.path);
+        assert!(desktop.custom && code.custom);
+        let work = agents.iter().find(|a| a.id == "chatgpt-work").unwrap();
+        let codex = agents.iter().find(|a| a.id == "codex").unwrap();
+        assert_eq!(work.path, codex.path);
     }
 }

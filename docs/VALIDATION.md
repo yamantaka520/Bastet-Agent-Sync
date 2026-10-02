@@ -1,5 +1,15 @@
 # Validation
 
+## Mac App Store preparation — local acceptance, 2026-10-02
+
+- Added an opt-in `mac-app-store` feature with direct updater/plugin commands excluded and five-language Store UI. The user's first-Store-release decision excludes Agent Memory OS in both backend and UI; the default direct-download channel retains its existing updater and AMOS behavior. Store credentials use a separate Keychain service.
+- Implemented security-scoped folder-picker bookmarks, scoped reads through worker/restore paths, and same-path managed-handoff reauthorization. Native Store-profile restart persistence, moved/revoked grant behavior and real provider acceptance remain pending.
+- Default Rust suite: **123 passed, 7 ignored**. Store-feature Rust suite: **132 passed, 6 ignored**. Frontend: **57 passed**, production build passed. Strict Clippy for both feature configurations and formatting passed. Two packaging-fixture tests passed; 28 Markdown documents passed the documentation check.
+- Built and verified the universal Store-signed `.app` and `.pkg` using marketing version `0.6.0`, build `1`. The production Store profile cannot be locally launched by design; TestFlight or a development profile is required. A separate ad-hoc sandbox test copy launched after correcting the test copy's executable bit. Its isolated core UI check passed: published/received 2, retained branches 2, repeated transfer 0, rebuilt objects 3. This is not production-profile, Store Keychain, or Drive acceptance.
+- Four frontend regression cases cover transient wizard-lock recovery, restored folder input/options, and preservation of genuine startup/action errors and unsaved edits. The native UI exposed a stale initial error; lock contention is inferred from the competing startup reads rather than a captured IPC trace.
+- App Store Connect draft state: names/subtitles, five localized descriptions and keywords, support/marketing URLs, free price, 175 eligible territories, `2026 Bastet AI` copyright, private review contact, manual release and user's non-trader DSA declaration saved. Apple's page reports regulatory requirements completed. No upload, TestFlight build, App Review submission or publication has occurred. Public 0.6.0 assets were not changed.
+- Still pending: production-profile/TestFlight acceptance, native bookmark restart/revoke/provider tests, privacy policy publication, privacy manifest and API reasons, encryption/age/content answers, reviewer setup and screenshots. See [App Store delivery](APP_STORE.md).
+
 ## 0.6.0 published release — 2026-10-02
 
 - [v0.6.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.6.0) is public/latest with 19 assets and five-language notes. Tagged source: `21e280de0588c4a0a17cd1b57c57e05482788a37`.

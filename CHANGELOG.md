@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Mac App Store preparation
+
+- Retry transient setup-state lock contention at startup without leaving a stale error; preserve genuine startup and action failures.
+
+- Add an opt-in `mac-app-store` build that omits direct updater/plugin commands, uses a separate Keychain service, and presents Store update guidance in all five locales. The first Store release excludes Agent Memory OS in backend and UI by explicit product decision; the default direct-download channel retains existing updater and AMOS behavior.
+- Implement security-scoped picker bookmarks, scoped reads for worker and restore flows, and same-path handoff reauthorization. Build and verify the universal Store-signed `.app` and `.pkg` at version `0.6.0` build `1`; this is a local candidate only.
+- Save five-language Store descriptions and keywords, support and marketing URLs, and account draft selections. Local validation and limits are in [validation](docs/VALIDATION.md); sandbox restart/revoke/provider acceptance, TestFlight, privacy/review materials, upload, App Review and publication remain pending. Public 0.6.0 assets are unchanged.
+
 ## 0.6.0 — cross-OS conversation handoff and sync performance
 
 Published 2026-10-02: [installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.6.0). Four architecture builds, three-platform CI and installer checks, six directed cross-OS returns, seven updater signatures and all release checksums passed. Actual continuation and performance boundaries are recorded in [validation](docs/VALIDATION.md).

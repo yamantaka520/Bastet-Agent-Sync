@@ -6,6 +6,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { messages, detectLocale, languages } from "../src/i18n";
 import { defaults } from "../src/model";
@@ -71,6 +72,97 @@ describe("locale and native setup contracts", () => {
     expect(detectLocale("ja-JP")).toBe("ja");
     expect(detectLocale("ko-KR")).toBe("ko");
     expect(detectLocale("fr-FR")).toBe("en");
+  });
+  it("hides Agent Memory OS and explains the Store limitation in all five locales", async () => {
+    api.native = true;
+    for (const locale of Object.keys(languages) as (keyof typeof languages)[]) {
+      const settings = {
+        ...defaults(locale),
+        deviceName: "Store test",
+        selectedAgents: ["codex", "agent-memory-os"],
+        customPaths: { "agent-memory-os": "/legacy-memory" },
+      };
+      api.invoke.mockImplementation(async (command: string) =>
+        command === "bootstrap"
+          ? {
+              settings,
+              agents: [
+                {
+                  id: "codex",
+                  path: "/fixture",
+                  detected: false,
+                  custom: false,
+                },
+                {
+                  id: "agent-memory-os",
+                  path: "/legacy-memory",
+                  detected: true,
+                  custom: true,
+                },
+              ],
+              memorySyncAvailable: false,
+              trayAvailable: true,
+            }
+          : undefined,
+      );
+      const { unmount } = render(<App />);
+      expect(
+        await screen.findByText(messages[locale].memoryUnavailableStore),
+      ).toBeTruthy();
+      expect(screen.getByText(messages[locale].storeFolderAccess)).toBeTruthy();
+      expect(screen.getByText(messages[locale].storeChooseFolder)).toBeTruthy();
+      expect(
+        screen.queryByRole("checkbox", { name: "Agent Memory OS" }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /Agent Memory OS CLI/ }),
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /JSONL/ })).toBeNull();
+      if (locale === "en") {
+        fireEvent.click(screen.getByRole("checkbox", { name: "Codex" }));
+        fireEvent.click(screen.getByRole("button", { name: messages.en.save }));
+        await waitFor(() =>
+          expect(api.invoke).toHaveBeenCalledWith("save_settings", {
+            settings: { ...settings, selectedAgents: [], customPaths: {} },
+          }),
+        );
+      }
+      unmount();
+      api.invoke.mockReset();
+    }
+  });
+  it("stores Store alias folder choices under the source root the worker reads", async () => {
+    api.native = true;
+    const settings = { ...defaults("en"), deviceName: "Store test" };
+    const agents = [
+      { id: "claude", path: "/claude", detected: false, custom: false },
+      { id: "claude-code", path: "/claude", detected: false, custom: false },
+      { id: "codex", path: "/codex", detected: false, custom: false },
+      { id: "chatgpt-work", path: "/codex", detected: false, custom: false },
+    ];
+    api.invoke.mockImplementation(async (command: string) => {
+      if (command === "bootstrap")
+        return { settings, agents, memorySyncAvailable: false, trayAvailable: true };
+      if (command === "choose_folder") return "/chosen";
+      if (command === "scan_agents") return agents;
+      return undefined;
+    });
+    render(<App />);
+    await screen.findByText("ChatGPT Work");
+    for (const [label, sourceId] of [
+      ["Claude", "claude-code"],
+      ["ChatGPT Work", "codex"],
+    ]) {
+      const card = screen.getByText(label).closest(".agent-card");
+      expect(card).not.toBeNull();
+      fireEvent.click(within(card as HTMLElement).getByRole("button", { name: messages.en.custom }));
+      await waitFor(() => {
+        const scans = api.invoke.mock.calls.filter(([command]) => command === "scan_agents");
+        expect(scans.at(-1)?.[1]).toMatchObject({
+          settings: { customPaths: { [sourceId]: "/chosen" } },
+        });
+      });
+    }
   });
   it("never simulates native discovery or synchronization in browser preview", () => {
     render(<App />);
@@ -189,7 +281,12 @@ describe("isolated synchronization check", () => {
     expect(api.invoke).toHaveBeenCalledWith("run_sync_diagnostic");
     expect(
       api.invoke.mock.calls.every(([name]) =>
-        ["bootstrap", "sync_status", "run_sync_diagnostic"].includes(name),
+        [
+          "bootstrap",
+          "sync_status",
+          "update_status",
+          "run_sync_diagnostic",
+        ].includes(name),
       ),
     ).toBe(true);
     expect(

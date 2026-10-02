@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "targets": [
+      "app"
+    ],
+    "category": "DeveloperTool",
+    "createUpdaterArtifacts": false,
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "bundleVersion": "1"
+    }
+  }
+}

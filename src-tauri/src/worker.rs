@@ -251,6 +251,11 @@ fn run_once(
     binding: &Binding,
     memory: Option<&Installed>,
 ) -> Result<(queue::Exchange, usize)> {
+    let config = app
+        .path()
+        .app_config_dir()
+        .map_err(|_| "store_unavailable")?;
+    let _scopes = crate::sandbox_access::settings_scopes(&config, settings)?;
     worker.update(|s| s.phase = "credentials".into());
     let mut guard = cloud.0.try_lock().map_err(|_| "cloud_busy")?;
     let root = app
@@ -424,6 +429,14 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
     memory: Option<&M>,
     direction: Direction,
 ) -> Result<(queue::Exchange, usize)> {
+    #[cfg(feature = "mac-app-store")]
+    if settings
+        .selected_agents
+        .iter()
+        .any(|a| a == "agent-memory-os")
+    {
+        return Err("invalid_source".into());
+    }
     use crate::native_sessions::SourceStatus;
     let (tasks, groups) = parallel::plan(&settings.selected_agents, agents);
     worker.update(|s| {
@@ -672,6 +685,14 @@ pub async fn sync_start(
             .map_err(|_| "store_unavailable")?;
         let settings =
             crate::model::load(&root.join("settings.json"))?.ok_or("settings_unreadable")?;
+        #[cfg(feature = "mac-app-store")]
+        let mut settings = settings;
+        #[cfg(feature = "mac-app-store")]
+        {
+            settings.selected_agents.retain(|a| a != "agent-memory-os");
+            settings.custom_paths.remove("agent-memory-os");
+        }
+        let _initial_scopes = crate::sandbox_access::settings_scopes(&root, &settings)?;
         crate::model::validate(&settings)?;
         let t = Transaction::open(&root)?;
         if !t.state.complete {
@@ -1027,6 +1048,7 @@ mod tests {
             self.lock().unwrap().apply(root, text, id)
         }
     }
+    #[cfg(not(feature = "mac-app-store"))]
     #[test]
     fn parallel_sources_preserve_alias_counts_failure_isolation_and_idempotent_restore() {
         let temp = tempfile::tempdir().unwrap();
@@ -1206,5 +1228,43 @@ mod tests {
             .sources
             .iter()
             .all(|s| s.state == "paused"));
+    }
+
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_sync_sources_rejects_memory_before_exchange() {
+        let temp = tempfile::tempdir().unwrap();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = crate::cloud::crypto::SpaceKey::generate().unwrap();
+        let remote = Mutex::new(Remote(RefCell::new(BTreeMap::new()), Cell::new(0)));
+        let memory = Mutex::new(Store(
+            RefCell::new(text("a")),
+            Cell::new(0),
+            Cell::new(false),
+        ));
+        let settings = Settings {
+            selected_agents: vec!["agent-memory-os".into()],
+            ..Default::default()
+        };
+        assert_eq!(
+            sync_sources(
+                temp.path(),
+                &Worker::default(),
+                &settings,
+                &[],
+                &binding,
+                &key,
+                &remote,
+                Some(&memory),
+                Direction::Upload,
+            )
+            .err(),
+            Some("invalid_source".into())
+        );
+        assert_eq!(memory.lock().unwrap().1.get(), 0);
     }
 }

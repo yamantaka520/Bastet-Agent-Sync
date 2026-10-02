@@ -124,6 +124,21 @@ fn load_handoffs(root: &Path) -> Result<Handoffs> {
     }
     Ok(registry)
 }
+
+fn handoff_parent_scope(
+    config: &Path,
+    parent: &Path,
+) -> Result<Option<crate::sandbox_access::Scope>> {
+    // Managed profiles created by auto_prepare are inside app-private data and
+    // never went through a picker. Canonical containment prevents a symlink in
+    // that tree from making an external directory look private.
+    if let (Ok(private), Ok(candidate)) = (fs::canonicalize(config), fs::canonicalize(parent)) {
+        if candidate.starts_with(private) {
+            return Ok(None);
+        }
+    }
+    crate::sandbox_access::access(config, parent).map(Some)
+}
 fn save_handoffs(root: &Path, registry: &Handoffs) -> Result<()> {
     storage::replace(&handoffs_path(root), json(registry)?.as_bytes())
 }
@@ -153,6 +168,22 @@ fn paths_overlap(a: &Path, b: &Path) -> bool {
     let a = fs::canonicalize(a).unwrap_or_else(|_| a.to_path_buf());
     let b = fs::canonicalize(b).unwrap_or_else(|_| b.to_path_buf());
     a.starts_with(&b) || b.starts_with(&a)
+}
+#[cfg(feature = "mac-app-store")]
+fn restore_overlaps_source(folder: &Path, source: &Path, config: &Path) -> bool {
+    if !source.is_absolute()
+        || source
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
+    {
+        return true;
+    }
+    if let Ok(_scope) = crate::sandbox_access::access(config, source) {
+        return paths_overlap(folder, source);
+    }
+    // An ungranted root cannot be stat-ed merely for this check.
+    let source = crate::sandbox_access::lexical_overlap_path(source);
+    folder.starts_with(&source) || source.starts_with(folder)
 }
 fn allowed(agent: &str, path: &str) -> bool {
     if !safe_relative(path) {
@@ -648,6 +679,10 @@ fn capture_grok(root: &Path, directory: &Path) -> Result<Manifest> {
     })
 }
 fn capture_handoff(h: &Handoff, staging: &Path) -> Result<Manifest> {
+    let _parent_scope = handoff_parent_scope(
+        staging.parent().ok_or("store_unavailable")?,
+        h.path.parent().ok_or("sandbox_reauthorize")?,
+    )?;
     if !safe_relative(&h.main_file) || !allowed(&h.agent, &h.main_file) {
         return Err("sync_journal_invalid".into());
     }
@@ -1071,6 +1106,9 @@ fn usable_cwd(cwd: &str, mappings: &[crate::project_mapping::Mapping]) -> Option
     let mapped = crate::project_mapping::remap_path(cwd, mappings)
         .ok()
         .flatten();
+    // A historical absolute cwd is not a user-selected project grant.
+    #[cfg(feature = "mac-app-store")]
+    mapped.as_ref()?;
     let candidate = mapped.unwrap_or_else(|| cwd.to_owned());
     Path::new(&candidate).is_dir().then_some(candidate)
 }
@@ -1113,6 +1151,14 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
         let mut entries = vec![];
         let settings =
             crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
+        let mut mapping_scopes = Vec::new();
+        let mut permitted_mappings = Vec::new();
+        for mapping in &settings.project_mappings {
+            if let Ok(scope) = crate::sandbox_access::access(&root, Path::new(&mapping.target)) {
+                mapping_scopes.push(scope);
+                permitted_mappings.push(mapping.clone());
+            }
+        }
         for agent in crate::model::AGENTS
             .iter()
             .filter(|a| **a != "agent-memory-os")
@@ -1135,10 +1181,13 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
                 if let Some(meta) = b.snapshot.files.get("session.json") {
                     let v: serde_json::Value =
                         serde_json::from_str(&meta.content).map_err(|_| "session_invalid")?;
-                    let managed = handoffs
-                        .entries
-                        .iter()
-                        .find(|h| h.base == b.id && capture_handoff(h, &p).is_ok());
+                    let managed = handoffs.entries.iter().find(|h| {
+                        h.base == b.id
+                            && h.path.parent().is_some_and(|parent| {
+                                handoff_parent_scope(&root, parent)
+                                    .is_ok_and(|_scope| capture_handoff(h, &p).is_ok())
+                            })
+                    });
                     let branch_count = all
                         .values()
                         .filter(|other| {
@@ -1167,12 +1216,19 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
                         branch_count,
                         managed_profile: managed.map(|h| h.path.to_string_lossy().into_owned()),
                         mapped_cwd: managed
-                            .and_then(|h| Path::new(&h.cwd).is_dir().then(|| h.cwd.clone()))
+                            .and_then(|h| {
+                                #[cfg(feature = "mac-app-store")]
+                                {
+                                    let _ = h;
+                                    None
+                                }
+                                #[cfg(not(feature = "mac-app-store"))]
+                                {
+                                    Path::new(&h.cwd).is_dir().then(|| h.cwd.clone())
+                                }
+                            })
                             .or_else(|| {
-                                usable_cwd(
-                                    v["cwd"].as_str().unwrap_or(""),
-                                    &settings.project_mappings,
-                                )
+                                usable_cwd(v["cwd"].as_str().unwrap_or(""), &permitted_mappings)
                             }),
                     });
                 }
@@ -1264,21 +1320,31 @@ pub async fn restore_received_session(
     if worker.active() {
         return Err("sync_running".into());
     }
-    if !crate::model::AGENTS.contains(&agent.as_str()) || !bundle::is_hash(&id) {
+    if !crate::model::agent_available(&agent) || !bundle::is_hash(&id) {
         return Err("session_invalid".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
-        let Some(folder) = rfd::FileDialog::new().pick_folder() else {
+        let Some(picked) = rfd::FileDialog::new().pick_folder() else {
             return Ok(None);
         };
         let (root, space) = native_root(&app)?;
+        let folder = crate::sandbox_access::grant_selected(&root, &picked)?;
+        let _restore_scope = crate::sandbox_access::access(&root, &folder)?;
         let settings =
             crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
-        if paths_overlap(&folder, &root)
-            || crate::detect(Some(&settings))
-                .iter()
-                .any(|source| paths_overlap(&folder, Path::new(&source.path)))
-        {
+        if paths_overlap(&folder, &root) {
+            return Err("overlapping_folder".into());
+        }
+        let sources = crate::detect(Some(&settings));
+        #[cfg(feature = "mac-app-store")]
+        let overlapping_source = sources
+            .iter()
+            .any(|source| restore_overlaps_source(&folder, Path::new(&source.path), &root));
+        #[cfg(not(feature = "mac-app-store"))]
+        let overlapping_source = sources
+            .iter()
+            .any(|source| paths_overlap(&folder, Path::new(&source.path)));
+        if overlapping_source {
             return Err("overlapping_folder".into());
         }
         let replica = Replica::open(
@@ -1296,15 +1362,23 @@ pub async fn restore_received_session(
         {
             return Err("session_invalid".into());
         }
+        #[cfg(feature = "mac-app-store")]
+        let relevant_mappings = if agent == "agy" {
+            Vec::new()
+        } else {
+            crate::project_mapping::relevant_mapping(&incoming.cwd, &settings.project_mappings)?
+        };
+        #[cfg(not(feature = "mac-app-store"))]
+        let relevant_mappings = settings.project_mappings.clone();
+        let _mapping_scopes = crate::sandbox_access::mapping_scopes(&root, &relevant_mappings)?;
         let manifest = if agent == "agy" {
             incoming
         } else {
             crate::project_mapping::validate_provider_group(&incoming)?;
-            if usable_cwd(&incoming.cwd, &settings.project_mappings).is_none() {
+            if usable_cwd(&incoming.cwd, &relevant_mappings).is_none() {
                 return Err("project_mapping_required".into());
             }
-            let mapped =
-                crate::project_mapping::transform_manifest(&incoming, &settings.project_mappings)?;
+            let mapped = crate::project_mapping::transform_manifest(&incoming, &relevant_mappings)?;
             crate::project_mapping::validate_provider_group(&mapped)?;
             mapped
         };
@@ -1330,7 +1404,7 @@ fn compare_session(
     id: &str,
     source_agent: Option<&str>,
 ) -> Result<crate::review::Comparison> {
-    if !crate::model::AGENTS.contains(&agent) || !bundle::is_hash(id) {
+    if !crate::model::agent_available(agent) || !bundle::is_hash(id) {
         return Err("session_invalid".into());
     }
     let (root, space) = native_root(app)?;
@@ -1351,6 +1425,7 @@ fn compare_session(
         .iter()
         .find(|a| a.id == chosen)
         .ok_or("source_missing")?;
+    let _source_scope = crate::sandbox_access::access(&root, Path::new(&source.path))?;
     let replica = Replica::open(
         &root
             .join(format!("sessions-{canonical}-{space}"))
@@ -1421,6 +1496,96 @@ mod tests {
     use std::cell::{Cell, RefCell};
     use std::collections::BTreeSet;
     use std::io::Write;
+
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_return_capture_requires_restore_parent_grant() {
+        let config = tempfile::tempdir().unwrap();
+        let root = config.path().join("sessions-pi-space");
+        storage::directory(&root).unwrap();
+        let managed = root.join("managed-profiles");
+        storage::directory(&managed).unwrap();
+        let external = tempfile::tempdir().unwrap();
+        assert!(handoff_parent_scope(config.path(), &managed)
+            .unwrap()
+            .is_none());
+        assert_eq!(
+            handoff_parent_scope(config.path(), external.path()).err(),
+            Some("sandbox_reauthorize".into())
+        );
+        #[cfg(unix)]
+        {
+            let alias = config.path().join("outside-link");
+            std::os::unix::fs::symlink(external.path(), &alias).unwrap();
+            assert_eq!(
+                handoff_parent_scope(config.path(), &alias).err(),
+                Some("sandbox_reauthorize".into())
+            );
+        }
+    }
+
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn revoked_external_handoff_is_partial_while_private_handoff_continues() {
+        let config = tempfile::tempdir().unwrap();
+        let root = config.path().join("sync");
+        let managed = root.join("managed-profiles/healthy");
+        let session = "019f0000-0000-7000-8000-000000000001";
+        let cwd = "/fixture";
+        cross_fixture("pi", &managed, cwd, session, "healthy");
+        let mut healthy = Handoff {
+            path: managed,
+            agent: "pi".into(),
+            session: session.into(),
+            main_file: cross_relative("pi", cwd, session),
+            cwd: cwd.into(),
+            stream_profile: "healthy".into(),
+            base: "baseline".into(),
+            fingerprint: String::new(),
+        };
+        healthy.fingerprint =
+            manifest_fingerprint(&capture_handoff(&healthy, &root).unwrap()).unwrap();
+        let external = tempfile::tempdir().unwrap();
+        let stale = Handoff {
+            path: external.path().join("old-restore"),
+            fingerprint: "unchanged".into(),
+            ..healthy.clone()
+        };
+        let registry = Handoffs {
+            version: 1,
+            entries: vec![stale, healthy],
+        };
+        save_handoffs(&root, &registry).unwrap();
+        let before = fs::read(handoffs_path(&root)).unwrap();
+        let binding = Binding {
+            folder: "folder".into(),
+            space: "space".into(),
+            proof: "proof".into(),
+        };
+        let key = SpaceKey::generate().unwrap();
+        let remote = Remote(
+            RefCell::new(BTreeMap::from([(
+                "proof".into(),
+                queue::proof_bundle("space").unwrap(),
+            )])),
+            Cell::new(0),
+        );
+        let result = cycle(
+            &root,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &config.path().join("missing"),
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(result.captured, 1);
+        assert_eq!(result.issues.get("sandbox_reauthorize"), Some(&1));
+        assert_eq!(result.state, "partial");
+        assert_eq!(fs::read(handoffs_path(&root)).unwrap(), before);
+    }
     #[derive(Serialize, Deserialize)]
     struct ExchangeCase {
         agent: String,
@@ -1907,7 +2072,7 @@ mod tests {
             .clone();
         let base_manifest = unpack(&base, &b_all).unwrap();
         drop(b_replica);
-        let b_profile = temp.path().join("b-branch");
+        let b_profile = b_root.join("b-branch");
         restore_manifest(&base_manifest, &b_profile).unwrap();
         register_handoff(&b_root, &base, &base_manifest, &b_profile).unwrap();
         let branch_file = b_profile.join(main_file(&base_manifest).unwrap());
@@ -1997,7 +2162,7 @@ mod tests {
             .unwrap();
         let a_b_head = a_all.get(&b_head.id).unwrap();
         let b_manifest = unpack(a_b_head, &a_all).unwrap();
-        let a_profile = temp.path().join("a-branch");
+        let a_profile = a_root.join("a-branch");
         restore_manifest(&b_manifest, &a_profile).unwrap();
         register_handoff(&a_root, a_b_head, &b_manifest, &a_profile).unwrap();
         fs::OpenOptions::new()
@@ -2290,7 +2455,14 @@ mod tests {
             )
             .unwrap();
         }
-        let result = cycle(
+        let mappings = ["b", "c"].map(|branch| crate::project_mapping::Mapping {
+            source: fs::canonicalize(t.path().join(format!("{branch}-project")))
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
+            target: a_project.to_string_lossy().into_owned(),
+        });
+        let result = cycle_with_mappings(
             &a_root,
             &binding,
             &key,
@@ -2298,6 +2470,7 @@ mod tests {
             agent,
             &a_home,
             Direction::Download,
+            &mappings,
             || false,
         )
         .unwrap();

@@ -69,6 +69,7 @@ pub fn restore_export(bundle: &Bundle) -> Result<String, String> {
     inspect(text)?;
     Ok(text.clone())
 }
+#[cfg(not(feature = "mac-app-store"))]
 #[tauri::command]
 pub async fn inspect_memory_export() -> Result<Option<Inspection>, String> {
     let selected = rfd::AsyncFileDialog::new()

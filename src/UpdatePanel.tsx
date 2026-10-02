@@ -25,6 +25,27 @@ export default function UpdatePanel({
     total: null,
   });
   const [busy, setBusy] = useState(false);
+  const [channelKnown, setChannelKnown] = useState(false);
+  useEffect(() => {
+    if (!native) return;
+    let active = true;
+    void invoke<Status>("update_status")
+      .then((s) => {
+        if (!s || typeof s.phase !== "string") {
+          throw new Error("Invalid update status");
+        }
+        if (active) {
+          setStatus(s);
+          setChannelKnown(true);
+        }
+      })
+      .catch(() => {
+        if (active) setStatus((s) => ({ ...s, phase: "failed" }));
+      });
+    return () => {
+      active = false;
+    };
+  }, [native]);
   async function run(command: string) {
     setBusy(true);
     setStatus((s) => ({
@@ -66,44 +87,52 @@ export default function UpdatePanel({
   return (
     <div className="update-panel">
       <strong>{t[12]}</strong>
-      <button
-        disabled={!native || busy || status.phase === "installed"}
-        onClick={() => run("check_update")}
-      >
-        {t[13]}
-      </button>
-      <p role="status">
-        {labels[status.phase]}
-        {status.phase === "available" && `v${status.version}`}
-      </p>
-      {status.phase === "installing" && (
-        <p>
-          {Math.round(status.downloaded / 1024)} KiB
-          {status.total ? ` / ${Math.round(status.total / 1024)} KiB` : ""}
-        </p>
-      )}
-      {status.phase === "available" && (
+      {status.phase === "app_store" ? (
+        <p role="status">{t[25]}</p>
+      ) : (
         <>
           <button
-            disabled={busy || dirty}
-            onClick={() => run("install_update")}
+            disabled={
+              !native || !channelKnown || busy || status.phase === "installed"
+            }
+            onClick={() => run("check_update")}
           >
-            {t[15]} v{status.version}
+            {t[13]}
           </button>
-          {dirty && <p>{t[23]}</p>}
+          <p role="status">
+            {labels[status.phase]}
+            {status.phase === "available" && `v${status.version}`}
+          </p>
+          {status.phase === "installing" && (
+            <p>
+              {Math.round(status.downloaded / 1024)} KiB
+              {status.total ? ` / ${Math.round(status.total / 1024)} KiB` : ""}
+            </p>
+          )}
+          {status.phase === "available" && (
+            <>
+              <button
+                disabled={busy || dirty}
+                onClick={() => run("install_update")}
+              >
+                {t[15]} v{status.version}
+              </button>
+              {dirty && <p>{t[23]}</p>}
+            </>
+          )}
+          {status.phase === "installed" && (
+            <button
+              disabled={dirty}
+              onClick={() => {
+                void invoke("restart_after_update").catch(() =>
+                  setStatus((s) => ({ ...s, phase: "failed" })),
+                );
+              }}
+            >
+              {t[18]}
+            </button>
+          )}
         </>
-      )}
-      {status.phase === "installed" && (
-        <button
-          disabled={dirty}
-          onClick={() => {
-            void invoke("restart_after_update").catch(() =>
-              setStatus((s) => ({ ...s, phase: "failed" })),
-            );
-          }}
-        >
-          {t[18]}
-        </button>
       )}
     </div>
   );

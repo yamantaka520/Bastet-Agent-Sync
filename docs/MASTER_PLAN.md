@@ -54,3 +54,7 @@ Historical 0.2.1 introduced AMOS automatic sync. The current worker also handles
 ## 0.5.0 concurrency and control milestone
 
 The worker now schedules 1–6 independent storage groups (default 3) concurrently, while preserving canonical store/journal serialization, alias deduplication and ordered native/AMOS writes. Queued states, safe pause/join and a thread-safe revision cache are implemented. See [behavior and limits](UPDATES_AND_STATUS.md) and [validation](VALIDATION.md). The published package version and evidence are tracked in the changelog.
+
+## Mac App Store preparation
+
+A separate opt-in `mac-app-store` build disables the direct updater and AMOS synchronization, uses folder-picker security-scoped bookmarks, and isolates its credential service. This follows the user's explicit first-Store-release scope decision; independently distributed builds keep their existing behavior. The free, five-localization listing is a draft. Universal signing/packaging and signed-sandbox acceptance are tracked in [App Store delivery](APP_STORE.md); no Store publication is implied.

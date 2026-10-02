@@ -59,6 +59,15 @@ const en = {
   start: "Start sync",
   pending:
     "Automatic Drive sync supports Agent Memory OS. Native conversation migration for the other sources is not available yet.",
+  memoryUnavailableStore:
+    "Agent Memory OS sync is unavailable in this Mac App Store version. Use the direct-download edition for memory sync.",
+  storeFolderAccess:
+    "For each selected agent and project, choose its folder to grant this App Store version access.",
+  storeChooseFolder: "Choose folder to grant access",
+  sandbox_reauthorize:
+    "Folder access needs renewal. Choose each selected agent and project folder again.",
+  sandbox_grant_unavailable:
+    "Folder access could not be saved. Choose the folder again and check app storage access.",
   overview: "Setup",
   roadmap: "What comes next",
   ready: "Selected agents",
@@ -136,6 +145,15 @@ const zhHant: Messages = {
   start: "啟動同步",
   pending:
     "Agent Memory OS 已接上自動 Drive 同步；其他來源的原生對話搬移尚未完成。",
+  memoryUnavailableStore:
+    "此 Mac App Store 版本暫不提供 Agent Memory OS 同步；如需同步記憶，請使用官網下載版。",
+  storeFolderAccess:
+    "請逐一選擇已勾選 Agent 與專案的資料夾，授權此 App Store 版本存取。",
+  storeChooseFolder: "選擇資料夾以授權存取",
+  sandbox_reauthorize:
+    "資料夾存取授權需要更新。請重新選擇每個已勾選 Agent 與專案資料夾。",
+  sandbox_grant_unavailable:
+    "無法儲存資料夾授權。請重新選擇資料夾並檢查程式儲存空間權限。",
   overview: "設定",
   roadmap: "接下來",
   ready: "已選 Agent",
@@ -210,6 +228,15 @@ const zhHans: Messages = {
   start: "启动同步",
   pending:
     "Agent Memory OS 已接入自动 Drive 同步；其他来源的原生对话迁移尚未完成。",
+  memoryUnavailableStore:
+    "此 Mac App Store 版本暂不提供 Agent Memory OS 同步；如需同步记忆，请使用官网下载版。",
+  storeFolderAccess:
+    "请逐一选择已勾选 Agent 和项目的文件夹，授权此 App Store 版本访问。",
+  storeChooseFolder: "选择文件夹以授权访问",
+  sandbox_reauthorize:
+    "文件夹访问授权需要更新。请重新选择每个已勾选 Agent 和项目文件夹。",
+  sandbox_grant_unavailable:
+    "无法保存文件夹授权。请重新选择文件夹并检查应用存储权限。",
   overview: "设置",
   roadmap: "接下来",
   ready: "已选 Agent",
@@ -287,6 +314,15 @@ const ja: Messages = {
   start: "同期を開始",
   pending:
     "Agent Memory OS の自動 Drive 同期に対応。他のソースのネイティブ会話移行は未実装です。",
+  memoryUnavailableStore:
+    "この Mac App Store 版では Agent Memory OS の同期は利用できません。記憶の同期には公式サイトからのダウンロード版を使用してください。",
+  storeFolderAccess:
+    "選択した各エージェントとプロジェクトのフォルダーを選び、この App Store 版にアクセスを許可してください。",
+  storeChooseFolder: "アクセスを許可するフォルダーを選択",
+  sandbox_reauthorize:
+    "フォルダーのアクセス許可を更新する必要があります。選択した各エージェントとプロジェクトのフォルダーを再選択してください。",
+  sandbox_grant_unavailable:
+    "フォルダーのアクセス許可を保存できません。フォルダーを再選択し、アプリの保存領域へのアクセスを確認してください。",
   overview: "設定",
   roadmap: "今後の予定",
   ready: "選択済み",
@@ -365,6 +401,15 @@ const ko: Messages = {
   start: "동기화 시작",
   pending:
     "Agent Memory OS 자동 Drive 동기화를 지원합니다. 다른 소스의 기본 대화 이전은 아직 구현되지 않았습니다.",
+  memoryUnavailableStore:
+    "이 Mac App Store 버전에서는 Agent Memory OS 동기화를 사용할 수 없습니다. 메모리 동기화는 공식 사이트 다운로드 버전을 사용하세요.",
+  storeFolderAccess:
+    "선택한 각 에이전트와 프로젝트 폴더를 지정하여 이 App Store 버전에 접근 권한을 부여하세요.",
+  storeChooseFolder: "접근을 허용할 폴더 선택",
+  sandbox_reauthorize:
+    "폴더 접근 권한을 갱신해야 합니다. 선택한 각 에이전트와 프로젝트 폴더를 다시 선택하세요.",
+  sandbox_grant_unavailable:
+    "폴더 접근 권한을 저장하지 못했습니다. 폴더를 다시 선택하고 앱 저장 공간 접근 권한을 확인하세요.",
   overview: "설정",
   roadmap: "다음 단계",
   ready: "선택한 Agent",

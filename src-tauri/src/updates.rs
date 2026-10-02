@@ -1,6 +1,9 @@
 use serde::Serialize;
+#[cfg(not(feature = "mac-app-store"))]
 use std::sync::Mutex;
+#[cfg(not(feature = "mac-app-store"))]
 use tauri::{Manager, State};
+#[cfg(not(feature = "mac-app-store"))]
 use tauri_plugin_updater::{Update, UpdaterExt};
 #[derive(Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -11,10 +14,13 @@ pub struct Status {
     pub total: Option<u64>,
 }
 #[derive(Default)]
+#[cfg(not(feature = "mac-app-store"))]
 pub struct Updates(Mutex<(Status, Option<Update>)>);
+#[cfg(not(feature = "mac-app-store"))]
 fn busy(phase: &str) -> bool {
     matches!(phase, "checking" | "installing")
 }
+#[cfg(not(feature = "mac-app-store"))]
 fn allowed(url: &url::Url) -> bool {
     url.scheme() == "https"
         && url.host_str() == Some("github.com")
@@ -24,10 +30,20 @@ fn allowed(url: &url::Url) -> bool {
         && url.username().is_empty()
         && url.password().is_none()
 }
+#[cfg(feature = "mac-app-store")]
+#[tauri::command]
+pub fn update_status() -> Status {
+    Status {
+        phase: "app_store".into(),
+        ..Status::default()
+    }
+}
+#[cfg(not(feature = "mac-app-store"))]
 #[tauri::command]
 pub fn update_status(state: State<Updates>) -> Result<Status, String> {
     Ok(state.0.lock().map_err(|_| "update_busy")?.0.clone())
 }
+#[cfg(not(feature = "mac-app-store"))]
 #[tauri::command]
 pub async fn check_update(
     app: tauri::AppHandle,
@@ -72,6 +88,7 @@ pub async fn check_update(
     .into();
     Ok(s.0.clone())
 }
+#[cfg(not(feature = "mac-app-store"))]
 #[tauri::command]
 pub async fn install_update(
     app: tauri::AppHandle,
@@ -110,6 +127,7 @@ pub async fn install_update(
     .into();
     Ok(s.0.clone())
 }
+#[cfg(not(feature = "mac-app-store"))]
 #[tauri::command]
 pub fn restart_after_update(app: tauri::AppHandle, state: State<Updates>) -> Result<(), String> {
     if app.state::<crate::worker::Worker>().active() {
@@ -120,6 +138,17 @@ pub fn restart_after_update(app: tauri::AppHandle, state: State<Updates>) -> Res
     }
     app.restart()
 }
+#[cfg(all(test, feature = "mac-app-store"))]
+mod store_tests {
+    #[test]
+    fn store_channel_reports_store_updates_without_a_download_state() {
+        let status = super::update_status();
+        assert_eq!(status.phase, "app_store");
+        assert!(status.version.is_none());
+        assert_eq!(status.downloaded, 0);
+    }
+}
+#[cfg(not(feature = "mac-app-store"))]
 #[cfg(test)]
 mod tests {
     use super::*;

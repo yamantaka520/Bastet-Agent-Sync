@@ -147,7 +147,7 @@ impl Options {
 impl Package {
     fn validate(&self) -> Result<()> {
         if self.schema != 1
-            || !crate::model::AGENTS.contains(&self.agent.as_str())
+            || !crate::model::agent_available(&self.agent)
             || self.files.len() > 256
             || self.files.values().map(String::len).sum::<usize>() > MAX_TOTAL
             || self.excluded.len() > 256
@@ -236,6 +236,9 @@ fn walk(root: &Path, path: &Path, depth: usize, package: &mut Package) -> Result
     Ok(())
 }
 pub fn capture(agent: &str, root: &Path, options: &Options) -> Result<Package> {
+    if !crate::model::agent_available(agent) {
+        return Err("portable_unsafe".into());
+    }
     options.validate()?;
     let mut package = Package {
         schema: 1,
@@ -416,7 +419,7 @@ fn context(app: &tauri::AppHandle) -> Result<(PathBuf, Settings, String)> {
     ))
 }
 fn load(root: &Path, space: &str, agent: &str, id: &str) -> Result<Package> {
-    if !crate::model::AGENTS.contains(&agent) || !bundle::is_hash(id) {
+    if !crate::model::agent_available(agent) || !bundle::is_hash(id) {
         return Err("portable_unsafe".into());
     }
     let replica = Replica::open(
@@ -445,8 +448,13 @@ fn decode_package(b: &Bundle, agent: &str) -> Result<Package> {
     Ok(package)
 }
 #[tauri::command]
-pub async fn portable_preview(settings: Settings) -> Result<Vec<Package>> {
+pub async fn portable_preview(app: tauri::AppHandle, settings: Settings) -> Result<Vec<Package>> {
     tauri::async_runtime::spawn_blocking(move || {
+        let config = app
+            .path()
+            .app_config_dir()
+            .map_err(|_| "store_unavailable")?;
+        let _scopes = crate::sandbox_access::provider_scopes(&config, &settings)?;
         crate::model::validate(&settings)?;
         let agents = crate::detect(Some(&settings));
         let (tasks, _) = crate::worker::parallel::plan(&settings.selected_agents, &agents);
@@ -466,7 +474,10 @@ pub async fn portable_list(app: tauri::AppHandle) -> Result<Vec<Received>> {
     tauri::async_runtime::spawn_blocking(move || {
         let (root, _, space) = context(&app)?;
         let mut entries = Vec::new();
-        for agent in crate::model::AGENTS {
+        for agent in crate::model::AGENTS
+            .into_iter()
+            .filter(|agent| crate::model::agent_available(agent))
+        {
             let path = root.join(format!("portable-{agent}-{space}"));
             if !path.is_dir() {
                 continue;
@@ -512,6 +523,7 @@ pub async fn portable_compare(
             .iter()
             .find(|a| a.id == agent)
             .ok_or("source_missing")?;
+        let _scope = crate::sandbox_access::access(&root, Path::new(&source.path))?;
         let local = capture(
             &agent,
             Path::new(&source.path),
@@ -553,6 +565,8 @@ pub async fn portable_restore(
         let Some(folder) = rfd::FileDialog::new().pick_folder() else {
             return Ok(None);
         };
+        let folder = crate::sandbox_access::grant_selected(&root, &folder)?;
+        let _scope = crate::sandbox_access::access(&root, &folder)?;
         let stage = tempfile::tempdir_in(&folder).map_err(|_| "store_unavailable")?;
         for (path, text) in package.files {
             let destination = stage.path().join(path);
@@ -572,6 +586,15 @@ pub async fn portable_restore(
 mod tests {
     use super::*;
     use std::cell::{Cell, RefCell};
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_channel_rejects_memory_portable_capture_before_reading_files() {
+        let absent = Path::new("/definitely-not-a-memory-store");
+        assert!(matches!(
+            capture("agent-memory-os", absent, &Options::default()),
+            Err(e) if e == "portable_unsafe"
+        ));
+    }
     fn write(root: &Path, name: &str, text: &str) {
         let p = root.join(name);
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
