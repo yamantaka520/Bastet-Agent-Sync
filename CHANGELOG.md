@@ -2,6 +2,8 @@
 
 ## Unreleased — Mac App Store preparation
 
+- Exclude France from the first Store release by explicit owner instruction; App Store Connect confirms 174 available territories. Encryption compliance remains open.
+
 - Fix Store recovery-kit export to write the exact Save-dialog-selected file with exclusive creation and private `0600` mode; preserve identical-content retry and refuse replacement of different content. An isolated signed sandbox exported and verified the kit, completed an encrypted Drive check and uploaded a synthetic Claude snapshot. A malformed synthetic restore was rejected; a corrected fixture restored into a separate profile with translated project metadata and retained session ID. Actual model continuation, return capture and two-device acceptance remain open.
 - Replace the Store wizard's Agent Memory OS completion prompt with supported-agent guidance in all five locales, while keeping the direct-download message. Upload five real native 2560 × 1600 screenshots; Apple reports all five `COMPLETE`. The latest universal Store package passed validation at 17:54 and upload at 17:59 Asia/Taipei on 2026-10-02. App Store Connect reports version `0.6.0` build `1` as `VALID` and `APP_STORE_ELIGIBLE`; export declaration, TestFlight testing and App Review remain open. The candidate includes working-tree Store fixes beyond its displayed base revision.
 - Prepare a private French encryption technical draft without submitting a declaration. The expired XChaCha20 draft alone does not establish proprietary status; the applicable classification and France declaration remain unresolved. Privacy labels remain unpublished.

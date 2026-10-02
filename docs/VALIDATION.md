@@ -1,5 +1,10 @@
 # Validation
 
+## France excluded from first Store release — 2026-10-02
+
+- Changed only France in App Store Connect availability following the owner’s explicit instruction. The saved page reports 174 territories and France unavailable.
+- Reopened the build encryption questionnaire without saving an unverified classification; export compliance remains incomplete. This is not an App Review submission.
+
 ## Mac App Store candidate and sandbox follow-up — 2026-10-02
 
 - The latest universal Store `0.6.0` build `1` package returned Apple `altool` **VERIFY SUCCEEDED with no errors** at 17:54 Asia/Taipei. This is server-side package validation, not a build upload, TestFlight processing or App Review submission.

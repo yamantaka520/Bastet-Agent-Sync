@@ -1,6 +1,6 @@
 # Mac App Store delivery plan
 
-Status (2026-10-02): The universal `0.6.0` build `1` package uploaded successfully. App Store Connect reports processing state `VALID` and audience `APP_STORE_ELIGIBLE`; export declaration, TestFlight testing, App Review submission and public listing remain open. The App Store Connect draft has saved five-language version copy, keywords, support and marketing URLs, free pricing, all 175 eligible territories, 2026 Bastet AI copyright, private review contact, manual release and the user's non-trader DSA declaration. Five real native screenshots have uploaded with Apple API status `COMPLETE`. Apple's account page reports regulatory requirements completed. Existing v0.6.0 remains the independently distributed Developer ID release.
+Status (2026-10-02): The universal `0.6.0` build `1` package uploaded successfully. App Store Connect reports processing state `VALID` and audience `APP_STORE_ELIGIBLE`; export declaration, TestFlight testing, App Review submission and public listing remain open. The App Store Connect draft has saved five-language version copy, keywords, support and marketing URLs, free pricing, 174 territories (France excluded by owner instruction), 2026 Bastet AI copyright, private review contact, manual release and the user's non-trader DSA declaration. Five real native screenshots have uploaded with Apple API status `COMPLETE`. Apple's account page reports regulatory requirements completed. Existing v0.6.0 remains the independently distributed Developer ID release.
 
 ## Account and submission gates
 
@@ -80,3 +80,7 @@ An exploratory, unsaved Apple encryption questionnaire selecting non-standard pl
 - Complete the export declaration, TestFlight testing and submission gates. The upload succeeded and App Store Connect reports the build `VALID` and `APP_STORE_ELIGIBLE`; no TestFlight test, App Review submission or approval is claimed by this preparation milestone.
 
 The processed build was selected and saved in the version draft. Apple’s Add for Review check still requires Content Rights, published App Privacy, export compliance, and the required review-login fields. The review has not been submitted.
+
+## First-release territory adjustment — 2026-10-02
+
+The owner explicitly excluded France from the first Store release. App Store Connect confirmed 174 available territories and France as unavailable. No encryption answer was saved: the build still reports missing export compliance, and territory removal alone does not establish the applicable algorithm classification or complete App Review.
