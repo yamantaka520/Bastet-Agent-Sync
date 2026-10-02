@@ -2,6 +2,8 @@
 
 ## Unreleased — Mac App Store preparation
 
+- Create a dedicated Google Cloud project and desktop OAuth client with Drive API and only `drive.file`. Embed the client in the Store candidate and verify real consent, callback and persisted credential reconnection in an isolated ad-hoc sandbox. Public/reviewer login and production-profile acceptance remain pending.
+
 - Normalize Store package permissions before final signing, check embedded privacy-manifest contents, and pass Apple server-side package validation. Add the candidate privacy manifest and source-based assessment; save age-rating and unpublished privacy drafts. Upload and App Review remain pending.
 
 - Retry transient setup-state lock contention at startup without leaving a stale error; preserve genuine startup and action failures. Read-only snapshot and operations views also retry short file-lock contention and show localized busy/setup guidance in all five locales.
