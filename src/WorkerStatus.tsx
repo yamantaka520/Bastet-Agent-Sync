@@ -1,4 +1,5 @@
 import { ops } from "./operations-i18n";
+import { folderMessages } from "./folder-i18n";
 import NativeSessions, {
   sessionMessages,
   type SourceStatus,
@@ -145,6 +146,7 @@ export const workerMessages = {
   ],
 } as const;
 export function phaseText(s: SyncStatus, locale: Locale) {
+  if (s.phase === "handed-off") return folderMessages[locale].handedOff;
   if (s.phase === "scheduled_pause") return "⏸️ " + ops[locale].timedPause;
   if (s.phase === "outside_window") return "🕒 " + ops[locale].windowWait;
   const t = workerMessages[locale];
@@ -193,12 +195,14 @@ export default function WorkerStatus({
   native,
   locale,
   memorySyncAvailable = true,
+  localProvider = false,
   status,
   onStatus,
 }: {
   native: boolean;
   locale: Locale;
   memorySyncAvailable?: boolean;
+  localProvider?: boolean;
   status: SyncStatus | null;
   onStatus: (s: SyncStatus) => void;
 }) {
@@ -255,8 +259,11 @@ export default function WorkerStatus({
         <>
           <strong>{phaseText(status, locale)}</strong>
           <p>
-            {t[11]}: {status.published} · {t[12]}: {status.received} ·{" "}
-            {memorySyncAvailable ? t[13] : t[21]}: {status.applied}
+            {localProvider ? folderMessages[locale].written : t[11]}:{" "}
+            {status.published} ·{" "}
+            {localProvider ? folderMessages[locale].read : t[12]}:{" "}
+            {status.received} · {memorySyncAvailable ? t[13] : t[21]}:{" "}
+            {status.applied}
           </p>
           {status.lastSuccess && (
             <p>

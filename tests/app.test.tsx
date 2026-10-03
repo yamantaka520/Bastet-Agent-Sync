@@ -11,6 +11,7 @@ import {
 import { messages, detectLocale, languages } from "../src/i18n";
 import { defaults } from "../src/model";
 import App from "../src/App";
+import { folderMessages } from "../src/folder-i18n";
 const api = vi.hoisted(() => ({ native: false, invoke: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({
   isTauri: () => api.native,
@@ -27,6 +28,97 @@ afterEach(() => {
   api.invoke.mockReset();
 });
 describe("locale and native setup contracts", () => {
+  it("routes iCloud setup and requires saving the provider before Start", async () => {
+    api.native = true;
+    const settings = { ...defaults("en"), deviceName: "Fixture" };
+    api.invoke.mockImplementation(async (command: string) => {
+      if (command === "bootstrap")
+        return { settings, agents: [], trayAvailable: true };
+      if (command === "folder_status")
+        return {
+          provider: "icloud-drive",
+          path: null,
+          space: null,
+          complete: false,
+          handoff: "local-folder",
+        };
+      if (command === "sync_start")
+        return {
+          running: true,
+          phase: "waiting",
+          published: 0,
+          received: 0,
+          applied: 0,
+          lastSuccess: null,
+          error: null,
+          skipped: [],
+        };
+      return undefined;
+    });
+    render(<App />);
+    await screen.findByRole("button", { name: messages.en.save });
+    fireEvent.change(screen.getByLabelText(folderMessages.en.provider), {
+      target: { value: "icloud-drive" },
+    });
+    await screen.findByRole("heading", { name: folderMessages.en.title });
+    expect(
+      screen.queryByRole("heading", { name: "Google Drive setup" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Start sync/ }));
+    expect(api.invoke).not.toHaveBeenCalledWith("sync_start");
+    fireEvent.click(screen.getByRole("button", { name: messages.en.save }));
+    await waitFor(() =>
+      expect(api.invoke).toHaveBeenCalledWith("save_settings", {
+        settings: { ...settings, cloudProvider: "icloud-drive" },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Start sync/ }));
+    await waitFor(() => expect(api.invoke).toHaveBeenCalledWith("sync_start"));
+    const calls = api.invoke.mock.calls.map(([command]) => command);
+    expect(calls.indexOf("save_settings")).toBeLessThan(
+      calls.indexOf("sync_start"),
+    );
+  });
+  it("previews the iCloud provider without invoking native setup", () => {
+    render(<App />);
+    const selector = screen.getByLabelText(
+      folderMessages.en.provider,
+    ) as HTMLSelectElement;
+    expect(selector.disabled).toBe(false);
+    fireEvent.change(selector, { target: { value: "icloud-drive" } });
+    expect(
+      screen.getByRole("heading", { name: folderMessages.en.title }),
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: folderMessages.en.pick,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (
+        screen.getByRole("button", {
+          name: folderMessages.en.prepare,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: /Start sync/ }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(api.invoke).not.toHaveBeenCalled();
+  });
+  it("opens and focuses credential management from the roadmap without reading secrets", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: /What comes next/ }));
+    fireEvent.click(screen.getByRole("button", { name: messages.en.privacy }));
+    const heading = screen.getByRole("heading", {
+      name: "Credentials & recovery",
+    });
+    expect(document.activeElement).toBe(heading);
+    expect(api.invoke).not.toHaveBeenCalled();
+  });
   it("can select a receiving agent before its default profile exists", async () => {
     api.native = true;
     const s = { ...defaults("en"), deviceName: "Receiving computer" };
@@ -142,7 +234,12 @@ describe("locale and native setup contracts", () => {
     ];
     api.invoke.mockImplementation(async (command: string) => {
       if (command === "bootstrap")
-        return { settings, agents, memorySyncAvailable: false, trayAvailable: true };
+        return {
+          settings,
+          agents,
+          memorySyncAvailable: false,
+          trayAvailable: true,
+        };
       if (command === "choose_folder") return "/chosen";
       if (command === "scan_agents") return agents;
       return undefined;
@@ -155,9 +252,15 @@ describe("locale and native setup contracts", () => {
     ]) {
       const card = screen.getByText(label).closest(".agent-card");
       expect(card).not.toBeNull();
-      fireEvent.click(within(card as HTMLElement).getByRole("button", { name: messages.en.custom }));
+      fireEvent.click(
+        within(card as HTMLElement).getByRole("button", {
+          name: messages.en.custom,
+        }),
+      );
       await waitFor(() => {
-        const scans = api.invoke.mock.calls.filter(([command]) => command === "scan_agents");
+        const scans = api.invoke.mock.calls.filter(
+          ([command]) => command === "scan_agents",
+        );
         expect(scans.at(-1)?.[1]).toMatchObject({
           settings: { customPaths: { [sourceId]: "/chosen" } },
         });

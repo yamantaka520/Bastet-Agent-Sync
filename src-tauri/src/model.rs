@@ -26,6 +26,8 @@ pub fn agent_available(id: &str) -> bool {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
     pub schema: u32,
+    #[serde(default = "default_cloud_provider")]
+    pub cloud_provider: String,
     pub locale: String,
     pub device_name: String,
     pub selected_agents: Vec<String>,
@@ -46,6 +48,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             schema: 1,
+            cloud_provider: default_cloud_provider(),
             locale: "en".into(),
             device_name: String::new(),
             selected_agents: vec![],
@@ -60,6 +63,9 @@ impl Default for Settings {
             portable: Default::default(),
         }
     }
+}
+fn default_cloud_provider() -> String {
+    "google-drive".into()
 }
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -146,6 +152,12 @@ pub fn validate(settings: &Settings) -> Result<(), String> {
     if settings.schema != 1 || !LOCALES.contains(&settings.locale.as_str()) {
         return Err("invalid_settings".into());
     }
+    if !matches!(
+        settings.cloud_provider.as_str(),
+        "google-drive" | "icloud-drive" | "onedrive-folder"
+    ) {
+        return Err("invalid_settings".into());
+    }
     if settings.device_name.trim().is_empty()
         || settings.device_name.chars().count() > 80
         || settings.device_name.chars().any(char::is_control)
@@ -173,7 +185,8 @@ pub fn validate(settings: &Settings) -> Result<(), String> {
             return Err("invalid_source".into());
         }
     }
-    if !settings.folder.is_empty()
+    if settings.cloud_provider == "google-drive"
+        && !settings.folder.is_empty()
         && (!Path::new(&settings.folder).is_absolute()
             || (!cfg!(feature = "mac-app-store") && !Path::new(&settings.folder).is_dir()))
     {
@@ -280,6 +293,25 @@ mod tests {
             device_name: "Test device".into(),
             ..Settings::default()
         }
+    }
+    #[test]
+    fn old_settings_default_google_and_local_provider_ignores_disconnected_legacy_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let mut legacy = serde_json::to_value(settings()).unwrap();
+        legacy.as_object_mut().unwrap().remove("cloudProvider");
+        fs::write(&path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+        assert_eq!(load(&path).unwrap().unwrap().cloud_provider, "google-drive");
+        let mut local = settings();
+        local.cloud_provider = "icloud-drive".into();
+        local.folder = dir
+            .path()
+            .join("disconnected-old-google-folder")
+            .to_string_lossy()
+            .into_owned();
+        assert!(validate(&local).is_ok());
+        save(&path, &local).unwrap();
+        assert_eq!(load(&path).unwrap().unwrap().folder, local.folder);
     }
     #[test]
     fn locale_only_save_preserves_sync_settings_and_disconnected_paths() {

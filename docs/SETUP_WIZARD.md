@@ -1,4 +1,12 @@
-# 🐈 Google Drive setup wizard
+# 🐈 Sync destination setup
+
+## Choose a service in 0.7.0
+
+Select one active service: **Google Drive**, **iCloud Drive folder**, or **OneDrive folder**. The guide changes with that choice. Google uses the OAuth steps below. iCloud and OneDrive use an already signed-in desktop sync client, a native folder picker, and encrypted-space create/join with a recovery kit; see [folder setup](LOCAL_CLOUD_FOLDERS.md). Bastet does not request Apple or Microsoft passwords. Keep the chosen folder downloaded locally.
+
+After either flow, save settings and explicitly Start. Pause synchronization before changing the service. Existing provider setup is retained, but changing services does not copy the old cloud history. The credentials entry opens recovery management for the selected service and can export its recovery kit again. Repeated macOS Keychain prompts remain under investigation.
+
+## Google Drive setup
 
 The five-language desktop offers **Step-by-step wizard** and **Manual setup**. Both use the same native validation and saved state. Finishing setup does not start synchronization. Select sources, save and explicitly press Start to run the supported adapters. Language changes save independently during sync in 0.4.2.
 

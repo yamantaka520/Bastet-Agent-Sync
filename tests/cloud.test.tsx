@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import CloudPanel, { type WizardView } from "../src/CloudPanel";
@@ -119,20 +120,38 @@ it("completes setup only after real command results and preserves progress on ca
   fireEvent.click(await screen.findByText(t.prepareKey));
   await waitFor(() =>
     expect(
-      (screen.getByText(t.exportRecovery) as HTMLButtonElement).disabled,
+      (
+        within(
+          screen.getByRole("region", { name: t.credentialCenter }),
+        ).getByRole("button", { name: t.exportRecovery }) as HTMLButtonElement
+      ).disabled,
     ).toBe(false),
   );
   expect((screen.getByText(t.publishProof) as HTMLButtonElement).disabled).toBe(
     true,
   );
-  fireEvent.click(screen.getByText(t.exportRecovery));
+  fireEvent.click(
+    within(screen.getByRole("region", { name: t.credentialCenter })).getByRole(
+      "button",
+      { name: t.exportRecovery },
+    ),
+  );
   await waitFor(() =>
     expect(
-      (screen.getByText(t.exportRecovery) as HTMLButtonElement).disabled,
+      (
+        within(
+          screen.getByRole("region", { name: t.credentialCenter }),
+        ).getByRole("button", { name: t.exportRecovery }) as HTMLButtonElement
+      ).disabled,
     ).toBe(false),
   );
   expect(saved.wizard.recoverySaved).toBe(false);
-  fireEvent.click(screen.getByText(t.exportRecovery));
+  fireEvent.click(
+    within(screen.getByRole("region", { name: t.credentialCenter })).getByRole(
+      "button",
+      { name: t.exportRecovery },
+    ),
+  );
   await waitFor(() =>
     expect(
       (screen.getByText(t.publishProof) as HTMLButtonElement).disabled,

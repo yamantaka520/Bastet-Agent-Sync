@@ -61,6 +61,7 @@ class StorePrepTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "development profile"):
                 prep.generate(profile, base / "output", plistlib.dumps(data))
 
+    @unittest.skipUnless(os.name == "posix", "macOS bundle permissions require POSIX file modes")
     def test_app_permissions_and_embedded_manifest(self):
         with tempfile.TemporaryDirectory() as temp:
             app = Path(temp) / "Fixture.app"

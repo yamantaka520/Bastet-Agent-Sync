@@ -14,21 +14,21 @@
 [繁體中文](docs/manual/zh-Hant/guide.md) · [简体中文](docs/manual/zh-Hans/guide.md) · [English](docs/manual/en/guide.md) · [日本語](docs/manual/ja/guide.md) · [한국어](docs/manual/ko/guide.md)
 </div>
 
-A local-first desktop companion for synchronizing supported local agent conversations and Agent Memory OS data through Google Drive. Part of the Bastet family.
+A local-first desktop companion for synchronizing supported local agent conversations and Agent Memory OS data through a selected encrypted cloud destination. Part of the Bastet family.
 
-> **0.6.0 — cross-platform conversation handoff and faster unchanged sync.** Map local project paths, continue received versions in isolated profiles, and sync causal descendants while retaining concurrent branches. Includes the encrypted-space fix and sync control center. [Download](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.6.0) · [Handoff and limits](docs/CROSS_OS_HANDOFF.md) · [Current support](docs/NATIVE_SESSIONS.md) · [Evidence](docs/VALIDATION.md).
+> **0.7.0 release candidate — selected cloud destination and recovery management.** Choose Google Drive API, an iCloud Drive folder, or a OneDrive folder. Folder modes use installed desktop sync clients and keep encrypted handoff distinct from cloud delivery. [Latest published release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest) · [Folder setup](docs/LOCAL_CLOUD_FOLDERS.md) · [Handoff and limits](docs/CROSS_OS_HANDOFF.md) · [Evidence](docs/VALIDATION.md).
 
 macOS installers are Developer ID signed and notarized. Windows publisher signing remains deferred; updater signatures are verified on every platform. Agy remains explicit database recovery without workspace remapping.
 
-The desktop includes a five-language resumable setup wizard, manual configuration, recovery-kit export/import and encrypted transport primitives. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
+The desktop includes five-language setup, recovery-kit export/import and encrypted transport. The credentials entry explains local credential storage and offers another recovery-kit export. Google login requires a distributor-configured or explicitly imported Desktop OAuth client. iCloud and OneDrive folder modes require their respective desktop clients; direct Apple/Microsoft sign-in is not included. Repeated macOS Keychain prompts after “Always Allow” remain under investigation. [Setup guide](docs/SETUP_WIZARD.md). [Cloud contract and remaining gates](docs/CLOUD_SECURITY.md).
 
 ## ✨ Current workflow
 
 1. Discover Claude, Claude Code, Codex, Google Agy CLI, Grok Build CLI, Pi Agent, Agent Memory OS and local ChatGPT Work.
 2. Select individual agents or all detected sources; custom paths are supported.
-3. Choose a Google Drive folder with guided setup.
+3. Choose one destination: a Google Drive API folder, a downloaded iCloud Drive folder, or a downloaded OneDrive folder. Create or join an encrypted space and save its recovery kit outside the synced folder.
 4. Pick an interval or near-real-time sync, then press Start.
-5. Receive supported local snapshots on another configured computer; existing different versions are preserved for separate recovery. Native continuation limits are documented per agent.
+5. Receive supported local snapshots on another configured computer; existing different versions are preserved for separate recovery. A successful folder cycle proves local handoff to the provider client, not cloud or second-device delivery. Physical iCloud/OneDrive two-device delivery is unverified. Native continuation limits are documented per agent.
 
 Five interface languages, a menu-bar/system-tray companion, explicit pause and recovery controls. Linux uses the Drive API transport without requiring Google's desktop client.
 

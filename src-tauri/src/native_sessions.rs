@@ -1133,16 +1133,15 @@ fn native_root(app: &tauri::AppHandle) -> Result<(PathBuf, String)> {
         .path()
         .app_config_dir()
         .map_err(|_| "store_unavailable")?;
-    let tx = crate::cloud::wizard::Transaction::open(&root)?;
-    Ok((
-        root,
-        tx.state
+    let settings = crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
+    let binding = if settings.cloud_provider == "google-drive" {
+        crate::cloud::wizard::Transaction::open(&root)?
+            .state
             .binding
-            .as_ref()
-            .ok_or("wizard_step_required")?
-            .space
-            .clone(),
-    ))
+    } else {
+        crate::cloud::folder::load(&root, &settings.cloud_provider)?.and_then(|s| s.binding)
+    };
+    Ok((root, binding.ok_or("wizard_step_required")?.space))
 }
 #[tauri::command]
 pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Received>> {
@@ -2013,6 +2012,91 @@ mod tests {
                 0
             );
         }
+    }
+    #[test]
+    fn folder_transport_captures_receives_and_restores_managed_pi_fixture() {
+        use crate::cloud::folder::{create_dirs, FolderObjects};
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("pi-source");
+        fixture("pi", &home);
+        let binding = Binding {
+            folder: "fixture-folder".into(),
+            space: "fixture-space".into(),
+            proof: "fixture-proof".into(),
+        };
+        let cloud = temp.path().join("selected-cloud-folder");
+        fs::create_dir(&cloud).unwrap();
+        create_dirs(&cloud, &binding).unwrap();
+        let remote = FolderObjects::new(&cloud, &binding).unwrap();
+        let key = SpaceKey::generate().unwrap();
+        remote
+            .put(
+                &binding.folder,
+                &binding.proof,
+                &key,
+                &queue::proof_bundle(&binding.space).unwrap(),
+            )
+            .unwrap();
+        let a = temp.path().join("a-sync");
+        let b = temp.path().join("b-sync");
+        let sent = cycle(
+            &a,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &home,
+            Direction::Upload,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(sent.published, 1, "{:?}", sent.issues);
+        let received = cycle(
+            &b,
+            &binding,
+            &key,
+            &remote,
+            "pi",
+            &temp.path().join("absent-pi"),
+            Direction::Download,
+            || false,
+        )
+        .unwrap();
+        assert_eq!(received.received, 1, "{:?}", received.issues);
+        assert_eq!(received.available, 1);
+        let all = Replica::open(&b.join("replica"), &binding.space)
+            .unwrap()
+            .transport_bundles()
+            .unwrap();
+        let snapshot = all
+            .values()
+            .find(|s| s.snapshot.stream.agent == "pi")
+            .unwrap();
+        let target = temp.path().join("managed-pi-profile");
+        let manifest = restore(snapshot, &all, &target).unwrap();
+        register_handoff(&b, snapshot, &manifest, &target).unwrap();
+        assert_eq!(load_handoffs(&b).unwrap().entries.len(), 1);
+        assert!(!target.join("auth.json").exists());
+        let restored = fs::read(target.join(manifest.files.keys().next().unwrap())).unwrap();
+        assert!(
+            String::from_utf8_lossy(&restored).contains("fixture")
+                || String::from_utf8_lossy(&restored).contains("session")
+        );
+        assert_eq!(
+            cycle(
+                &a,
+                &binding,
+                &key,
+                &remote,
+                "pi",
+                &home,
+                Direction::Upload,
+                || false
+            )
+            .unwrap()
+            .published,
+            0
+        );
     }
     #[test]
     fn managed_handoff_roundtrip_keeps_causal_parents_and_original_files() {

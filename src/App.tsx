@@ -21,6 +21,11 @@ import OperationsPanel, { ResourceControls } from "./OperationsPanel";
 import TrafficStatus from "./TrafficStatus";
 import MemoryPanel from "./MemoryPanel";
 import CloudPanel, { type WizardView } from "./CloudPanel";
+import FolderPanel, {
+  type FolderStatus,
+  type FolderProvider,
+} from "./FolderPanel";
+import { folderMessages } from "./folder-i18n";
 import UpdatePanel from "./UpdatePanel";
 import { runtimeMessages } from "./runtime-i18n";
 import cat from "../assets/calico.png";
@@ -41,6 +46,7 @@ export default function App() {
   const [memorySyncAvailable, setMemorySyncAvailable] = useState(!native);
   const [diagnostic, setDiagnostic] = useState<Diagnostic | null>(null);
   const [cloud, setCloud] = useState<WizardView | null>(null);
+  const [folderStatus, setFolderStatus] = useState<FolderStatus | null>(null);
   const [version, setVersion] = useState(__APP_VERSION__);
   const [revision, setRevision] = useState("");
   const [runtime, setRuntime] = useState<SyncStatus | null>(null);
@@ -56,8 +62,20 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [dirty, setDirty] = useState(false);
   const [page, setPage] = useState<"setup" | "roadmap">("setup");
+  const [focusCredentials, setFocusCredentials] = useState(false);
   const t = messages[settings.locale];
   const rt = runtimeMessages[settings.locale];
+  const ft = folderMessages[settings.locale];
+  const localProvider = settings.cloudProvider !== "google-drive";
+  useEffect(() => {
+    if (page !== "setup" || !focusCredentials) return;
+    const heading = document.getElementById(
+      localProvider ? "folder-panel-title" : "credential-center-title",
+    );
+    heading?.focus();
+    heading?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    setFocusCredentials(false);
+  }, [page, focusCredentials, localProvider]);
   useEffect(() => {
     document.documentElement.lang = settings.locale;
   }, [settings.locale]);
@@ -76,6 +94,7 @@ export default function App() {
         if (b.settings)
           setSettings({
             ...b.settings,
+            cloudProvider: b.settings.cloudProvider ?? "google-drive",
             selectedAgents: memoryAvailable
               ? b.settings.selectedAgents
               : b.settings.selectedAgents.filter(
@@ -210,7 +229,15 @@ export default function App() {
         <div className="sidebar-bottom">
           <div className="privacy">
             <span>◇</span>
-            <strong>{t.privacy}</strong>
+            <button
+              className="privacy-link"
+              onClick={() => {
+                setPage("setup");
+                setFocusCredentials(true);
+              }}
+            >
+              {t.privacy}
+            </button>
             <p>{t.privacyHint}</p>
             <a
               href="https://bastet.tw/agent-sync/privacy/"
@@ -273,7 +300,16 @@ export default function App() {
             <b>{settings.selectedAgents.length.toString().padStart(2, "0")}</b>
           </span>
           <span>
-            {t.transport} <b>{cloud?.wizard.complete ? rt[1] : rt[2]}</b>
+            {t.transport}{" "}
+            <b>
+              {localProvider
+                ? folderStatus?.complete
+                  ? ft.readyBadge
+                  : ft.pendingBadge
+                : cloud?.wizard.complete
+                  ? rt[1]
+                  : rt[2]}
+            </b>
           </span>
         </div>
         <section
@@ -283,7 +319,13 @@ export default function App() {
         >
           <div className="runtime-line">
             <strong>{native ? rt[0] : t.preview}</strong>
-            <span>{cloud?.connected ? rt[3] : rt[4]}</span>
+            <span>
+              {localProvider
+                ? ft.clientStatus
+                : cloud?.connected
+                  ? rt[3]
+                  : rt[4]}
+            </span>
             <strong>
               {checkingStart
                 ? wt[2]
@@ -303,6 +345,7 @@ export default function App() {
             native={native}
             locale={settings.locale}
             memorySyncAvailable={memorySyncAvailable}
+            localProvider={localProvider}
             status={runtime}
             onStatus={setRuntime}
           />
@@ -348,11 +391,15 @@ export default function App() {
           native={native}
           locale={settings.locale}
           runtime={runtime}
+          localProvider={localProvider}
+          settingsDirty={dirty}
+          provider={settings.cloudProvider}
         />
         <ResourceControls
           locale={settings.locale}
           value={settings.resources}
           disabled={!native || busy || running || !loaded}
+          localProvider={localProvider}
           onChange={(value) => change("resources", value)}
         />
         <ProjectMappings
@@ -361,12 +408,23 @@ export default function App() {
           disabled={!native || busy || running || !loaded}
           onChange={(value) => change("projectMappings", value)}
         />
-        <CloudPanel
-          native={native}
-          locale={settings.locale}
-          storeChannel={loaded ? !memorySyncAvailable : null}
-          onChange={setCloud}
-        />
+        {localProvider ? (
+          <FolderPanel
+            key={settings.cloudProvider}
+            native={native}
+            locale={settings.locale}
+            provider={settings.cloudProvider as FolderProvider}
+            disabled={busy || running || !loaded}
+            onChange={setFolderStatus}
+          />
+        ) : (
+          <CloudPanel
+            native={native}
+            locale={settings.locale}
+            storeChannel={loaded ? !memorySyncAvailable : null}
+            onChange={setCloud}
+          />
+        )}
         {memorySyncAvailable && (
           <>
             <p className="panel">{wt[1]}</p>
@@ -547,20 +605,44 @@ export default function App() {
                 <span className="step">02</span>
                 {t.destination}
               </h2>
-              <p>{t.destinationHint}</p>
-              <label className="folder-label">{t.folder}</label>
-              <div className="folder-row">
-                <div className="folder-value">
-                  ▱ <span>{settings.folder || t.noFolder}</span>
-                </div>
-                <button
-                  disabled={!native || busy || !loaded || running}
-                  onClick={() => choose()}
+              <label>
+                {ft.provider}
+                <select
+                  value={settings.cloudProvider}
+                  disabled={busy || !loaded || running}
+                  onChange={(e) => {
+                    setFolderStatus(null);
+                    change(
+                      "cloudProvider",
+                      e.target.value as Settings["cloudProvider"],
+                    );
+                  }}
                 >
-                  {t.browse}
-                </button>
-              </div>
-              {settings.folder && <p className="muted">{t.localOnly}</p>}
+                  <option value="google-drive">{ft.google}</option>
+                  <option value="icloud-drive">{ft.icloud}</option>
+                  <option value="onedrive-folder">{ft.onedrive}</option>
+                </select>
+              </label>
+              {localProvider ? (
+                <p>{ft.intro}</p>
+              ) : (
+                <>
+                  <p>{t.destinationHint}</p>
+                  <label className="folder-label">{t.folder}</label>
+                  <div className="folder-row">
+                    <div className="folder-value">
+                      ▱ <span>{settings.folder || t.noFolder}</span>
+                    </div>
+                    <button
+                      disabled={!native || busy || !loaded || running}
+                      onClick={() => choose()}
+                    >
+                      {t.browse}
+                    </button>
+                  </div>
+                  {settings.folder && <p className="muted">{t.localOnly}</p>}
+                </>
+              )}
             </section>
             <section className="panel">
               <h2>
@@ -651,7 +733,7 @@ export default function App() {
                   {checkingStart
                     ? rt[6]
                     : blocked
-                      ? `${rt[7]} — ${blocked.map((reason) => (({ settings: rt[8], sources: rt[9], drive: rt[10], adapters: rt[11] + unsupported.map((id) => names[id] ?? id).join(", "), check_failed: t.error }) as Record<string, string>)[reason] ?? workerError(reason, settings.locale)).join("；")}`
+                      ? `${rt[7]} — ${blocked.map((reason) => (({ settings: rt[8], sources: rt[9], drive: localProvider ? ft.pending : rt[10], adapters: rt[11] + unsupported.map((id) => names[id] ?? id).join(", "), check_failed: t.error }) as Record<string, string>)[reason] ?? workerError(reason, settings.locale)).join("；")}`
                       : runtime?.phase
                         ? phaseText(runtime, settings.locale)
                         : rt[24]}

@@ -32,16 +32,41 @@ pub async fn sync_preflight(
 ) -> Result<Preflight, String> {
     let shared = cloud.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let _guard = shared.0.try_lock().map_err(|_| "cloud_busy")?;
         let root = app
             .path()
             .app_config_dir()
             .map_err(|_| "store_unavailable")?;
         let settings = crate::model::load(&root.join("settings.json"))?;
-        let wizard = crate::cloud::wizard::Transaction::open(&root)?;
-        let preflight = evaluate(settings.as_ref(), wizard.state.complete);
-        #[cfg(feature = "mac-app-store")]
-        let mut preflight = preflight;
+        let _guard = if settings
+            .as_ref()
+            .is_some_and(|s| s.cloud_provider != "google-drive")
+        {
+            None
+        } else {
+            Some(shared.0.try_lock().map_err(|_| "cloud_busy")?)
+        };
+        let mut folder_reason = None;
+        let complete = match settings.as_ref().map(|s| s.cloud_provider.as_str()) {
+            Some("icloud-drive" | "onedrive-folder") => {
+                let provider = &settings.as_ref().ok_or("invalid_settings")?.cloud_provider;
+                match crate::cloud::folder::probe_ready(&root, provider) {
+                    Ok(complete) => complete,
+                    Err(reason) => {
+                        folder_reason = Some(reason);
+                        false
+                    }
+                }
+            }
+            _ => {
+                crate::cloud::wizard::Transaction::open(&root)?
+                    .state
+                    .complete
+            }
+        };
+        let mut preflight = evaluate(settings.as_ref(), complete);
+        if let Some(reason) = folder_reason {
+            preflight.reasons.push(reason);
+        }
         #[cfg(feature = "mac-app-store")]
         if let Some(mut configured) = settings {
             configured

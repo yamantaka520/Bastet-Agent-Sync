@@ -205,26 +205,42 @@ export default function CloudPanel({
           <p>{t.intro}</p>
         </div>
       </div>
-      <div className="wizard-note">
+      <section
+        className="wizard-note credential-center"
+        aria-labelledby="credential-center-title"
+      >
+        <h3 id="credential-center-title" tabIndex={-1}>
+          {t.credentialCenter}
+        </h3>
+        <p>{t.credentialStore}</p>
         <p>{t.credentialHint}</p>
-        <button
-          disabled={unavailable || !w?.clientId}
-          onClick={() =>
-            run(async () => {
-              const result = await invoke<WizardView>("wizard_execute", {
-                action: "unlock_credentials",
-                input: "",
-                locale,
-              });
-              setCredentialsReady(true);
-              return result;
-            })
-          }
-        >
-          {t.unlockCredentials}
-        </button>
+        <div className="cloud-actions">
+          <button
+            disabled={unavailable || !w?.clientId}
+            onClick={() =>
+              run(async () => {
+                const result = await invoke<WizardView>("wizard_execute", {
+                  action: "unlock_credentials",
+                  input: "",
+                  locale,
+                });
+                setCredentialsReady(true);
+                return result;
+              })
+            }
+          >
+            {t.unlockCredentials}
+          </button>
+          <button
+            disabled={unavailable || !w?.binding}
+            onClick={() => execute("export_recovery")}
+          >
+            {t.exportRecovery}
+          </button>
+        </div>
+        <p>{w?.binding ? t.backupHint : t.recoveryUnavailable}</p>
         {credentialsReady && <p role="status">{t.credentialsReady}</p>}
-      </div>
+      </section>
       {connecting && (
         <div role="status">
           <button onClick={cancelLogin}>{t.cancelLogin}</button>

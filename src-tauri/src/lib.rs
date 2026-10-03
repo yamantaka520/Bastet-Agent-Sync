@@ -155,13 +155,16 @@ fn save_settings(
     model::load(&state.path)?;
     let config = state.path.parent().ok_or("sandbox_grant_unavailable")?;
     let _scopes = sandbox_access::settings_scopes(config, &settings)?;
-    let _legacy_folder_scope = if settings.folder.is_empty() {
-        None
-    } else {
-        Some(sandbox_access::access(config, Path::new(&settings.folder))?)
-    };
+    let _legacy_folder_scope =
+        if settings.cloud_provider != "google-drive" || settings.folder.is_empty() {
+            None
+        } else {
+            Some(sandbox_access::access(config, Path::new(&settings.folder))?)
+        };
     model::validate(&settings)?;
-    model::validate_overlap(&settings, &detect(Some(&settings)))?;
+    if settings.cloud_provider == "google-drive" {
+        model::validate_overlap(&settings, &detect(Some(&settings)))?;
+    }
     if settings.close_to_tray && !state.tray_available {
         return Err("tray_unavailable".into());
     }
@@ -219,6 +222,11 @@ macro_rules! handlers {
             cloud::wizard_desktop::wizard_navigate,
             cloud::wizard_desktop::wizard_restart,
             cloud::wizard_desktop::wizard_execute,
+            cloud::folder::folder_status,
+            cloud::folder::folder_pick,
+            cloud::folder::folder_prepare,
+            cloud::folder::folder_join,
+            cloud::folder::folder_export_recovery,
             cloud::desktop::wizard_cancel_login,
             runtime_status::sync_preflight,
             $($memory,)*

@@ -1,5 +1,6 @@
 import type { Locale } from "./i18n";
 export type Settings = {
+  cloudProvider: "google-drive" | "icloud-drive" | "onedrive-folder";
   portable?: import("./PortablePanel").PortableOptions;
   resources?: import("./OperationsPanel").Resources;
   schema: number;
@@ -32,6 +33,7 @@ export const names: Record<string, string> = {
 };
 export const defaults = (locale: Locale): Settings => ({
   schema: 1,
+  cloudProvider: "google-drive",
   locale,
   deviceName: "",
   selectedAgents: [],

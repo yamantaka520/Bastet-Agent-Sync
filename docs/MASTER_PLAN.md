@@ -8,9 +8,11 @@ A local-first desktop companion that synchronizes selected agent settings, skill
 
 ## Architecture
 
+Unreleased 2026-10-03 work adds selectable iCloud Drive/OneDrive local-folder transport and an actionable credentials/recovery entry. Google Drive API remains the default; provider-client delivery is distinct from durable local handoff. The folder worker preserves encryption and isolated restore. See [folder setup and limitations](LOCAL_CLOUD_FOLDERS.md) and [validation](VALIDATION.md). OneDrive direct OAuth login remains future work. The historical M2 diagnostic below remains synthetic and is not the new provider route.
+
 Tauri 2 + React/TypeScript for the desktop UI; Rust owns local discovery, configuration and the synchronization engine. The renderer has a narrow command interface, not arbitrary filesystem or shell access. One desktop process owns the lifecycle; closing to tray is opt-in and only allowed with an available tray. No daemon or localhost web server is needed for the first foundation.
 
-Use immutable, content-verified snapshots and a persistent local journal in the sync milestone. Preserve concurrent conversation branches and conflicting settings. Google Drive API with desktop OAuth is the implemented production transport (Linux has no official Drive desktop client); the local-folder transport remains an isolated diagnostic, not an enabled agent-sync route. Do not use cloud lock files as distributed mutexes.
+Use immutable, content-verified snapshots and a persistent local journal. Preserve concurrent conversation branches and conflicting settings. Google Drive API with desktop OAuth is the direct transport (Linux has no official Drive desktop client). The user-selected iCloud Drive and OneDrive folder routes feed the encrypted worker; they are distinct from the historical M2 synthetic diagnostic. Provider clients handle delivery beyond the local folder. Do not use cloud lock files as distributed mutexes.
 
 ## Milestones and gates
 

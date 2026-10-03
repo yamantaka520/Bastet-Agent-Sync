@@ -251,6 +251,9 @@ fn run_once(
     binding: &Binding,
     memory: Option<&Installed>,
 ) -> Result<(queue::Exchange, usize)> {
+    if settings.cloud_provider != "google-drive" {
+        return run_folder_once(app, worker, settings, binding, memory);
+    }
     let config = app
         .path()
         .app_config_dir()
@@ -408,6 +411,135 @@ fn run_once(
             binding,
             &key,
             guard.as_ref().ok_or("reauth_required")?,
+            outcome,
+            || worker.stopped(),
+        );
+        worker.update(|s| s.observer_error = report.err());
+    }
+    result
+}
+
+fn run_folder_once(
+    app: &tauri::AppHandle,
+    worker: &Worker,
+    settings: &Settings,
+    binding: &Binding,
+    memory: Option<&Installed>,
+) -> Result<(queue::Exchange, usize)> {
+    let root = app
+        .path()
+        .app_config_dir()
+        .map_err(|_| "store_unavailable")?;
+    let _source_scopes = crate::sandbox_access::settings_scopes(&root, settings)?;
+    let (folder_state, _folder_scope, remote) =
+        crate::cloud::folder::ready(&root, &settings.cloud_provider)?;
+    if folder_state.binding.as_ref() != Some(binding) {
+        return Err("sync_setup_changed".into());
+    }
+    let mut overlap_settings = settings.clone();
+    overlap_settings.folder = folder_state.path().to_string_lossy().into_owned();
+    crate::model::validate_overlap(&overlap_settings, &crate::detect(Some(settings)))?;
+    let key = load_space_key(&NativeStore, &binding.space)?;
+    let direction = match settings.direction.as_str() {
+        "upload" => Direction::Upload,
+        "download" => Direction::Download,
+        _ => Direction::Both,
+    };
+    let result = sync_sources(
+        &root,
+        worker,
+        settings,
+        &crate::detect(Some(settings)),
+        binding,
+        &key,
+        &remote,
+        memory,
+        direction,
+    );
+    if (settings.portable.settings || settings.portable.skills) && !worker.stopped() {
+        let agents = crate::detect(Some(settings));
+        let (tasks, _) = parallel::plan(&settings.selected_agents, &agents);
+        let transport = crate::cloud::folder::PortableObjects {
+            folder: &remote,
+            proof: &binding.proof,
+        };
+        for task in tasks {
+            if worker.stopped() {
+                break;
+            }
+            if task.canonical == "agent-memory-os" {
+                continue;
+            }
+            let Some(source) = task.path else {
+                continue;
+            };
+            let exchanged = crate::portable::cycle(
+                &root.join(format!("portable-{}-{}", task.canonical, binding.space)),
+                &source,
+                &task.canonical,
+                &settings.portable,
+                binding,
+                &key,
+                &Cancellable {
+                    remote: &transport,
+                    stop: &|| worker.stopped(),
+                },
+                direction,
+                || worker.stopped(),
+            );
+            worker.update(|s| {
+                if let Ok(r) = &exchanged {
+                    s.published += r.published;
+                    s.received += r.received;
+                }
+                for (alias, &i) in task.indices.iter().enumerate() {
+                    if let Some(item) = s.sources.get_mut(i) {
+                        match &exchanged {
+                            Ok(r) if alias == 0 => {
+                                item.published += r.published;
+                                item.received += r.received;
+                            }
+                            Err(e) => {
+                                item.issues.insert(e.clone(), 1);
+                            }
+                            _ => {}
+                        }
+                        item.state = if item.issues.is_empty() {
+                            "complete"
+                        } else {
+                            "partial"
+                        }
+                        .into();
+                    }
+                }
+            });
+        }
+    }
+    if !worker.stopped() {
+        let outcome = if result.is_err() {
+            "error"
+        } else if worker
+            .0
+             .0
+            .lock()
+            .map(|c| {
+                c.status
+                    .sources
+                    .iter()
+                    .any(|s| s.state == "error" || s.state == "partial")
+            })
+            .unwrap_or(true)
+        {
+            "partial"
+        } else {
+            "complete"
+        };
+        let report = crate::operations::device_exchange_folder(
+            &root,
+            settings,
+            binding,
+            &key,
+            &remote,
             outcome,
             || worker.stopped(),
         );
@@ -694,11 +826,28 @@ pub async fn sync_start(
         }
         let _initial_scopes = crate::sandbox_access::settings_scopes(&root, &settings)?;
         crate::model::validate(&settings)?;
-        let t = Transaction::open(&root)?;
-        if !t.state.complete {
-            return Err("wizard_step_required".into());
-        }
-        let binding = t.state.binding.clone().ok_or("wizard_step_required")?;
+        let _folder_setup_lock = if settings.cloud_provider == "google-drive" {
+            None
+        } else {
+            Some(crate::cloud::folder::setup_lock(
+                &root,
+                &settings.cloud_provider,
+            )?)
+        };
+        let binding = if settings.cloud_provider == "google-drive" {
+            let t = Transaction::open(&root)?;
+            if !t.state.complete {
+                return Err("wizard_step_required".into());
+            }
+            t.state.binding.clone().ok_or("wizard_step_required")?
+        } else {
+            let (folder_state, _scope, _) =
+                crate::cloud::folder::ready(&root, &settings.cloud_provider)?;
+            let mut overlap_settings = settings.clone();
+            overlap_settings.folder = folder_state.path().to_string_lossy().into_owned();
+            crate::model::validate_overlap(&overlap_settings, &crate::detect(Some(&settings)))?;
+            folder_state.binding.ok_or("wizard_step_required")?
+        };
         if settings.selected_agents.is_empty() {
             return Err("no_ready_sources".into());
         }
@@ -785,8 +934,10 @@ pub async fn sync_start(
                                     .any(|a| a.state == "error" || a.state == "partial")
                                 {
                                     "partial"
-                                } else {
+                                } else if settings.cloud_provider == "google-drive" {
                                     "waiting"
+                                } else {
+                                    "handed-off"
                                 }
                                 .into();
                                 s.last_success = Some(

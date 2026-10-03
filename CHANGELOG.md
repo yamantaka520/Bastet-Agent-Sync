@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0 — credentials and cloud folders
+
+Release candidate prepared 2026-10-03; cross-platform CI, signed packages and publication are pending.
+
+- Replace the inert credential notice with an accessible management entry and recovery-kit export available after setup. Clarify that credentials save/read automatically; manual reload is for external credential changes, not a required step on every launch. Preserve all five locales.
+- Add iCloud Drive and OneDrive **local synchronized folder** destinations alongside the existing Google Drive API. Integrate encrypted immutable objects with the real worker, native-session restore, portable packages, device reports, preflight and storage measurement. Save setup and explicit Start remain required. Existing Google configuration is retained; direct Microsoft OAuth is not included.
+- Check key proofs, wrong-provider recovery kits, missing/partial/placeholder files, conflicting immutable writes, source overlap and setup mutation during sync. Store folder access uses bookmarks; recovery export targets the chosen file without requiring parent-directory access. Report local handoff separately from provider delivery.
+- Keep the macOS repeated-Keychain-prompt issue open. Read-only signature and ACL checks found no demonstrated mismatch; no credentials or ACLs were changed. The owner will leave the next prompt visible for diagnosis. This change does not establish native cloud-delivery acceptance or fix that unresolved prompt.
+
 ## Mac App Store — information supplied and resubmitted 2026-10-03
 
 - Record Apple’s Guideline 2.1 information request and `REJECTED` status. Prepare an internal TestFlight group containing the submitted build, with automatic distribution disabled. Prepare a six-part response/notes draft, capture checklist and synthetic sample. After the owner updated the Mac to `27.0.1` and authorized the invitation, the invitation was redeemed and the exact TestFlight build installed and launched in its production sandbox; Google setup, one synthetic bundle upload and isolated restore with verified project-path remapping passed on one physical Mac; a privacy-edited 7:26 physical-Mac recording and synthetic ZIP were attached, six-part Notes saved, and Apple confirms WAITING_FOR_REVIEW after resubmission; no specific runtime defect was identified in the review message.

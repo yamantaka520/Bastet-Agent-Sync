@@ -6,50 +6,40 @@
 
 ## 繁體中文
 
-0.6.0 加入跨系統專案路徑對應與獨立對話接續目錄。收到的版本不會覆寫原本 Agent 資料；在還原目錄繼續對話後，可同步回傳子版本，同時修改則保留分支。請將參與同步的電腦全部升級，並設定每台電腦的本機專案路徑。
+0.7.0 可選擇一個同步目的地：Google Drive API、iCloud Drive 資料夾或 OneDrive 資料夾。後兩者使用已安裝的雲端桌面同步程式，不提供 Apple／Microsoft 直接登入。選擇已下載的專用資料夾、建立加密空間，並將恢復套件存於同步資料夾外；另一台電腦用同一服務的套件加入。切換目的地不會搬移舊空間資料。憑證入口現在提供恢復套件匯出及儲存方式說明。
 
-同步會略過未變動內容的重複壓縮、合併重疊雲端查詢，並降低進度回報成本。仍驗證完整內容、子對話及資料庫 WAL，沒有以快取略過空間金鑰驗證。
+本機同步完成只代表 Bastet 將加密封包交給資料夾；雲端上傳、下載及送達另一台電腦由服務的桌面程式負責。iCloud／OneDrive 尚無兩台實機交付驗證。macOS 鑰匙圈選擇「永遠允許」後仍重複提示的問題尚未解決。對話接續與 Agent 限制見 VALIDATION.md；不會覆寫正在使用的 Agent 資料。
 
-目前支援範圍與實測證據見儲存庫的 VALIDATION.md 與 CROSS_OS_HANDOFF.md。官方讀取器能開啟資料不等於模型已成功續聊；Agy 仍以資料庫還原為限。專案程式碼、附件、外部依賴與登入憑證不會自動搬移，還原環境可能需要重新登入。
-
-安裝包使用內建／系統元件，不需要 Node.js、Rust 或 Drive Desktop。macOS 發布需通過 Developer ID、公證及 Gatekeeper 驗證。Windows Authenticode 暫緩，可能出現系統信任提示；更新包簽章仍須驗證，與作業系統發行者簽章不同。
+獨立下載安裝包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 資料夾模式需要對應桌面程式。macOS 發布須通過 Developer ID 簽章、公證及安裝驗證。Windows 發行者簽章暫緩；更新包仍驗證簽章。
 
 ## 简体中文
 
-0.6.0 加入跨系统项目路径映射与独立对话续接目录。收到的版本不会覆盖原有 Agent 数据；在还原目录继续对话后，可同步回传子版本，同时修改则保留分支。请升级所有参与同步的电脑，并配置各自的本地项目路径。
+0.7.0 可选择一个同步目标：Google Drive API、iCloud Drive 文件夹或 OneDrive 文件夹。后两者使用已安装的云端桌面同步程序，不提供 Apple／Microsoft 直接登录。选择已下载的专用文件夹、创建加密空间，并把恢复套件保存在同步文件夹之外；另一台电脑用同一服务的套件加入。切换目标不会迁移旧空间数据。凭据入口现在提供恢复套件导出及存储方式说明。
 
-同步会跳过未变动内容的重复压缩、合并重叠云端查询，并降低进度回报开销。仍验证完整内容、子对话及数据库 WAL，不会用缓存跳过空间密钥验证。
+本地同步完成只表示 Bastet 已将加密数据交给文件夹；上传、下载及送达另一台电脑由对应的桌面程序负责。iCloud／OneDrive 尚未完成两台实体电脑交付验证。macOS 钥匙串选择“始终允许”后仍反复提示的问题尚未解决。对话续接和 Agent 限制见 VALIDATION.md；不会覆盖正在使用的 Agent 数据。
 
-支持范围与实测证据见仓库的 VALIDATION.md 和 CROSS_OS_HANDOFF.md。官方读取器能打开数据不代表模型已成功续聊；Agy 仍限于数据库恢复。项目代码、附件、外部依赖和登录凭据不会自动迁移，还原环境可能需要重新登录。
-
-安装包使用内置／系统组件，不需要 Node.js、Rust 或 Drive Desktop。macOS 发布须通过 Developer ID、公证和 Gatekeeper 验证。Windows Authenticode 暂缓，可能出现系统信任提示；更新包签名仍须验证，与系统发布者签名不同。
+独立下载安装包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 文件夹模式需要对应桌面程序。macOS 发布须通过 Developer ID 签名、公证和安装验证。Windows 发布者签名暂缓；更新包仍验证签名。
 
 ## English
 
-0.6.0 adds cross-platform project path mappings and isolated conversation profiles. Received versions never overwrite your default agent store. Continuing a restored profile publishes a child version back to the other computer; concurrent edits retain separate branches. Upgrade every participating computer and configure its local project paths.
+0.7.0 lets you select one sync destination: the Google Drive API, an iCloud Drive folder, or a OneDrive folder. Folder modes use the provider's installed desktop sync client; they do not sign in to Apple or Microsoft directly. Choose a dedicated folder kept downloaded, create an encrypted space, and save its recovery kit outside that folder. Join on another computer with a kit for the same provider. Switching destinations does not migrate the old space. The credentials entry now explains storage and exports another recovery kit.
 
-Synchronization avoids recompressing unchanged captures, shares overlapping cloud listings and reduces progress-report overhead. Complete content, child conversations and SQLite WAL snapshots are still checked. Caching never substitutes for space-key proof verification.
+A completed local cycle means Bastet handed encrypted objects to the selected folder. The provider's client handles upload, download, and delivery to another computer. Physical two-device delivery through iCloud or OneDrive has not been verified. Repeated macOS Keychain prompts after “Always Allow” remain unresolved. See VALIDATION.md for conversation continuation and agent limits; active agent stores are not overwritten.
 
-See VALIDATION.md and CROSS_OS_HANDOFF.md in the repository for tested scope and evidence. A successful official-reader check does not establish model continuation. Agy remains database recovery. Project code, attachments, external dependencies and credentials are not automatically transferred; restored profiles may need local sign-in.
-
-Installers use bundled or system components; Node.js, Rust and Drive Desktop are not required. macOS publication requires Developer ID signing, notarization and Gatekeeper checks. Windows Authenticode is deferred, so OS trust prompts may appear. Update-package signatures remain mandatory and are separate from OS publisher signatures.
+Standalone installers do not require Node.js or Rust. Google API mode needs no Drive Desktop; iCloud and OneDrive folder modes require their respective desktop sync clients. macOS publication requires Developer ID signing, notarization, and installer verification. Windows publisher signing is deferred; update packages still require signature verification.
 
 ## 日本語
 
-0.6.0 では、OS 間のプロジェクトパス対応と、会話再開用の独立したプロファイルを追加しました。受信したバージョンは既存の Agent データを上書きしません。復元先で会話を続けると子バージョンを同期し、同時編集では両方の分岐を保持します。同期するすべての端末を更新し、各端末のプロジェクトパスを設定してください。
+0.7.0 では同期先を Google Drive API、iCloud Drive フォルダー、OneDrive フォルダーから一つ選べます。フォルダーモードは導入済みの各社デスクトップ同期アプリを使用し、Apple／Microsoft への直接ログインは行いません。ダウンロード済みの専用フォルダーを選び、暗号化スペースを作成して復元キットを同期フォルダーの外に保存します。別端末では同じサービス用のキットで参加します。同期先を変更しても旧スペースのデータは移行されません。認証情報画面から復元キットを再出力できます。
 
-変更のない内容の再圧縮を省き、重複するクラウド一覧取得を共有し、進捗通知の負荷を軽減します。内容、子会話、SQLite WAL の検証と同期空間の鍵の確認は引き続き行います。
+ローカル同期の完了は、Bastet が暗号化データを選択フォルダーに渡したことを示します。クラウドへの送受信と別端末への配信は各社の同期アプリが担います。iCloud／OneDrive を使った実機２台間の配信は未検証です。macOS キーチェーンで「常に許可」を選んだ後の繰り返し確認は未解決です。会話再開と Agent の制限は VALIDATION.md を参照してください。使用中の Agent データは上書きしません。
 
-検証範囲と結果はリポジトリの VALIDATION.md と CROSS_OS_HANDOFF.md を参照してください。公式リーダーで読み込めることは、モデルによる会話再開の成功を意味しません。Agy はデータベース復元に限定されます。コード、添付ファイル、外部依存関係、認証情報は自動転送されず、復元先で再ログインが必要な場合があります。
-
-Node.js、Rust、Drive Desktop の別途導入は不要です。macOS の公開には Developer ID 署名、公証、Gatekeeper 検証が必要です。Windows Authenticode は延期しているため、OS の信頼確認が表示される場合があります。更新パッケージの署名検証は必須であり、OS の発行者署名とは別です。
+単体配布版に Node.js と Rust は不要です。Google API モードに Drive Desktop は不要ですが、iCloud／OneDrive フォルダーモードには対応するデスクトップ同期アプリが必要です。macOS の公開には Developer ID 署名、公証、インストーラー検証が必要です。Windows 発行者署名は延期中で、更新パッケージの署名検証は継続します。
 
 ## 한국어
 
-0.6.0은 운영체제 간 프로젝트 경로 매핑과 대화 재개용 독립 프로필을 추가합니다. 수신한 버전은 기존 Agent 저장소를 덮어쓰지 않습니다. 복원 프로필에서 대화를 이어가면 하위 버전을 다시 동기화하며, 동시 수정은 별도 분기로 보존합니다. 참여하는 모든 컴퓨터를 업데이트하고 각 컴퓨터의 프로젝트 경로를 설정하세요.
+0.7.0에서는 Google Drive API, iCloud Drive 폴더, OneDrive 폴더 중 하나를 동기화 대상으로 선택할 수 있습니다. 폴더 모드는 설치된 제공업체의 데스크톱 동기화 앱을 사용하며 Apple／Microsoft 계정에 직접 로그인하지 않습니다. 다운로드된 전용 폴더를 선택하고 암호화 공간을 만든 뒤 복구 키트를 동기화 폴더 밖에 보관하세요. 다른 컴퓨터에서는 같은 서비스용 키트로 참여합니다. 대상을 바꿔도 이전 공간의 데이터는 자동으로 옮겨지지 않습니다. 자격 증명 메뉴에서 보관 방법을 확인하고 복구 키트를 다시 내보낼 수 있습니다.
 
-변경되지 않은 내용의 반복 압축을 생략하고, 겹치는 클라우드 목록 요청을 공유하며, 진행 알림 비용을 줄입니다. 전체 내용, 하위 대화, SQLite WAL과 동기화 공간 키 검증은 계속 수행합니다.
+로컬 동기화 완료는 Bastet이 암호화된 데이터를 선택한 폴더에 전달했음을 뜻합니다. 클라우드 업로드, 다운로드, 다른 컴퓨터로의 전달은 제공업체의 앱이 담당합니다. iCloud／OneDrive를 통한 실제 두 컴퓨터 간 전달은 아직 검증하지 않았습니다. macOS 키체인에서 “항상 허용”을 선택한 뒤에도 반복되는 요청은 해결되지 않았습니다. 대화 이어가기와 Agent 지원 범위는 VALIDATION.md를 확인하세요. 사용 중인 Agent 저장소는 덮어쓰지 않습니다.
 
-검증 범위와 결과는 저장소의 VALIDATION.md 및 CROSS_OS_HANDOFF.md를 확인하세요. 공식 리더가 데이터를 읽는다는 사실만으로 모델의 대화 재개 성공을 의미하지 않습니다. Agy는 데이터베이스 복원으로 제한됩니다. 코드, 첨부 파일, 외부 의존성 및 인증 정보는 자동 전송되지 않으며, 복원 환경에서 다시 로그인해야 할 수 있습니다.
-
-Node.js, Rust, Drive Desktop을 별도로 설치할 필요가 없습니다. macOS 공개에는 Developer ID 서명, 공증 및 Gatekeeper 검증이 필요합니다. Windows Authenticode는 보류되어 OS 신뢰 경고가 표시될 수 있습니다. 업데이트 패키지 서명 검증은 필수이며 OS 게시자 서명과는 별개입니다.
+독립 설치 파일에는 Node.js와 Rust가 필요하지 않습니다. Google API 모드에는 Drive Desktop이 필요 없지만 iCloud／OneDrive 폴더 모드에는 각 서비스의 데스크톱 동기화 앱이 필요합니다. macOS 공개에는 Developer ID 서명, 공증, 설치 검증이 필요합니다. Windows 게시자 서명은 보류 중이며 업데이트 패키지 서명 검증은 계속 적용됩니다.

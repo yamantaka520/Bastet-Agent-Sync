@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
 import { names } from "./model";
+import type { Settings } from "./model";
 import { ops } from "./operations-i18n";
+import { folderMessages } from "./folder-i18n";
 import { formatBytes } from "./TrafficStatus";
 import type { SyncStatus } from "./WorkerStatus";
 import type { SourceStatus } from "./NativeSessions";
@@ -28,11 +30,13 @@ export function ResourceControls({
   locale,
   value = resourceDefaults,
   disabled,
+  localProvider = false,
   onChange,
 }: {
   locale: Locale;
   value?: Resources;
   disabled: boolean;
+  localProvider?: boolean;
   onChange: (v: Resources) => void;
 }) {
   const t = ops[locale];
@@ -57,31 +61,35 @@ export function ResourceControls({
           }
         />
       </label>
-      <label>
-        {t.upload}
-        <input
-          type="number"
-          min={0}
-          max={1048576}
-          value={value.uploadKib}
-          onChange={(e) =>
-            onChange({ ...value, uploadKib: Number(e.target.value) })
-          }
-        />
-      </label>
-      <label>
-        {t.download}
-        <input
-          type="number"
-          min={0}
-          max={1048576}
-          value={value.downloadKib}
-          onChange={(e) =>
-            onChange({ ...value, downloadKib: Number(e.target.value) })
-          }
-        />
-      </label>
-      <p>{t.unlimited}</p>
+      {!localProvider && (
+        <>
+          <label>
+            {t.upload}
+            <input
+              type="number"
+              min={0}
+              max={1048576}
+              value={value.uploadKib}
+              onChange={(e) =>
+                onChange({ ...value, uploadKib: Number(e.target.value) })
+              }
+            />
+          </label>
+          <label>
+            {t.download}
+            <input
+              type="number"
+              min={0}
+              max={1048576}
+              value={value.downloadKib}
+              onChange={(e) =>
+                onChange({ ...value, downloadKib: Number(e.target.value) })
+              }
+            />
+          </label>
+        </>
+      )}
+      <p>{localProvider ? folderMessages[locale].localLimits : t.unlimited}</p>
       <label>
         <input
           type="checkbox"
@@ -199,10 +207,16 @@ export default function OperationsPanel({
   native,
   locale,
   runtime,
+  localProvider = false,
+  settingsDirty = false,
+  provider = "google-drive",
 }: {
   native: boolean;
   locale: Locale;
   runtime: SyncStatus | null;
+  localProvider?: boolean;
+  settingsDirty?: boolean;
+  provider?: Settings["cloudProvider"];
 }) {
   const t = ops[locale];
   const [data, setData] = useState<{ history: History[]; devices: Device[] }>({
@@ -218,6 +232,7 @@ export default function OperationsPanel({
     objects: number;
     measuredAt: number;
   } | null>(null);
+  useEffect(() => setCloud(null), [provider]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const date = (n: number) => new Date(n * 1000).toLocaleString(locale);
@@ -349,14 +364,16 @@ export default function OperationsPanel({
             {t.measure}
           </button>
           <button
-            disabled={!native || busy || runtime?.running}
+            disabled={!native || busy || runtime?.running || settingsDirty}
             onClick={() =>
               void act(async () =>
                 setCloud(await invoke("cloud_storage_usage")),
               )
             }
           >
-            {t.cloudMeasure}
+            {localProvider
+              ? folderMessages[locale].localMeasure
+              : t.cloudMeasure}
           </button>
           <button
             disabled={!native || busy || runtime?.running}
@@ -379,7 +396,8 @@ export default function OperationsPanel({
         )}
         {cloud && (
           <p>
-            {t.cloud}: {formatBytes(cloud.bytes, locale)} ({cloud.objects}) ·{" "}
+            {localProvider ? folderMessages[locale].localObjects : t.cloud}:{" "}
+            {formatBytes(cloud.bytes, locale)} ({cloud.objects}) ·{" "}
             {date(cloud.measuredAt)}
           </p>
         )}

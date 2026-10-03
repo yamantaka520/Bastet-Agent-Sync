@@ -139,8 +139,18 @@ p {
   display: block;
   margin-bottom: 9px;
 }
-.privacy strong {
+.privacy-link {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   font-weight: 600;
+  cursor: pointer;
+}
+.privacy-link:hover {
+  text-decoration: underline;
 }
 .privacy p {
   font-size: 11px;
@@ -660,6 +670,9 @@ footer p {
   font-size: 13px;
   line-height: 1.8;
 }
+.credential-center h3 {
+  margin-top: 0;
+}
 .wizard-step label {
   display: block;
   margin-top: 16px;
@@ -926,6 +939,9 @@ details summary {
 .project-mappings input {
   width: 100%;
   min-width: 0;
+}
+.folder-panel .folder-path {
+  overflow-wrap: anywhere;
 }
 @media (max-width: 800px) {
   .project-mappings .form-grid {

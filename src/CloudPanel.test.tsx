@@ -2,6 +2,7 @@ import {
   act,
   cleanup,
   fireEvent,
+  within,
   render,
   screen,
 } from "@testing-library/react";
@@ -180,4 +181,42 @@ it("does not clear an action error when the wizard background poll succeeds", as
   expect(screen.getByRole("alert").textContent).toBe(
     wizardMessages.en.clientStoreError,
   );
+});
+
+it("exports a recovery kit from the credential center after setup", async () => {
+  const bound: WizardView = {
+    ...view,
+    wizard: {
+      ...view.wizard,
+      page: 4,
+      clientId: "fixture-client",
+      authorized: true,
+      folderId: "fixture-folder",
+      binding: {
+        folder: "fixture-folder",
+        space: "fixture-space",
+        proof: "proof",
+      },
+      recoverySaved: true,
+      proofVerified: true,
+      complete: true,
+    },
+  };
+  invoke.mockResolvedValue(bound);
+  render(<CloudPanel native locale="en" />);
+  await act(async () => {});
+  const center = screen.getByRole("region", {
+    name: wizardMessages.en.credentialCenter,
+  });
+  const exportButton = within(center).getByRole("button", {
+    name: wizardMessages.en.exportRecovery,
+  }) as HTMLButtonElement;
+  expect(exportButton.textContent).toBe(wizardMessages.en.exportRecovery);
+  expect(exportButton.disabled).toBe(false);
+  await act(async () => fireEvent.click(exportButton));
+  expect(invoke).toHaveBeenCalledWith("wizard_execute", {
+    action: "export_recovery",
+    input: "",
+    locale: "en",
+  });
 });

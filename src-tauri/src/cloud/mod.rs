@@ -2,6 +2,7 @@
 pub mod crypto;
 pub mod desktop;
 pub mod drive;
+pub mod folder;
 pub mod oauth;
 pub mod pending;
 pub mod queue;

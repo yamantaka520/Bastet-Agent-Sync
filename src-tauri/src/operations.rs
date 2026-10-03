@@ -3,7 +3,7 @@ use crate::{
     cloud::{
         crypto::SpaceKey,
         drive::{Drive, ObjectKind},
-        queue::Binding,
+        queue::{Binding, Objects},
     },
     model::Settings,
     native_sessions::SourceStatus,
@@ -235,6 +235,117 @@ pub fn device_exchange(
     }
     Ok(())
 }
+/// Folder providers publish append-only encrypted reports; a device's newest
+/// timestamp wins locally, so concurrent machines never overwrite one another.
+pub fn device_exchange_folder(
+    root: &Path,
+    settings: &Settings,
+    binding: &Binding,
+    key: &SpaceKey,
+    folder: &crate::cloud::folder::FolderObjects,
+    outcome: &str,
+    stop: impl Fn() -> bool,
+) -> Result<()> {
+    use crate::cloud::folder::Kind;
+    let path = root.join(format!("devices-{}.json", binding.space));
+    let mut reports: Vec<DeviceReport> = read_json(&path, 1024 * 1024)?;
+    if stop() {
+        return Err("sync_paused".into());
+    }
+    if folder.get(&binding.folder, &binding.proof, &binding.space, key)?
+        != crate::cloud::queue::proof_bundle(&binding.space)?
+    {
+        return Err("invalid_space_proof".into());
+    }
+    let local_identity = if settings.direction == "download" {
+        None
+    } else {
+        Some(identity(root)?)
+    };
+    let last_local = local_identity
+        .as_ref()
+        .and_then(|id| reports.iter().find(|r| r.id == id.id));
+    let needs_report = last_local.is_none_or(|r| {
+        r.reported_at.saturating_add(86400) <= now()
+            || r.outcome != outcome
+            || r.name != settings.device_name
+            || r.agents != settings.selected_agents
+    });
+    if let Some(device) = local_identity.filter(|_| needs_report) {
+        let report = DeviceReport {
+            id: device.id.clone(),
+            name: settings.device_name.clone(),
+            os: std::env::consts::OS.into(),
+            version: env!("CARGO_PKG_VERSION").into(),
+            reported_at: now(),
+            observed_at: 0,
+            outcome: outcome.into(),
+            agents: settings.selected_agents.clone(),
+        };
+        report.validate()?;
+        let bundle = Bundle::new(Snapshot {
+            schema: 1,
+            space: binding.space.clone(),
+            device: device.id.clone(),
+            stream: Stream {
+                agent: "codex".into(),
+                profile: device.id.clone(),
+                conversation: "bastet-device-report".into(),
+            },
+            parents: vec![],
+            files: BTreeMap::from([(
+                "device.json".into(),
+                Entry::new(serde_json::to_string(&report).map_err(|_| "device_report_invalid")?),
+            )]),
+        })?;
+        let id = folder.allocate()?;
+        folder.put_kind(&binding.folder, &id, key, &bundle, Kind::Device)?;
+        let mut local = report;
+        local.observed_at = now();
+        reports.retain(|r| r.id != local.id);
+        reports.push(local);
+    }
+    if settings.direction != "upload" {
+        let ids = folder.ids_kind(&binding.folder, Kind::Device)?;
+        if ids.len() > 4096 {
+            return Err("device_limit".into());
+        }
+        for id in ids {
+            if stop() {
+                return Err("sync_paused".into());
+            }
+            let bundle =
+                folder.get_kind(&binding.folder, &id, &binding.space, key, Kind::Device)?;
+            let mut report: DeviceReport = serde_json::from_str(
+                &bundle
+                    .snapshot
+                    .files
+                    .get("device.json")
+                    .ok_or("device_report_invalid")?
+                    .content,
+            )
+            .map_err(|_| "device_report_invalid")?;
+            report.validate()?;
+            if report.id != bundle.snapshot.stream.profile
+                || bundle.snapshot.stream.conversation != "bastet-device-report"
+            {
+                return Err("device_report_invalid".into());
+            }
+            report.observed_at = now();
+            if reports
+                .iter()
+                .any(|r| r.id == report.id && r.reported_at >= report.reported_at)
+            {
+                continue;
+            }
+            reports.retain(|r| r.id != report.id);
+            reports.push(report);
+        }
+    }
+    reports.sort_by_key(|r| std::cmp::Reverse(r.observed_at));
+    reports.truncate(128);
+    write_json(&path, &reports)
+}
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageUsage {
@@ -298,8 +409,19 @@ pub async fn operations_view(app: tauri::AppHandle) -> Result<View> {
     tauri::async_runtime::spawn_blocking(move || {
         let root = root(&app)?;
         let history = read_json(&root.join("sync-history.json"), 16 * 1024 * 1024)?;
-        let tx = crate::cloud::wizard::Transaction::open(&root)?;
-        let devices = match tx.state.binding {
+        let settings = crate::model::load(&root.join("settings.json"))?;
+        let provider = settings
+            .as_ref()
+            .map(|s| s.cloud_provider.as_str())
+            .unwrap_or("google-drive");
+        let binding = if provider == "google-drive" {
+            crate::cloud::wizard::Transaction::open(&root)?
+                .state
+                .binding
+        } else {
+            crate::cloud::folder::load(&root, provider)?.and_then(|s| s.binding)
+        };
+        let devices = match binding {
             Some(b) => read_json(&root.join(format!("devices-{}.json", b.space)), 1024 * 1024)?,
             None => Vec::new(),
         };
@@ -331,8 +453,19 @@ pub async fn clear_download_cache(
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = cloud.0.try_lock().map_err(|_| "cloud_busy")?;
         let root = root(&app)?;
-        let tx = crate::cloud::wizard::Transaction::open(&root)?;
-        let binding = tx.state.binding.ok_or("wizard_step_required")?;
+        let settings = crate::model::load(&root.join("settings.json"))?;
+        let provider = settings
+            .as_ref()
+            .map(|s| s.cloud_provider.as_str())
+            .unwrap_or("google-drive");
+        let binding = if provider == "google-drive" {
+            crate::cloud::wizard::Transaction::open(&root)?
+                .state
+                .binding
+        } else {
+            crate::cloud::folder::load(&root, provider)?.and_then(|s| s.binding)
+        }
+        .ok_or("wizard_step_required")?;
         let path = root.join(format!("drive-cache-{}", binding.space));
         clear_cache(&path)
     })
@@ -373,9 +506,25 @@ pub async fn cloud_storage_usage(
 ) -> Result<CloudUsage> {
     let cloud = cloud.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        let config = root(&app)?;
+        let settings = crate::model::load(&config.join("settings.json"))?;
+        let provider = settings
+            .as_ref()
+            .map(|s| s.cloud_provider.as_str())
+            .unwrap_or("google-drive");
+        if provider != "google-drive" {
+            let (state, _scope, folder) = crate::cloud::folder::ready(&config, provider)?;
+            let _binding = state.binding.ok_or("wizard_step_required")?;
+            let (bytes, objects) = folder.usage()?;
+            return Ok(CloudUsage {
+                bytes,
+                objects,
+                measured_at: now(),
+            });
+        }
         let guard = cloud.0.try_lock().map_err(|_| "cloud_busy")?;
         let drive = guard.as_ref().ok_or("reauth_required")?;
-        let tx = crate::cloud::wizard::Transaction::open(&root(&app)?)?;
+        let tx = crate::cloud::wizard::Transaction::open(&config)?;
         let b = tx.state.binding.ok_or("wizard_step_required")?;
         let mut objects = Vec::new();
         for kind in [

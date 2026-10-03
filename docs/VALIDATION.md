@@ -1,5 +1,18 @@
 # Validation
 
+## 0.7.0 credentials and cloud-folder release candidate — 2026-10-03
+
+- The former static credential notice now focuses an actionable management section. Recovery export uses the existing native command and is available independently of the Google wizard's current page. Folder-provider setup has its own recovery export. Credential guidance no longer requires manual reload at every launch; native secret storage itself is unchanged.
+- iCloud Drive and OneDrive folder choices are wired into the actual encrypted worker, portable packages, device reports, session listing/restore and provider-aware preflight. Legacy settings default to Google; the Google wizard and keys are preserved. Provider changes require saving settings before Start. There is no Microsoft OAuth integration or automatic cloud-history migration.
+- Rust default suite: **130 passed, 7 ignored**. Store-feature suite: **142 passed, 6 ignored**, including selected-file descriptor resolution through a symlink parent before writing recovery bytes. Existing loopback HTTP tests needed execution outside the restricted sandbox; the elevated full runs passed. No real Google/iCloud/OneDrive account or active agent store was used by these tests.
+- Folder fixtures cover immutable encrypted retries and concurrent branches; missing, partial, wrong-key and wrong-space failures; missing namespaces and symlink rejection; provider-specific recovery kits; proof-gated queue transfer; and a native Pi capture/receive/managed-restore round trip. Google migration defaults and stale legacy local-folder settings are tested. Platform placeholder checks are implemented, but real provider eviction/hydration is not established by these fixtures.
+- Strict Clippy for default and Store features and Rust formatting passed. Three release-asset tests and three Store-packaging tests passed locally. The POSIX bundle-permission fixture is explicitly skipped on Windows, whose chmod semantics cannot exercise macOS file modes; the remaining profile checks still run there. Cross-platform CI, installers and publication are pending.
+- Frontend build and **72 tests pass**. Tests cover provider persistence, cancellation, error recovery, stale readiness, actual native-command dispatch, preview without IPC and credential-entry focus. Traditional Chinese browser preview was inspected at the native default 1140 × 840 size, including the credential entry and iCloud recovery controls; browser preview is not native Save-panel or cloud acceptance.
+- Read-only macOS diagnostics found the running independent-distribution app passes strict signature verification, uses the login Keychain, and appears in the decrypt ACLs of its three configured credential categories. The current app's opaque trusted-application data matched those entries; no forced-password flag was observed. These facts do not establish the cause of repeated prompts. The owner will keep the next prompt visible for further diagnosis. No password data was requested, and no Keychain item/ACL was changed.
+- Still unverified: actual iCloud/OneDrive upload and second-device receipt, signed Store picker/bookmark/recovery export after restart, Windows native folder-provider behavior, and prompt-free macOS relaunch. The installed app, current Google synchronization, released installers and submitted Store build were not replaced.
+
+See [folder workflow](LOCAL_CLOUD_FOLDERS.md) and [credential boundaries](CLOUD_SECURITY.md).
+
 ## App Review information request — 2026-10-03
 
 Before resubmission, the authenticated review page and App Store Connect API confirmed **REJECTED** for `0.6.0` build `1`. Apple's Guideline 2.1 message requests:

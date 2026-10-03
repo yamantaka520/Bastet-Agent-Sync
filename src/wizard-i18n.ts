@@ -1,9 +1,14 @@
 import type { Locale } from "./i18n";
 export const wizardMessages = {
   en: {
-    unlockCredentials: "🔐 Prepare credential access",
+    credentialCenter: "Credentials & recovery",
+    credentialStore:
+      "Google login and space keys are saved in this computer's system credential store. Bastet keeps successful reads in memory for this app session; the recovery kit is saved only where you choose in the system file dialog.",
+    recoveryUnavailable:
+      "Set up an encrypted space before saving a recovery kit.",
+    unlockCredentials: "🔐 Reload saved credentials",
     credentialHint:
-      "Before syncing, unlock your system credential store. On macOS, choose “Always Allow” for each Bastet credential when prompted. Successful reads stay in memory until you quit, forget login or change the client configuration. Each computer needs its own authorization; updates may prompt again. Use this button again after changing credentials outside Bastet.",
+      "Bastet saves credentials during setup and reads them automatically when needed. On macOS, choose “Always Allow” for each Bastet credential when prompted; each computer needs its own approval and updates may prompt again. Successful reads stay in memory until you quit, forget login or change the client configuration. Use this button only after changing credentials outside Bastet to clear cached reads and reload them.",
     credentialsReady:
       "Saved credentials are ready for this app session. This does not verify Google access or start syncing.",
     cancelLogin: "Cancel browser authorization wait",
@@ -118,9 +123,13 @@ export const wizardMessages = {
     ],
   },
   "zh-Hant": {
-    unlockCredentials: "🔐 準備憑證存取",
+    credentialCenter: "憑證與恢復",
+    credentialStore:
+      "Google 登入與空間金鑰保存在這台電腦的系統憑證庫。Bastet 在本次執行期間暫存成功讀取的資料；恢復檔只會存到你在系統檔案對話框選擇的位置。",
+    recoveryUnavailable: "請先設定加密空間，才能保存恢復檔。",
+    unlockCredentials: "🔐 重新讀取已儲存憑證",
     credentialHint:
-      "同步前請解鎖系統憑證庫。macOS 出現提示時，請針對 Bastet 的各項憑證選擇「永遠允許」。成功讀取的憑證會暫存在記憶體，結束程式、忘記登入或更換用戶端設定時清除。每台電腦須各自授權，更新後可能再次詢問。在程式外修改憑證後，可再按此按鈕重新讀取。",
+      "Bastet 會在設定時儲存憑證，並在需要時自動讀取。macOS 出現提示時，請針對 Bastet 的各項憑證選擇「永遠允許」；每台電腦須各自授權，更新後可能再次詢問。成功讀取的憑證會暫存在記憶體，直到結束程式、忘記登入或更換用戶端設定。在程式外修改憑證後，才使用此按鈕清除暫存並重新讀取。",
     credentialsReady:
       "已儲存的憑證已準備好供本次程式執行使用；這不代表 Google 連線已驗證，也不會啟動同步。",
     cancelLogin: "取消等待瀏覽器授權",
@@ -224,9 +233,13 @@ export const wizardMessages = {
     ],
   },
   "zh-Hans": {
-    unlockCredentials: "🔐 准备凭据访问",
+    credentialCenter: "凭据与恢复",
+    credentialStore:
+      "Google 登录和空间密钥保存在这台电脑的系统凭据库。Bastet 在本次运行期间暂存成功读取的数据；恢复文件只会保存到你在系统文件对话框选择的位置。",
+    recoveryUnavailable: "请先设置加密空间，才能保存恢复文件。",
+    unlockCredentials: "🔐 重新读取已保存凭据",
     credentialHint:
-      "同步前请解锁系统凭据库。macOS 出现提示时，请为 Bastet 的各项凭据选择“始终允许”。成功读取的凭据会暂存在内存中，退出程序、忘记登录或更换客户端配置时清除。每台电脑须分别授权，更新后可能再次询问。在程序外修改凭据后，可再次点击此按钮重新读取。",
+      "Bastet 会在设置时保存凭据，并在需要时自动读取。macOS 出现提示时，请为 Bastet 的各项凭据选择“始终允许”；每台电脑须分别授权，更新后可能再次询问。成功读取的凭据会暂存在内存中，直到退出程序、忘记登录或更换客户端配置。在程序外修改凭据后，才使用此按钮清除缓存并重新读取。",
     credentialsReady:
       "已保存的凭据已准备好供本次程序运行使用；这不代表 Google 连接已验证，也不会启动同步。",
     cancelLogin: "取消等待浏览器授权",
@@ -331,9 +344,14 @@ export const wizardMessages = {
     ],
   },
   ja: {
-    unlockCredentials: "🔐 認証情報へのアクセスを準備",
+    credentialCenter: "認証情報と復元",
+    credentialStore:
+      "Google ログイン情報とスペースキーは、このパソコンのシステム認証情報ストアに保存されます。読み取った情報は今回の起動中だけメモリに保持され、復元キットはシステムのファイルダイアログで選んだ場所に保存されます。",
+    recoveryUnavailable:
+      "復元キットを保存する前に暗号化スペースを設定してください。",
+    unlockCredentials: "🔐 保存済み認証情報を再読み込み",
     credentialHint:
-      "同期前にシステムの認証情報ストアを解除してください。macOS で確認されたら、Bastet の各認証情報に「常に許可」を選択します。読み取った情報は終了、ログイン情報の削除、クライアント設定の変更までメモリに保持します。各パソコンで許可が必要で、更新後に再確認される場合があります。外部で認証情報を変更した場合は、このボタンで再読み込みしてください。",
+      "Bastet は設定中に認証情報を保存し、必要なときに自動で読み取ります。macOS の確認画面では各 Bastet 認証情報に「常に許可」を選んでください。各パソコンで許可が必要で、更新後に再確認される場合があります。読み取った情報は終了、ログイン情報の削除、クライアント設定の変更までメモリに保持します。Bastet の外部で認証情報を変更した場合にのみ、このボタンでキャッシュを消して再読み込みしてください。",
     credentialsReady:
       "保存済みの認証情報を今回の起動中に使用できます。Google 接続の確認や同期の開始は行いません。",
     cancelLogin: "ブラウザー認証待ちをキャンセル",
@@ -449,9 +467,14 @@ export const wizardMessages = {
     ],
   },
   ko: {
-    unlockCredentials: "🔐 자격 증명 접근 준비",
+    credentialCenter: "자격 증명 및 복구",
+    credentialStore:
+      "Google 로그인 정보와 공간 키는 이 컴퓨터의 시스템 자격 증명 저장소에 보관됩니다. 읽은 정보는 이번 앱 실행 중에 메모리에 보관하며, 복구 키트는 시스템 파일 대화상자에서 선택한 위치에만 저장됩니다.",
+    recoveryUnavailable:
+      "복구 키트를 저장하려면 먼저 암호화 공간을 설정하세요.",
+    unlockCredentials: "🔐 저장된 자격 증명 다시 읽기",
     credentialHint:
-      "동기화 전에 시스템 자격 증명 저장소를 잠금 해제하세요. macOS에서 요청하면 Bastet의 각 자격 증명에 “항상 허용”을 선택하세요. 읽은 정보는 앱 종료, 로그인 정보 삭제 또는 클라이언트 설정 변경까지 메모리에 보관합니다. 컴퓨터마다 승인이 필요하며 업데이트 후 다시 요청할 수 있습니다. 앱 외부에서 정보를 변경했다면 이 버튼으로 다시 읽으세요.",
+      "Bastet은 설정 중 자격 증명을 저장하고 필요할 때 자동으로 읽습니다. macOS에서 요청하면 Bastet의 각 자격 증명에 “항상 허용”을 선택하세요. 컴퓨터마다 승인이 필요하며 업데이트 후 다시 요청할 수 있습니다. 읽은 정보는 앱 종료, 로그인 정보 삭제 또는 클라이언트 설정 변경까지 메모리에 보관합니다. 앱 외부에서 자격 증명을 변경한 경우에만 이 버튼으로 캐시를 지우고 다시 읽으세요.",
     credentialsReady:
       "저장된 자격 증명을 이번 앱 실행 중 사용할 준비가 되었습니다. Google 연결을 확인하거나 동기화를 시작하지 않습니다.",
     cancelLogin: "브라우저 인증 대기 취소",

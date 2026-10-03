@@ -411,12 +411,14 @@ fn context(app: &tauri::AppHandle) -> Result<(PathBuf, Settings, String)> {
         .app_config_dir()
         .map_err(|_| "store_unavailable")?;
     let settings = crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
-    let tx = crate::cloud::wizard::Transaction::open(&root)?;
-    Ok((
-        root,
-        settings,
-        tx.state.binding.ok_or("wizard_step_required")?.space,
-    ))
+    let binding = if settings.cloud_provider == "google-drive" {
+        crate::cloud::wizard::Transaction::open(&root)?
+            .state
+            .binding
+    } else {
+        crate::cloud::folder::load(&root, &settings.cloud_provider)?.and_then(|s| s.binding)
+    };
+    Ok((root, settings, binding.ok_or("wizard_step_required")?.space))
 }
 fn load(root: &Path, space: &str, agent: &str, id: &str) -> Result<Package> {
     if !crate::model::agent_available(agent) || !bundle::is_hash(id) {
