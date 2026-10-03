@@ -851,7 +851,7 @@ mod tests {
     }
     #[test]
     fn missing_namespace_or_symlinked_object_is_never_recreated() {
-        let (dir, binding, key, remote) = fixture();
+        let (dir, binding, _key, remote) = fixture();
         fs::remove_dir_all(dir.path().join(MANAGED).join(&binding.folder)).unwrap();
         assert_eq!(
             remote.ids(&binding.folder),
@@ -876,7 +876,7 @@ mod tests {
                 .put(
                     &binding.folder,
                     "alias",
-                    &key,
+                    &_key,
                     &queue::proof_bundle(&binding.space).unwrap()
                 )
                 .is_err());
