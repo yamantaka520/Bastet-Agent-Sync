@@ -1,6 +1,21 @@
 # Mac App Store delivery plan
 
-Status (2026-10-02): macOS `0.6.0` build `1` is formally submitted and **WAITING_FOR_REVIEW**, verified through Apple’s website and API. Release remains manual. France is excluded; 174 territories remain. Privacy disclosures and content-rights answers are saved, and the encryption questionnaire is completed. No Store approval or public availability is claimed. Existing v0.6.0 remains the independently distributed Developer ID release.
+Status (2026-10-03): macOS `0.6.0` build `1` was **resubmitted and is WAITING_FOR_REVIEW**, verified on the authenticated App Store Connect review page. The Guideline 2.1 response includes the physical-Mac recording and synthetic sample ZIP; all six answers were also saved in App Review Notes. TestFlight production-sandbox Google setup, one synthetic upload and independent-profile restore passed on one Mac. Release remains manual, with France excluded (174 territories). No Store approval or public availability is claimed.
+
+## App Review information request — 2026-10-03
+
+Before resubmission, the authenticated review page and App Store Connect API confirmed **REJECTED** for `0.6.0` build `1`. Apple's Guideline 2.1 message requests:
+
+1. A recording on a physical device running the latest OS, beginning with app launch and demonstrating the typical flow, including applicable account, user-content and purchase flows.
+2. Purpose, target audience, problem and value.
+3. Main-feature setup/access instructions, credentials where applicable and sample files.
+4. External services, tools and platforms.
+5. Regional differences or consistent functionality.
+6. Relevant authorization for regulated services or protected material, if applicable.
+
+Apple asks for this information in both the review reply and App Review Notes. The message does not report a specific crash or functional defect. Existing ad-hoc sandbox evidence is not substituted for the requested production/TestFlight recording.
+
+An internal `App Review QA` TestFlight group was created with automatic build distribution disabled, and the exact `0.6.0` build `1` was added. The owner initially deferred the invitation, then explicitly authorized it after updating the physical Mac to macOS `27.0.1` (`26A434`). The invitation was received and redeemed after the owner accepted the TestFlight terms. TestFlight installed the exact `0.6.0` build `1`; its bundle has an App Store receipt and the production sandbox launched successfully on the physical Mac. The first-launch interface shows the Store update policy, AMOS exclusion, no selected sources and no transfers. Google authorization, a dedicated Drive folder, recovery-kit backup and encrypted-space/final setup verification completed. An explicit sync uploaded one synthetic Claude Code bundle, then paused. Snapshot restore created a new separate profile; file inspection confirmed the one message and session ID were preserved and `cwd` was mapped to the chosen receiving project. No active agent store was used. This is one physical Mac uploading and restoring its own captured version; downloaded bundles remained zero, so it does not establish a second-device download or model continuation. The 7:26 delivery recording was inspected and privacy-edited to hide unrelated desktop/chat and personal identifiers while retaining the Google consent flow and actual operations. [Apple's current security-release page](https://support.apple.com/en-us/100100) lists `27.0.1` as the latest release. The [submitted six-part response and evidence record](app-store/REVIEW_INFORMATION.md) is preserved; the synthetic sample ZIP was checked for archive integrity and path consistency, and its extracted sample was exercised in the submitted TestFlight build as described above. The video and sample ZIP were attached to the review response; Notes were saved, Update Review Content completed, and Resubmit to App Review returned WAITING_FOR_REVIEW.
 
 ## App Review submitted — 2026-10-02
 

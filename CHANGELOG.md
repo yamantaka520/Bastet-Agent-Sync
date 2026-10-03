@@ -1,5 +1,9 @@
 # Changelog
 
+## Mac App Store — information supplied and resubmitted 2026-10-03
+
+- Record Apple’s Guideline 2.1 information request and `REJECTED` status. Prepare an internal TestFlight group containing the submitted build, with automatic distribution disabled. Prepare a six-part response/notes draft, capture checklist and synthetic sample. After the owner updated the Mac to `27.0.1` and authorized the invitation, the invitation was redeemed and the exact TestFlight build installed and launched in its production sandbox; Google setup, one synthetic bundle upload and isolated restore with verified project-path remapping passed on one physical Mac; a privacy-edited 7:26 physical-Mac recording and synthetic ZIP were attached, six-part Notes saved, and Apple confirms WAITING_FOR_REVIEW after resubmission; no specific runtime defect was identified in the review message.
+
 ## Mac App Store — submitted 2026-10-02
 
 - Formally submit macOS `0.6.0` build `1`; Apple website and API confirm `WAITING_FOR_REVIEW`. Release remains manual with France excluded (174 territories). Complete the published non-OS encryption questionnaire, publish privacy disclosures and save the owner-confirmed content-rights answer. Review notes explicitly describe Google OAuth access. This is not Store approval or publication.
