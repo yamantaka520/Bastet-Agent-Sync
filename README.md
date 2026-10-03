@@ -16,7 +16,7 @@
 
 A local-first desktop companion for synchronizing supported local agent conversations and Agent Memory OS data through a selected encrypted cloud destination. Part of the Bastet family.
 
-> **0.7.0 release candidate — selected cloud destination and recovery management.** Choose Google Drive API, an iCloud Drive folder, or a OneDrive folder. Folder modes use installed desktop sync clients and keep encrypted handoff distinct from cloud delivery. [Latest published release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest) · [Folder setup](docs/LOCAL_CLOUD_FOLDERS.md) · [Handoff and limits](docs/CROSS_OS_HANDOFF.md) · [Evidence](docs/VALIDATION.md).
+> **0.7.0 — selected cloud destination and recovery management.** Choose Google Drive API, an iCloud Drive folder, or a OneDrive folder. Folder modes use installed desktop sync clients and keep encrypted handoff distinct from cloud delivery. [Latest published release](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest) · [Folder setup](docs/LOCAL_CLOUD_FOLDERS.md) · [Handoff and limits](docs/CROSS_OS_HANDOFF.md) · [Evidence](docs/VALIDATION.md).
 
 macOS installers are Developer ID signed and notarized. Windows publisher signing remains deferred; updater signatures are verified on every platform. Agy remains explicit database recovery without workspace remapping.
 

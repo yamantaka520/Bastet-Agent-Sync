@@ -2,7 +2,7 @@
 
 ## 0.7.0 — credentials and cloud folders
 
-Release candidate prepared 2026-10-03; cross-platform CI, signed packages and publication are pending.
+Published 2026-10-03: [installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.7.0). Four architecture packages, three-platform CI, six directed cross-OS returns, independent installer checks and all update signatures/checksums passed. macOS packages are Developer ID signed and Apple notarized; Windows publisher signing remains deferred. See [release evidence](docs/VALIDATION.md).
 
 - Replace the inert credential notice with an accessible management entry and recovery-kit export available after setup. Clarify that credentials save/read automatically; manual reload is for external credential changes, not a required step on every launch. Preserve all five locales.
 - Add iCloud Drive and OneDrive **local synchronized folder** destinations alongside the existing Google Drive API. Integrate encrypted immutable objects with the real worker, native-session restore, portable packages, device reports, preflight and storage measurement. Save setup and explicit Start remain required. Existing Google configuration is retained; direct Microsoft OAuth is not included.

@@ -2,7 +2,7 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.7.0 release candidate: credentials and cloud folders
+## 0.7.0: credentials and cloud folders
 
 Select one destination: Google Drive API, an iCloud Drive folder, or a OneDrive folder. Folder modes use the provider's installed desktop sync client. Choose a dedicated folder kept downloaded; create an encrypted space and save its recovery kit outside the shared folder, or join with a kit for that provider. Save setup, select sources, then Start. Switching destinations does not migrate old history. The credentials entry exports another recovery kit and explains local credential storage. Direct Apple/Microsoft sign-in is not included. A completed local handoff does not verify cloud or second-device delivery; a physical two-device folder run has not been verified. macOS credentials still use Keychain; repeated prompts after Always Allow remain unresolved.
 
@@ -10,7 +10,7 @@ Select one destination: Google Drive API, an iCloud Drive folder, or a OneDrive 
 
 ## 0.6.0 cross-platform conversation handoff
 
-0.6.0 adds cross-OS project mapping and managed conversation handoff. Save the source-to-local project paths, synchronize, pause and choose **Continue restored version**. Continued edits sync back with their parent version; concurrent branches remain separate. Default agent stores are not overwritten. Agy remains database recovery. Upgrade every participating computer to 0.6.0. [Workflow and limits](../../CROSS_OS_HANDOFF.md).
+0.6.0 adds cross-OS project mapping and managed conversation handoff. Save the source-to-local project paths, synchronize, pause and choose **Continue restored version**. Continued edits sync back with their parent version; concurrent branches remain separate. Default agent stores are not overwritten. Agy remains database recovery. Upgrade every participating computer to 0.7.0. [Workflow and limits](../../CROSS_OS_HANDOFF.md).
 
 ## 0.5.0
 
@@ -46,7 +46,7 @@ npm run tauri dev
 
 ## 🐈 Download and install
 
-[Versions and downloads](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest): click the version for direct installer links in its release notes. Windows detects and installs missing embedded WebView2; macOS uses system WebKit; Linux users can run the downloaded `sh install-linux.sh` for apt/dnf detection, checksums and dependency installation. Node.js and Rust are unnecessary. Google API mode needs no Drive Desktop; folder modes need the installed iCloud or OneDrive client. Configure AMOS CLI and agent accounts separately. The published macOS 0.6.0 release is Developer ID signed and Apple notarized; 0.7.0 publication requires its own verification. Windows Authenticode is deferred, so OS trust prompts may appear; update-package signatures remain verified.
+[Versions and downloads](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest): click the version for direct installer links in its release notes. Windows detects and installs missing embedded WebView2; macOS uses system WebKit; Linux users can run the downloaded `sh install-linux.sh` for apt/dnf detection, checksums and dependency installation. Node.js and Rust are unnecessary. Google API mode needs no Drive Desktop; folder modes need the installed iCloud or OneDrive client. Configure AMOS CLI and agent accounts separately. The published macOS 0.7.0 release is Developer ID signed, Apple notarized and verified. Windows Authenticode is deferred, so OS trust prompts may appear; update-package signatures remain verified.
 
 If macOS blocks the first launch, confirm the download source, then use System Settings → Privacy & Security → Open Anyway for this app. [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 

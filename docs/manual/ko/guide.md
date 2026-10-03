@@ -2,7 +2,7 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.7.0 출시 후보: 자격 증명 및 클라우드 폴더
+## 0.7.0: 자격 증명 및 클라우드 폴더
 
 동기화 대상은 Google Drive API, iCloud Drive 폴더, OneDrive 폴더 중 하나를 선택합니다. 폴더 모드는 설치된 데스크톱 동기화 앱을 사용합니다. 다운로드된 전용 폴더를 선택하고 암호화 공간을 만든 뒤 복구 키트를 동기화 폴더 밖에 보관하거나 같은 서비스의 키트로 참여하세요. 설정과 소스를 저장한 후 시작하세요. 대상을 바꿔도 기존 데이터는 자동 이전되지 않습니다. 자격 증명 메뉴에서 복구 키트를 다시 내보내고 로컬 저장 방식을 확인할 수 있습니다. Apple／Microsoft 직접 로그인은 제공하지 않습니다. 로컬 전달은 클라우드나 다른 컴퓨터로의 도착을 증명하지 않으며 실제 두 컴퓨터 간 전달은 미검증입니다. macOS에서 “항상 허용” 이후 반복되는 요청은 미해결 상태입니다.
 
@@ -10,7 +10,7 @@
 
 ## 0.6.0 운영체제 간 대화 이어가기
 
-0.6.0에는 운영체제 간 프로젝트 경로 연결과 대화 버전 이어가기가 추가되었습니다. 경로를 저장하고 동기화한 후 일시 중지하고 “복원된 버전 계속하기”를 선택하세요. 계속한 변경 사항은 부모 버전을 유지하여 동기화하고 분기는 별도로 보존합니다. 기존 Agent 데이터를 덮어쓰지 않습니다. Agy는 DB 복원만 제공합니다. 동기화하는 모든 컴퓨터를 0.6.0으로 업데이트하세요. [사용 방법과 제한](../../CROSS_OS_HANDOFF.md).
+0.6.0에는 운영체제 간 프로젝트 경로 연결과 대화 버전 이어가기가 추가되었습니다. 경로를 저장하고 동기화한 후 일시 중지하고 “복원된 버전 계속하기”를 선택하세요. 계속한 변경 사항은 부모 버전을 유지하여 동기화하고 분기는 별도로 보존합니다. 기존 Agent 데이터를 덮어쓰지 않습니다. Agy는 DB 복원만 제공합니다. 동기화하는 모든 컴퓨터를 0.7.0으로 업데이트하세요. [사용 방법과 제한](../../CROSS_OS_HANDOFF.md).
 
 ## 0.5.0
 
@@ -46,7 +46,7 @@ npm run tauri dev
 
 ## 🐈 다운로드 및 설치
 
-[버전 및 다운로드](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)의 버전 번호를 누르면 OS별 직접 다운로드 링크가 표시됩니다. Windows는 누락된 WebView2를 내장 설치기로 설치하며 macOS는 시스템 WebKit을 사용합니다. Linux는 다운로드한 `sh install-linux.sh`로 apt/dnf 감지, 검증 및 의존성 설치를 수행합니다. Node.js와 Rust는 필요하지 않습니다. AMOS CLI와 Agent 로그인은 별도 설정이 필요합니다. macOS 0.6.0은 Developer ID 서명과 Apple 공증을 완료했습니다. Windows Authenticode는 보류되어 OS 확인이 표시될 수 있으며, 업데이트 패키지 서명은 계속 검증합니다.
+[버전 및 다운로드](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)의 버전 번호를 누르면 OS별 직접 다운로드 링크가 표시됩니다. Windows는 누락된 WebView2를 내장 설치기로 설치하며 macOS는 시스템 WebKit을 사용합니다. Linux는 다운로드한 `sh install-linux.sh`로 apt/dnf 감지, 검증 및 의존성 설치를 수행합니다. Node.js와 Rust는 필요하지 않습니다. AMOS CLI와 Agent 로그인은 별도 설정이 필요합니다. macOS 0.7.0은 Developer ID 서명과 Apple 공증을 완료했습니다. Windows Authenticode는 보류되어 OS 확인이 표시될 수 있으며, 업데이트 패키지 서명은 계속 검증합니다.
 
 macOS에서 첫 실행이 차단되면 다운로드 출처를 확인하고 시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기에서 이 앱을 승인하세요. [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 

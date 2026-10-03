@@ -2,7 +2,7 @@
 
 [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · [English](../en/guide.md) · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 
-## 0.7.0 公開候補：認証情報とクラウドフォルダー
+## 0.7.0：認証情報とクラウドフォルダー
 
 同期先は Google Drive API、iCloud Drive フォルダー、OneDrive フォルダーから一つ選びます。後二者は導入済みのデスクトップ同期アプリを使用します。ダウンロード済みの専用フォルダーを選び、暗号化スペースを作成して復元キットを同期フォルダーの外に保存するか、同じサービスのキットで参加します。設定とソースを保存してから開始してください。同期先を変えても旧データは移行されません。認証情報画面では復元キットの再出力とローカル保存方法の確認ができます。Apple／Microsoft への直接ログインはありません。ローカル受け渡しはクラウドや別端末への到達を示さず、実機２台での配信は未検証です。macOS で「常に許可」後の繰り返し確認は未解決です。
 
@@ -10,7 +10,7 @@
 
 ## 0.6.0 OS 間の会話引き継ぎ
 
-0.6.0 では OS 間のプロジェクトパス対応と会話の引き継ぎを追加しました。パス対応を保存して同期し、一時停止後に「復元済みの版を再開」を選択します。続行した変更は親バージョンを保持して同期され、分岐は別々に残ります。既存の Agent データは上書きしません。Agy は DB 復元のみです。同期するすべての端末を 0.6.0 に更新してください。[操作と制限](../../CROSS_OS_HANDOFF.md)。
+0.6.0 では OS 間のプロジェクトパス対応と会話の引き継ぎを追加しました。パス対応を保存して同期し、一時停止後に「復元済みの版を再開」を選択します。続行した変更は親バージョンを保持して同期され、分岐は別々に残ります。既存の Agent データは上書きしません。Agy は DB 復元のみです。同期するすべての端末を 0.7.0 に更新してください。[操作と制限](../../CROSS_OS_HANDOFF.md)。
 
 ## 0.5.0
 
@@ -46,7 +46,7 @@ npm run tauri dev
 
 ## 🐈 ダウンロードとインストール
 
-[バージョンとダウンロード](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)のバージョン番号から各OSの直接リンクを開けます。Windowsは同梱WebView2を必要に応じて補い、macOSはシステムWebKitを使用します。Linuxはダウンロードした `sh install-linux.sh` でapt/dnf判定・検証・依存パッケージの導入を行います。Node.jsとRustは不要です。AMOS CLIとAgentログインは別途設定してください。macOS 0.6.0 は Developer ID 署名と Apple 公証を完了しています。Windows Authenticode は延期しているため、OS の確認が表示される場合があります。更新パッケージの署名検証は必須です。
+[バージョンとダウンロード](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/latest)のバージョン番号から各OSの直接リンクを開けます。Windowsは同梱WebView2を必要に応じて補い、macOSはシステムWebKitを使用します。Linuxはダウンロードした `sh install-linux.sh` でapt/dnf判定・検証・依存パッケージの導入を行います。Node.jsとRustは不要です。AMOS CLIとAgentログインは別途設定してください。macOS 0.7.0 は Developer ID 署名と Apple 公証を完了しています。Windows Authenticode は延期しているため、OS の確認が表示される場合があります。更新パッケージの署名検証は必須です。
 
 macOSで初回起動が阻止された場合は配布元を確認し、「システム設定 → プライバシーとセキュリティ → このまま開く」でこのAppを確認してください。 [Apple](https://support.apple.com/en-au/guide/mac-help/mh40616/mac)
 

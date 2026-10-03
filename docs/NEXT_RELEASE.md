@@ -1,11 +1,11 @@
-# 🐈 0.7.0 release candidate checklist
+# 🐈 0.7.0 completed release checklist
 
 Authorized 2026-10-03: offer one selected destination from Google Drive API, iCloud Drive folder, and OneDrive folder, plus an actionable credentials/recovery entry. The folder modes use installed provider desktop clients and the encrypted worker. The historical synthetic folder diagnostic remains separate.
 
 - [x] Implement destination selection, provider-specific create/join, recovery-kit export, encrypted local object exchange and five-language UI/guides.
-- [ ] Finish integration tests and three-platform CI for this candidate; record exact results in [validation](VALIDATION.md).
-- [ ] Verify installer artifacts, macOS Developer ID signing/notarization and updater signatures for this version.
-- [ ] Publish v0.7.0 and record immutable release evidence and notebook records.
+- [x] Integration tests and three-platform CI passed; exact results are recorded in [validation](VALIDATION.md).
+- [x] Installer artifacts, macOS Developer ID signing/notarization and updater signatures verified.
+- [x] Publish v0.7.0 and record immutable release evidence and notebook records.
 
 A completed folder cycle proves only local handoff. iCloud/OneDrive cloud delivery and a physical two-device run have not been verified. Repeated macOS Keychain prompts after “Always Allow” remain unresolved. Direct Microsoft Graph sign-in is outside this release.
 
