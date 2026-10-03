@@ -1,5 +1,11 @@
 # Validation
 
+## Store entitlement explanation and resubmission — 2026-10-04
+
+- Read-only inspection traced `com.apple.security.network.server` to the Google OAuth loopback listener: explicit Connect, `127.0.0.1` with an ephemeral port, `/oauth/callback`, state validation, PKCE S256, loopback-peer check, 180-second callback wait and cancellation. No code change or new runtime test was performed.
+- The authenticated Apple page confirmed the full explanation as a fourth sent review message. Notes were saved and read back with item 7 present and 3,945/4,000 characters, preserving the previous six items and evidence references.
+- Update Review Content and Resubmit to App Review completed. At 02:38 Asia/Taipei, the same `0.6.0 (1)` visibly returned to WAITING_FOR_REVIEW. Release remains manual. Acceptance of the explanation, approval and Store availability remain pending.
+
 ## 0.7.0 published release — 2026-10-03
 
 - [v0.7.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.7.0) is public/latest with 19 assets and five-language release notes with direct installer links. Tagged source: `1fa76b82f15769abf173735c05a9d64d7fabbf64`.

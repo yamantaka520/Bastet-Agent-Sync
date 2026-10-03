@@ -1,6 +1,12 @@
 # Mac App Store delivery plan
 
-Status (2026-10-03): macOS `0.6.0` build `1` was **resubmitted and is WAITING_FOR_REVIEW**, verified on the authenticated App Store Connect review page. The Guideline 2.1 response includes the physical-Mac recording and synthetic sample ZIP; all six answers were also saved in App Review Notes. TestFlight production-sandbox Google setup, one synthetic upload and independent-profile restore passed on one Mac. Release remains manual, with France excluded (174 territories). No Store approval or public availability is claimed.
+Status (2026-10-04): macOS `0.6.0` build `1` was resubmitted at 02:38 Asia/Taipei and is **WAITING_FOR_REVIEW**, verified on the authenticated App Store Connect review page. The Guideline 2.4.5 network-server entitlement explanation was sent and saved in App Review Notes. The prior Guideline 2.1 recording, synthetic sample and six-part information remain available. Release remains manual, with France excluded (174 territories). No Store approval or public availability is claimed.
+
+## Network-server entitlement clarification — 2026-10-04
+
+Automated review rejected the same build under Guideline 2.4.5 because `com.apple.security.network.server` appeared to lack matching functionality. The entitlement is used by the desktop Google OAuth callback: after explicit Connect, `src-tauri/src/cloud/oauth.rs` binds a temporary HTTP listener to `127.0.0.1:0`, accepts the browser redirect at `/oauth/callback`, validates state and uses PKCE S256. It rejects non-loopback peers; callback waiting is limited to 180 seconds and cancellation is supported. The listener is released when the authorization operation ends. The app exposes no LAN/public server or file service. Outgoing HTTPS uses the separate client entitlement. See [Google's desktop loopback flow](https://developers.google.com/identity/protocols/oauth2/native-app#redirect-uri_loopback).
+
+The explanation was sent to App Review, added as item 7 in Notes (3,945/4,000 characters), saved and read back. Update Review Content and Resubmit to App Review completed; the visible result is WAITING_FOR_REVIEW for the unchanged `0.6.0 (1)`. No binary, entitlement, credential or installed application was changed. This confirms submission receipt, not Apple's acceptance of the explanation.
 
 ## App Review information request — 2026-10-03
 

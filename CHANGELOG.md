@@ -1,5 +1,9 @@
 # Changelog
 
+## Mac App Store — entitlement clarification and resubmission 2026-10-04
+
+- Explain the existing Google desktop OAuth loopback listener for Guideline 2.4.5 in the review reply and saved Notes. Resubmit unchanged `0.6.0 (1)`; Apple confirms WAITING_FOR_REVIEW. No binary or entitlement change, Store approval or publication.
+
 ## 0.7.0 — credentials and cloud folders
 
 Published 2026-10-03: [installers and five-language notes](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.7.0). Four architecture packages, three-platform CI, six directed cross-OS returns, independent installer checks and all update signatures/checksums passed. macOS packages are Developer ID signed and Apple notarized; Windows publisher signing remains deferred. See [release evidence](docs/VALIDATION.md).

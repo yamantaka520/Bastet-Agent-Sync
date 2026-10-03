@@ -1,6 +1,6 @@
-# Apple Guideline 2.1 — submitted review information
+# Apple App Review information
 
-Submitted on 2026-10-03 in both the review response and App Review Notes. The named video and sample ZIP are attached to the response. Notes additionally point to that response. Apple confirms WAITING_FOR_REVIEW after resubmission.
+Submitted on 2026-10-03 in both the review response and App Review Notes. The named video and sample ZIP are attached to the response. Notes additionally point to that response. Apple confirmed WAITING_FOR_REVIEW after that resubmission; the subsequent October 4 entitlement clarification is recorded below.
 
 1. Recording: Bastet-0.6.0-build1-Review.mp4 was captured on a physical MacBook Pro (Apple M2 Max), macOS 27.0.1 (26A434), October 3, 2026, using TestFlight 0.6.0 (1). Capture began before launch and demonstrates source-folder permission, project mapping, Google authorization, Drive/encryption setup, explicit Start sync, one synthetic bundle upload, pause and restoration to a new profile. Privacy edits crop unrelated desktop edges, cover chat screens and personal identifiers, remove audio and trim idle footage at the beginning/end. App operations remain in their original order and speed. This is one-Mac upload/local-snapshot restoration; it does not demonstrate second-device reception or model continuation.
 
@@ -28,3 +28,11 @@ Privacy: https://bastet.tw/agent-sync/privacy/
 # Source pointers
 
 REQUIREMENTS.md (purpose and setup); docs/MASTER_PLAN.md (scope and limits); docs/APP_STORE.md (submitted build, Store-specific scope, OAuth/review status); docs/VALIDATION.md (isolated sandbox evidence); docs/app-store/LISTING.md (five-language listing); src/App.tsx (source folder picker); src/CloudPanel.tsx (Google wizard); src/NativeSessions.tsx (received versions and restore).
+
+## Guideline 2.4.5 — entitlement clarification, 2026-10-04
+
+A technical explanation was sent through App Review and the following item was appended to the existing Notes, preserving all six earlier answers and attachment references. The saved Notes contain 3,945 characters, within the 4,000-character limit.
+
+7. Network server entitlement: Google desktop OAuth needs a temporary HTTP listener at 127.0.0.1:<random port>/oauth/callback for the browser response. It uses state/PKCE, waits up to 180s, and closes when authorization ends. No LAN/public listener.
+
+The full technical rationale and source pointers are in [the Store delivery record](../APP_STORE.md#network-server-entitlement-clarification--2026-10-04). The unchanged `0.6.0 (1)` was resubmitted at 02:38 Asia/Taipei; the authenticated review page confirms WAITING_FOR_REVIEW. This is not approval or Store publication.
