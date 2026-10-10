@@ -1059,10 +1059,13 @@ esac
         write(
             &home,
             "agent-memory-os.json",
-            &format!(
-                "{{\"home\": \"{}\", \"agent_id\": \"hermes-fixture\", \"share_default\": \"private\", \"prefetch_limit\": 8}}",
-                memory_home.to_string_lossy()
-            ),
+            &serde_json::json!({
+                "home": memory_home.to_string_lossy(),
+                "agent_id": "hermes-fixture",
+                "share_default": "private",
+                "prefetch_limit": 8,
+            })
+            .to_string(),
         );
         // An unrelated credential file that must never travel.
         write(&home, "secrets.txt", "sk-ant-SECRET-should-never-travel\n");
@@ -1288,7 +1291,7 @@ esac
         write(
             &home,
             "agent-memory-os.json",
-            &format!("{{\"home\": \"{}\"}}", store.to_string_lossy()),
+            &serde_json::json!({ "home": store.to_string_lossy() }).to_string(),
         );
         let settings = amos_settings(&store);
         let manifest = manifest_of(&capture_with(None, &home, &settings).unwrap());

@@ -855,11 +855,9 @@ fn hermes_project_mapping_rewrites_cwd_inside_database() {
     fs::create_dir_all(&old).unwrap();
     fs::create_dir_all(&new).unwrap();
     let old_cwd = old.to_string_lossy().into_owned();
-    // remap resolves the target; compare against its canonical form.
-    let new_cwd = fs::canonicalize(&new)
-        .unwrap()
-        .to_string_lossy()
-        .into_owned();
+    // The mapping canonicalizes and normalizes the target (stripping Windows
+    // verbatim `\\?\` prefixes); compare against that exact resolved form.
+    let new_cwd = crate::project_mapping::canonical_target(&new).unwrap();
     hermes_db(&home.join("state.db"), &[(A, &old_cwd)]);
     let root = temp.path().join("sync");
     let key = SpaceKey::generate().unwrap();
@@ -1731,10 +1729,9 @@ fn hermes_transform_remaps_windows_attachment_reference() {
     };
     let target = temp.path().join("dest");
     fs::create_dir_all(&target).unwrap();
-    let target_str = fs::canonicalize(&target)
-        .unwrap()
-        .to_string_lossy()
-        .into_owned();
+    // The mapping canonicalizes and normalizes the target (stripping Windows
+    // verbatim `\\?\` prefixes); compare against that exact resolved form.
+    let target_str = crate::project_mapping::canonical_target(&target).unwrap();
     let mapped = transform_hermes_manifest(
         &manifest,
         &[Mapping {
@@ -2090,7 +2087,10 @@ fn hermes_project_sidecar_tampering_and_unsafe_paths_are_refused() {
 }
 
 // A Windows-recorded source cwd maps onto a POSIX target and the restored
-// session cwd is re-rooted to the NEW isolated working tree.
+// session cwd is re-rooted to the NEW isolated working tree. POSIX-only: the
+// "no `C:` survives" assertion is only meaningful when the local target is not
+// itself on a Windows drive.
+#[cfg(unix)]
 #[test]
 fn hermes_project_windows_source_mapping_reroots_to_restored_tree_on_posix() {
     let temp = tempfile::tempdir().unwrap();

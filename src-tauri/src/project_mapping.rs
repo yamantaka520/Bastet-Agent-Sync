@@ -90,7 +90,7 @@ fn absolute(input: &str) -> Result<Absolute> {
     })
 }
 
-fn canonical_target(path: &Path) -> Result<String> {
+pub(crate) fn canonical_target(path: &Path) -> Result<String> {
     let canonical = fs::canonicalize(path).map_err(|_| "project_mapping_target_missing")?;
     let raw = canonical.to_str().ok_or("project_mapping_invalid")?;
     let normalized = absolute(raw)?;

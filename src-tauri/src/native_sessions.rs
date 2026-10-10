@@ -2461,16 +2461,19 @@ fn restore_hermes_project(
         crate::hermes_project::restore_to_new_directory(&subset, project_destination)?;
     }
     // Re-root to the canonical path so the recorded cwd, the DB value and the
-    // reported workdir agree on every platform (macOS `/var` is a symlink).
-    let workdir = fs::canonicalize(project_destination).map_err(|_| "store_unavailable")?;
-    let target = workdir.to_string_lossy().into_owned();
+    // reported workdir agree on every platform (macOS `/var` is a symlink; the
+    // mapping also normalizes Windows verbatim `\\?\` prefixes).
+    let canonical = fs::canonicalize(project_destination).map_err(|_| "store_unavailable")?;
     let rerooted = crate::project_mapping::transform_manifest(
         &adjusted,
         &[crate::project_mapping::Mapping {
             source: adjusted.cwd.clone(),
-            target,
+            target: canonical.to_string_lossy().into_owned(),
         }],
     )?;
+    // The mapping's normalized cwd is the working directory the resume command,
+    // the DB value and the handoff record all share, so none disagree on Windows.
+    let workdir = PathBuf::from(rerooted.cwd.clone());
     Ok((
         rerooted,
         Some(ProjectRestore {
