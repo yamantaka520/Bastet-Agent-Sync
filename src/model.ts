@@ -30,7 +30,31 @@ export const names: Record<string, string> = {
   grok: "Grok Build CLI",
   pi: "Pi Agent",
   "agent-memory-os": "Agent Memory OS",
+  hermes: "Hermes Agent",
 };
+// The Store channel excludes the external memory-service adapter, not native
+// conversation adapters using user-authorized folder access.
+const storeHidden = new Set(["agent-memory-os"]);
+// Keep every known agent selectable even when a discovery response predates its
+// backend entry, so a new source is never missing from the setup list. The Store
+// build trusts discovery exactly, since it already reports the reduced set.
+export function withKnownAgents(
+  found: Agent[],
+  memorySyncAvailable = true,
+): Agent[] {
+  const present = found.filter(
+    (agent) => memorySyncAvailable || !storeHidden.has(agent.id),
+  );
+  if (!memorySyncAvailable) return present;
+  const seen = new Set(present.map((agent) => agent.id));
+  const known: Agent[] = Object.keys(names).map((id) => ({
+    id,
+    path: "",
+    detected: false,
+    custom: false,
+  }));
+  return [...present, ...known.filter((agent) => !seen.has(agent.id))];
+}
 export const defaults = (locale: Locale): Settings => ({
   schema: 1,
   cloudProvider: "google-drive",

@@ -35,6 +35,7 @@ export function resumeCommand(
     "claude-code": ["CLAUDE_CONFIG_DIR", ["claude", "--resume", session]],
     pi: ["PI_CODING_AGENT_DIR", ["pi", "--session", session]],
     grok: ["GROK_HOME", ["grok", "--resume", session]],
+    hermes: ["HERMES_HOME", ["hermes", "--resume", session]],
   };
   const spec = agents[agent];
   if (!spec) return null;
@@ -48,24 +49,49 @@ export function resumeCommand(
     ? `& { $bastetPreviousPath = Get-Location; $bastetPreviousHome = $env:${variable}; try { Set-Location -LiteralPath ${quote(cwd)} -ErrorAction Stop; $env:${variable} = ${quote(path)}; ${command} } finally { Set-Location -LiteralPath $bastetPreviousPath; $env:${variable} = $bastetPreviousHome } }`
     : `(cd -- ${quote(cwd)} && ${variable}=${quote(path)} ${command})`;
 }
+export type ContinuationState = "blocked" | "unverified" | "ready";
+// Optional readiness report the native backend attaches per received Hermes
+// version. Absent for adapters that do not provide one; the UI never invents
+// readiness it cannot prove.
+export type ContinuationReport = {
+  state: ContinuationState;
+  blockers?: string[];
+  warnings?: string[];
+  verified?: string[];
+  projectPath?: string;
+};
 export default function Continuation({
   locale,
   path,
   session,
   agent = "grok",
   cwd,
+  readiness,
 }: {
   locale: Locale;
   path: string;
   session: string;
   agent?: string;
   cwd?: string;
+  readiness?: ContinuationReport | null;
 }) {
   const t = ops[locale];
   const [powershell, setPowershell] = useState(
     navigator.platform.startsWith("Win"),
   );
   const [failed, setFailed] = useState(false);
+  const state = readiness?.state ?? "ready";
+  // Blocked work must not present a normal copy/resume action: the command is
+  // withheld until the reported blockers are resolved. Safe isolated restore
+  // remains available elsewhere in the panel.
+  if (state === "blocked") {
+    return (
+      <details className="continuation continuation-blocked">
+        <summary>{t.contBlocked}</summary>
+        <p role="status">{t.contBlockedAction}</p>
+      </details>
+    );
+  }
   const command = cwd
     ? resumeCommand(agent, path, session, cwd, powershell)
     : agent === "grok"
@@ -73,9 +99,16 @@ export default function Continuation({
       : null;
   if (!command) return null;
   return (
-    <details className="continuation">
+    <details className="continuation" open={state === "unverified"}>
       <summary>{t.continuation}</summary>
       <p>{t.cliHint}</p>
+      {state === "unverified" ? (
+        <p className="continuation-note" role="status">
+          {t.contUnverifiedNote}
+        </p>
+      ) : readiness ? (
+        <p className="continuation-note">{t.contReadyNote}</p>
+      ) : null}
       <select
         aria-label="Shell"
         value={powershell ? "powershell" : "posix"}

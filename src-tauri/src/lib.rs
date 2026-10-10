@@ -1,5 +1,17 @@
 mod amos_runtime;
 pub mod cloud;
+// External-memory namespace + readiness are wired into the Hermes adapter; the
+// capture/restore entry points await a Settings-threaded cycle and are admitted
+// without a dead-code warning until then.
+#[allow(dead_code)]
+mod hermes_memory;
+// `capture_selected` is a deliberate selection API that is not yet wired to a
+// selection UI; the wired integration uses `capture`/`validate`/`allowed`/
+// `read_manifest`/`restore_to_new_directory`/`ready`. Admit the module without a
+// dead-code warning until a selected-source surface exists.
+#[allow(dead_code)]
+mod hermes_project;
+mod hermes_workspace;
 pub mod memory_adapter;
 mod model;
 mod native_sessions;
@@ -56,6 +68,7 @@ fn detect(settings: Option<&Settings>) -> Vec<Agent> {
         "GROK_HOME",
         "PI_CODING_AGENT_DIR",
         "AGENT_MEMORY_HOME",
+        "HERMES_HOME",
     ] {
         if let Ok(v) = std::env::var(key) {
             if !v.is_empty() {
@@ -247,6 +260,7 @@ macro_rules! handlers {
             native_sessions::restore_received_session,
             native_sessions::compare_received_session,
             native_sessions::review_received_session,
+            native_sessions::recheck_continuation,
             updates::update_status,
             $($updater,)*
             cloud::desktop::run_crypto_diagnostic
@@ -311,7 +325,8 @@ pub fn run() {
     #[cfg(not(feature = "mac-app-store"))]
     let builder = builder.invoke_handler(handlers![
         memory_adapter::inspect_memory_export,
-        amos_runtime::choose_memory_cli;
+        amos_runtime::choose_memory_cli,
+        native_sessions::setup_memory_provider;
         updates::check_update,
         updates::install_update,
         updates::restart_after_update

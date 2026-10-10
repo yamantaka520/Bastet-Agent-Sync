@@ -12,6 +12,7 @@ use crate::{
         storage, Direction, Replica,
     },
 };
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -110,6 +111,12 @@ fn allowed(path: &str) -> bool {
                 .contains(&s)
             })
 }
+// Hermes captures a different portable surface (identity, rules, builtin memory,
+// whole skill packages and a sanitized `config.yaml`). Its workspace paths stay
+// scoped to the hermes agent so every other adapter is unchanged.
+fn allowed_for(agent: &str, path: &str) -> bool {
+    (agent == "hermes" && crate::hermes_workspace::allowed(path)) || allowed(path)
+}
 fn sanitized(text: &str, toml: bool) -> Result<String> {
     let value: serde_json::Value = if toml {
         serde_json::to_value(text.parse::<toml::Value>().map_err(|_| "portable_format")?)
@@ -136,7 +143,7 @@ impl Options {
             || self.excluded_paths.iter().any(|(a, paths)| {
                 !crate::model::AGENTS.contains(&a.as_str())
                     || paths.len() > 256
-                    || paths.iter().any(|p| !allowed(p))
+                    || paths.iter().any(|p| !allowed_for(a, p))
             })
         {
             return Err("invalid_settings".into());
@@ -155,10 +162,24 @@ impl Package {
             return Err("portable_limit".into());
         }
         for (path, text) in &self.files {
-            if !allowed(path) || text.len() > MAX_FILE as usize || suspected_secret(text) {
+            if !allowed_for(&self.agent, path)
+                || text.len() > MAX_FILE as usize
+                || suspected_secret(text)
+            {
                 return Err("portable_unsafe".into());
             }
-            if ["config.toml", "settings.json"].contains(&path.as_str())
+            // A received Hermes workspace manifest is validated under the same
+            // rules as the workspace path, so a crafted manifest is refused here
+            // too rather than restored.
+            if self.agent == "hermes" && path == crate::hermes_workspace::MANIFEST {
+                crate::hermes_workspace::validate_manifest(text)
+                    .map_err(|_| "portable_unsafe".to_string())?;
+            }
+            if path == "config.yaml" && self.agent == "hermes" {
+                if crate::hermes_workspace::sanitized_config(text)? != *text {
+                    return Err("portable_unsafe".into());
+                }
+            } else if ["config.toml", "settings.json"].contains(&path.as_str())
                 && sanitized(text, path.ends_with("toml"))? != *text
             {
                 return Err("portable_unsafe".into());
@@ -248,6 +269,22 @@ pub fn capture(agent: &str, root: &Path, options: &Options) -> Result<Package> {
     if agent == "agent-memory-os" {
         return Ok(package);
     }
+    // Hermes Agent travels its workspace (identity, rules, curated memory, whole
+    // skill packages and a sanitized config.yaml) alongside the native state.db.
+    // Previously this returned empty; now it honours the settings/skills
+    // selection so preview and explicit restore are populated.
+    if agent == "hermes" {
+        capture_hermes(root, options, &mut package)?;
+        if let Some(paths) = options.excluded_paths.get(agent) {
+            for path in paths {
+                if package.files.remove(path).is_some() {
+                    package.excluded.insert(path.clone(), "not_selected".into());
+                }
+            }
+        }
+        package.validate()?;
+        return Ok(package);
+    }
     if options.settings {
         for file in ["config.toml", "settings.json"] {
             add(root, file, &mut package)?;
@@ -292,6 +329,35 @@ fn capture_shared(shared: &Path, package: &mut Package) -> Result<()> {
             .insert(path.replacen("skills/", "shared-skills/", 1), reason);
     }
     package.validate()
+}
+// Build the Hermes portable package from the sanitized workspace capture. The
+// settings toggle gates identity/rules/memory/config/manifest; the skills toggle
+// gates the whole skill tree. Binary skill assets are not text and are recorded
+// as excluded rather than silently dropped.
+fn capture_hermes(root: &Path, options: &Options, package: &mut Package) -> Result<()> {
+    for (path, encoded) in crate::hermes_workspace::capture(root)? {
+        if path.starts_with("skills/") {
+            if !options.skills {
+                continue;
+            }
+        } else if !options.settings {
+            continue;
+        }
+        match STANDARD.decode(&encoded) {
+            Ok(bytes) => match String::from_utf8(bytes) {
+                Ok(text) => {
+                    package.files.insert(path, text);
+                }
+                Err(_) => {
+                    package.excluded.insert(path, "non_text".into());
+                }
+            },
+            Err(_) => {
+                package.excluded.insert(path, "non_text".into());
+            }
+        }
+    }
+    Ok(())
 }
 pub struct Transport<'a> {
     pub drive: &'a Drive,
@@ -871,5 +937,116 @@ mod tests {
             || true
         )
         .is_err());
+    }
+    #[test]
+    fn hermes_workspace_is_captured_into_portable_package_and_respects_selection() {
+        let root = tempfile::tempdir().unwrap();
+        write(
+            root.path(),
+            "config.yaml",
+            "model:\n  default: \"gpt-test\"\napi_key: LEAK\n",
+        );
+        write(root.path(), "SOUL.md", "identity");
+        write(root.path(), "skills/cat/SKILL.md", "# Cat\n");
+
+        // Nothing selected stays empty (default options).
+        assert!(capture("hermes", root.path(), &Options::default())
+            .unwrap()
+            .files
+            .is_empty());
+
+        let options = Options {
+            settings: true,
+            skills: true,
+            ..Default::default()
+        };
+        let package = capture("hermes", root.path(), &options).unwrap();
+        assert!(package.files.contains_key("SOUL.md"));
+        assert!(package.files.contains_key("config.yaml"));
+        assert!(package.files.contains_key("skills/cat/SKILL.md"));
+        assert!(package
+            .files
+            .contains_key(crate::hermes_workspace::MANIFEST));
+        assert!(!package.files["config.yaml"].contains("LEAK"));
+
+        // Selective capture: skills only drops the identity/config surface.
+        let skills_only = Options {
+            settings: false,
+            skills: true,
+            ..Default::default()
+        };
+        let package = capture("hermes", root.path(), &skills_only).unwrap();
+        assert!(package.files.contains_key("skills/cat/SKILL.md"));
+        assert!(!package.files.contains_key("SOUL.md"));
+    }
+
+    #[test]
+    fn hermes_portable_receive_validates_the_manifest_and_preserves_provider() {
+        // The captured, sanitized config keeps the (non-secret) provider selection.
+        let root = tempfile::tempdir().unwrap();
+        write(
+            root.path(),
+            "config.yaml",
+            "memory:\n  provider: \"agent-memory-os\"\napi_key: LEAK\n",
+        );
+        let package = capture(
+            "hermes",
+            root.path(),
+            &Options {
+                settings: true,
+                skills: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(package.files["config.yaml"].contains("agent-memory-os"));
+        assert!(!package.files["config.yaml"].contains("LEAK"));
+        package.validate().unwrap();
+
+        // A received package carrying a crafted workspace manifest (opaque secret
+        // in command/args, or a generic credential) is refused, not restored.
+        for text in [
+            "{\"version\":1,\"agent\":\"hermes\",\"files\":[],\"issues\":[],\"dependencies\":[{\"kind\":\"mcp\",\"name\":\"evil\",\"detail\":\"install\",\"blocking\":true,\"args\":[\"--password\",\"hunter2\"]}]}",
+            "{\"version\":1,\"agent\":\"hermes\",\"files\":[],\"issues\":[],\"dependencies\":[{\"kind\":\"env\",\"name\":\"LEAK_KEY\",\"detail\":\"sk-ant-LEAK\",\"blocking\":true}]}",
+        ] {
+            let package = Package {
+                schema: 1,
+                agent: "hermes".into(),
+                files: BTreeMap::from([(
+                    crate::hermes_workspace::MANIFEST.into(),
+                    text.into(),
+                )]),
+                ..Default::default()
+            };
+            assert_eq!(package.validate().unwrap_err(), "portable_unsafe");
+        }
+
+        // Any received MCP command/args is refused on the portable receive path
+        // too — even a secret-free legacy shape or an opaque positional token the
+        // producer never emits and no keyword heuristic can judge.
+        for dependency in [
+            serde_json::json!({"kind": "mcp", "name": "demo", "detail": "install",
+                "blocking": true, "command": "/usr/bin/demo",
+                "args": ["serve", "--port", "9000"]}),
+            serde_json::json!({"kind": "mcp", "name": "demo", "detail": "install",
+                "blocking": true, "args": ["xY9zQ2wLp"]}),
+            serde_json::json!({"kind": "mcp", "name": "demo", "detail": "install",
+                "blocking": true, "args": ["-p", "hunter2"]}),
+        ] {
+            let manifest = serde_json::json!({
+                "version": 1, "agent": "hermes", "files": [], "issues": [],
+                "dependencies": [dependency],
+            });
+            let package = Package {
+                schema: 1,
+                agent: "hermes".into(),
+                files: BTreeMap::from([(
+                    crate::hermes_workspace::MANIFEST.into(),
+                    serde_json::to_string(&manifest).unwrap(),
+                )]),
+                ..Default::default()
+            };
+            assert_eq!(package.validate().unwrap_err(), "portable_unsafe");
+        }
     }
 }

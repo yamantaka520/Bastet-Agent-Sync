@@ -1,5 +1,5 @@
-import { ops } from "./operations-i18n";
-import Continuation from "./Continuation";
+import { ops, continuationIssueText, continuationFactText } from "./operations-i18n";
+import Continuation, { type ContinuationReport } from "./Continuation";
 import ReviewPanel from "./ReviewPanel";
 import { SourceProgress, type Progress } from "./OperationsPanel";
 import { useState } from "react";
@@ -12,7 +12,7 @@ import { localReadError, retryBusyRead } from "./local-read";
 export const sessionMessages = {
   "zh-Hant": [
     "本機對話同步",
-    "同步已勾選來源的原生對話版本。專案路徑可用時，接收版本會準備為獨立資料目錄；接續後的變更會再同步，各分支分別保留。帳號、金鑰、專案檔案和雲端託管聊天不包含在內。Claude 使用本機 Claude Code 對話；Codex 與 Work 共用本機對話來源。Agy 提供資料庫還原。",
+    "同步已勾選來源的原生對話版本。專案路徑可用時，接收版本會準備為獨立資料目錄；接續後的變更會再同步，各分支分別保留。帳號、金鑰、專案檔案和雲端託管聊天不包含在內。Claude 使用本機 Claude Code 對話；Codex 與 Work 共用本機對話來源。Agy 提供資料庫還原；Hermes Agent 以一致快照保存原生 state.db，並還原到隔離的受管理主目錄。尚未宣稱跨裝置接續驗收。",
     "查看對話快照",
     "恢復到新資料夾",
     "請先暫停同步，再查看或恢復。",
@@ -31,7 +31,7 @@ export const sessionMessages = {
   ],
   "zh-Hans": [
     "本地对话同步",
-    "同步所选来源的原生对话版本。项目路径可用时，接收版本会准备为独立数据目录；接续后的更改会再次同步，各分支分别保留。不包含账号、密钥、项目文件和云端托管聊天。Claude 使用本地 Claude Code 对话；Codex 与 Work 共用本地对话来源。Agy 提供数据库恢复。",
+    "同步所选来源的原生对话版本。项目路径可用时，接收版本会准备为独立数据目录；接续后的更改会再次同步，各分支分别保留。不包含账号、密钥、项目文件和云端托管聊天。Claude 使用本地 Claude Code 对话；Codex 与 Work 共用本地对话来源。Agy 提供数据库恢复；Hermes Agent 以一致快照保存原生 state.db，并还原到隔离的受管主目录。尚未声明跨设备接续验收。",
     "查看对话快照",
     "恢复到新文件夹",
     "请先暂停同步，再查看或恢复。",
@@ -50,7 +50,7 @@ export const sessionMessages = {
   ],
   en: [
     "Local conversation sync",
-    "Sync native conversation versions from selected sources. Received versions are prepared in separate profiles when their project paths are available. Continued edits sync back and branches stay separate. Accounts, keys, project files and cloud-hosted chats are excluded. Claude uses local Claude Code conversations; Codex and Work share local storage. Agy provides database recovery.",
+    "Sync native conversation versions from selected sources. Received versions are prepared in separate profiles when their project paths are available. Continued edits sync back and branches stay separate. Accounts, keys, project files and cloud-hosted chats are excluded. Claude uses local Claude Code conversations; Codex and Work share local storage. Agy provides database recovery; Hermes Agent snapshots its native state.db consistently and restores it in an isolated managed home. Cross-device resume acceptance is not claimed.",
     "View conversation snapshots",
     "Restore to a new folder",
     "Pause sync before viewing or restoring.",
@@ -69,7 +69,7 @@ export const sessionMessages = {
   ],
   ja: [
     "ローカル会話の同期",
-    "選択したソースの会話の版を同期します。プロジェクトパスが利用可能な場合、受信した版を個別のプロファイルに準備します。再開後の変更も同期し、分岐は個別に保持します。アカウント、キー、プロジェクトファイル、クラウド会話は対象外です。Claude はローカル Claude Code、Codex と Work は共通のローカル会話を使用します。Agy はデータベース復元に対応します。",
+    "選択したソースの会話の版を同期します。プロジェクトパスが利用可能な場合、受信した版を個別のプロファイルに準備します。再開後の変更も同期し、分岐は個別に保持します。アカウント、キー、プロジェクトファイル、クラウド会話は対象外です。Claude はローカル Claude Code、Codex と Work は共通のローカル会話を使用します。Agy はデータベース復元に対応し、Hermes Agent はネイティブの state.db を整合スナップショットとして保存し、隔離された管理ホームへ復元します。クロスデバイスでの再開受入は未検証です。",
     "会話スナップショットを表示",
     "新規フォルダーに復元",
     "表示・復元前に同期を一時停止してください。",
@@ -88,7 +88,7 @@ export const sessionMessages = {
   ],
   ko: [
     "로컬 대화 동기화",
-    "선택한 소스의 대화 버전을 동기화합니다. 프로젝트 경로를 사용할 수 있으면 수신 버전을 별도 프로필로 준비합니다. 계속한 변경 사항도 동기화하고 분기는 별도로 보존합니다. 계정, 키, 프로젝트 파일 및 클라우드 대화는 제외합니다. Claude는 로컬 Claude Code 대화를, Codex와 Work는 같은 로컬 저장소를 사용합니다. Agy는 데이터베이스 복원을 제공합니다.",
+    "선택한 소스의 대화 버전을 동기화합니다. 프로젝트 경로를 사용할 수 있으면 수신 버전을 별도 프로필로 준비합니다. 계속한 변경 사항도 동기화하고 분기는 별도로 보존합니다. 계정, 키, 프로젝트 파일 및 클라우드 대화는 제외합니다. Claude는 로컬 Claude Code 대화를, Codex와 Work는 같은 로컬 저장소를 사용합니다. Agy는 데이터베이스 복원을 제공하고, Hermes Agent는 네이티브 state.db를 일관된 스냅숏으로 저장하고 격리된 관리 홈에 복원합니다. 교차 기기 재개 검증은 아직 주장하지 않습니다.",
     "대화 스냅샷 보기",
     "새 폴더에 복원",
     "조회 또는 복원 전에 동기화를 일시 중지하세요.",
@@ -129,7 +129,125 @@ type Snapshot = {
   branchCount?: number;
   managedProfile?: string | null;
   mappedCwd?: string | null;
+  // The NEW isolated project working directory restored with this version.
+  projectWorkdir?: string | null;
+  // Optional per-version continuation readiness report. Present only for the
+  // Hermes adapter; other adapters leave it absent and their UI is unchanged.
+  continuation?: ContinuationReport | null;
 };
+// Resolve the readiness report to render. Only Hermes carries one; a Hermes
+// version without a report (a legacy snapshot) is unverified, never ready.
+function describeContinuation(
+  item: Snapshot,
+): { report: ContinuationReport; legacy: boolean } | null {
+  if (item.agent !== "hermes") return null;
+  const raw = item.continuation;
+  if (raw) {
+    // A malformed report is never rendered as ready.
+    const state: ContinuationReport["state"] =
+      raw.state === "blocked" || raw.state === "unverified" || raw.state === "ready"
+        ? raw.state
+        : "unverified";
+    return {
+      report: {
+        state,
+        blockers: raw.blockers ?? [],
+        warnings: raw.warnings ?? [],
+        verified: raw.verified ?? [],
+        projectPath: raw.projectPath,
+      },
+      legacy: false,
+    };
+  }
+  return {
+    report: { state: "unverified", blockers: [], warnings: [], verified: [] },
+    legacy: true,
+  };
+}
+function continuationIcon(state: ContinuationReport["state"]) {
+  return state === "ready" ? "✅" : state === "blocked" ? "⛔" : "⚠️";
+}
+// Compact per-version state line shown beside a snapshot in the list.
+function continuationBadge(locale: Locale, item: Snapshot) {
+  const cont = describeContinuation(item);
+  if (!cont) return null;
+  const o = ops[locale];
+  const label =
+    cont.report.state === "ready"
+      ? o.contReady
+      : cont.report.state === "blocked"
+        ? o.contBlocked
+        : o.contUnverified;
+  return (
+    <p className="continuation-state">
+      {continuationIcon(cont.report.state)} {label}
+    </p>
+  );
+}
+// Full readiness panel: state, actionable blockers/warnings and verified facts,
+// each localized by machine code (an unknown code stays visible, never hidden).
+function ContinuationReadiness({
+  locale,
+  report,
+  legacy,
+  project,
+}: {
+  locale: Locale;
+  report: ContinuationReport;
+  legacy: boolean;
+  project?: string | null;
+}) {
+  const o = ops[locale];
+  const label =
+    report.state === "ready"
+      ? o.contReady
+      : report.state === "blocked"
+        ? o.contBlocked
+        : o.contUnverified;
+  return (
+    <div className={"continuation-readiness " + report.state}>
+      <p className="continuation-state">
+        {continuationIcon(report.state)} {o.contReadiness}: {label}
+      </p>
+      {legacy && <p className="continuation-legacy">{o.contLegacy}</p>}
+      {!!project && (
+        <p className="continuation-project">
+          {o.contProject}: <code>{project}</code>
+        </p>
+      )}
+      {!!report.blockers?.length && (
+        <>
+          <p className="continuation-heading">{o.contBlockers}</p>
+          <ul className="continuation-blockers">
+            {report.blockers.map((code) => (
+              <li key={code}>{continuationIssueText(code, locale)}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {!!report.warnings?.length && (
+        <>
+          <p className="continuation-heading">{o.contWarnings}</p>
+          <ul className="continuation-warnings">
+            {report.warnings.map((code) => (
+              <li key={code}>{continuationIssueText(code, locale)}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {!!report.verified?.length && (
+        <>
+          <p className="continuation-heading">{o.contVerified}</p>
+          <ul className="continuation-verified">
+            {report.verified.map((fact) => (
+              <li key={fact}>{continuationFactText(fact, locale)}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
 const handoffText = {
   "zh-Hant": [
     "版本",
@@ -175,6 +293,7 @@ const env: Record<string, string> = {
   pi: "PI_CODING_AGENT_DIR",
   grok: "GROK_HOME",
   agy: "",
+  hermes: "HERMES_HOME",
 };
 export default function NativeSessions({
   native,
@@ -192,6 +311,7 @@ export default function NativeSessions({
   const t = sessionMessages[locale];
   const d = syncDisplay[locale];
   const h = handoffText[locale];
+  const o = ops[locale];
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const [items, setItems] = useState<Snapshot[] | null>(null);
@@ -216,6 +336,41 @@ export default function NativeSessions({
       setBusy(false);
     }
   };
+  const restoredCont = restored ? describeContinuation(restored.item) : null;
+  // Explicit, user-clicked continuation recheck / provider setup / requirement
+  // acknowledgment. The backend resolves the target from its own registry by
+  // version id — the UI never passes a path — and the refreshed report replaces
+  // the one shown. Nothing runs automatically or in the background.
+  const retry = async (command: string, extra: Record<string, unknown>) => {
+    if (!restored) return;
+    const result = await invoke<{ continuation?: ContinuationReport }>(command, {
+      agent: restored.item.agent,
+      id: restored.item.id,
+      ...extra,
+    });
+    if (result?.continuation) {
+      const updated: Snapshot = {
+        ...restored.item,
+        continuation: result.continuation,
+      };
+      setRestored({ path: restored.path, item: updated });
+      setItems((previous) =>
+        previous
+          ? previous.map((entry) => (entry.id === updated.id ? updated : entry))
+          : previous,
+      );
+    }
+  };
+  // Use the isolated restored project path as the resume working directory when
+  // supplied, instead of the receiver's mapped worktree or the source cwd.
+  const restoredProject = restored
+    ? (restoredCont?.report.projectPath ?? restored.item.projectWorkdir ?? null)
+    : null;
+  const restoredWorkdir = restored
+    ? restoredCont
+      ? (restoredProject ?? restored.item.mappedCwd ?? undefined)
+      : (restored.item.mappedCwd ?? undefined)
+    : undefined;
   return (
     <section className="native-sessions">
       <h3>🐈 {t[0]}</h3>
@@ -402,6 +557,7 @@ export default function NativeSessions({
                                   {h[2]}: <code>{item.mappedCwd}</code>
                                 </p>
                               )}
+                              {continuationBadge(locale, item)}
                               {item.managedProfile && (
                                 <button
                                   disabled={running || busy}
@@ -484,16 +640,70 @@ export default function NativeSessions({
             {t[6]}: <code>{restored.path}</code>
           </p>
           <p>
-            {restored.item.agent === "agy" ? ops[locale].agyRecovery : t[14]}
+            {restored.item.agent === "agy"
+              ? ops[locale].agyRecovery
+              : restored.item.agent === "hermes"
+                ? ops[locale].hermesRecovery
+                : t[14]}
           </p>
           {restored.item.agent !== "agy" && <p>{h[4]}</p>}
+          {restoredCont && (
+            <ContinuationReadiness
+              locale={locale}
+              report={restoredCont.report}
+              legacy={restoredCont.legacy}
+              project={restoredProject}
+            />
+          )}
+          {restored.item.agent === "hermes" && (
+            <div className="continuation-actions">
+              <button
+                disabled={running || busy}
+                onClick={() =>
+                  void action(() =>
+                    retry("recheck_continuation", {
+                      acknowledgeRequirements: false,
+                    }),
+                  )
+                }
+              >
+                {o.recheck}
+              </button>
+              {!storeChannel && (
+                <button
+                  disabled={running || busy}
+                  onClick={() =>
+                    void action(() => retry("setup_memory_provider", {}))
+                  }
+                >
+                  {o.setupProvider}
+                </button>
+              )}
+              <button
+                disabled={running || busy}
+                onClick={() =>
+                  void action(() =>
+                    retry("recheck_continuation", {
+                      acknowledgeRequirements: true,
+                    }),
+                  )
+                }
+              >
+                {o.acknowledgeRequirements}
+              </button>
+              <p>{o.recheckHint}</p>
+              {!storeChannel && <p>{o.setupProviderHint}</p>}
+              <p>{o.acknowledgeHint}</p>
+            </div>
+          )}
           {restored.item.agent !== "agy" && (
             <Continuation
               locale={locale}
               path={restored.path}
               session={restored.item.session}
               agent={restored.item.agent}
-              cwd={restored.item.mappedCwd ?? undefined}
+              cwd={restoredWorkdir}
+              readiness={restoredCont ? restoredCont.report : undefined}
             />
           )}
           <pre>

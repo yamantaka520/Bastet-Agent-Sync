@@ -575,3 +575,143 @@ it("places the three runtime states directly below the Drive setup strip", async
   expect(summary.nextElementSibling?.className).toBe("traffic-strip");
   expect(summary.textContent).toContain("Syncing selected sources");
 });
+
+describe("sync relay destination picker", () => {
+  it("offers three selectable destinations and requires an explicit save before Start", async () => {
+    api.native = true;
+    const settings = { ...defaults("en"), deviceName: "Fixture" };
+    api.invoke.mockImplementation(
+      async (command: string, args?: { provider?: string }) => {
+        if (command === "bootstrap")
+          return { settings, agents: [], trayAvailable: true };
+        if (command === "folder_status")
+          return {
+            provider: args?.provider ?? "onedrive-folder",
+            path: null,
+            space: null,
+            complete: false,
+            handoff: "local-folder",
+          };
+        if (command === "sync_start")
+          return {
+            running: true,
+            phase: "waiting",
+            published: 0,
+            received: 0,
+            applied: 0,
+            lastSuccess: null,
+            error: null,
+            skipped: [],
+          };
+        return undefined;
+      },
+    );
+    render(<App />);
+    const selector = (await screen.findByLabelText(
+      folderMessages.en.provider,
+    )) as HTMLSelectElement;
+    await waitFor(() => expect(selector.disabled).toBe(false));
+    const options = Array.from(selector.querySelectorAll("option"));
+    expect(
+      options.map((option) => ({
+        value: option.value,
+        disabled: option.disabled,
+        hidden: option.hidden,
+      })),
+    ).toEqual([
+      { value: "google-drive", disabled: false, hidden: false },
+      { value: "icloud-drive", disabled: false, hidden: false },
+      { value: "onedrive-folder", disabled: false, hidden: false },
+    ]);
+    expect(selector.value).toBe("google-drive");
+    fireEvent.change(selector, { target: { value: "onedrive-folder" } });
+    await screen.findByRole("heading", { name: folderMessages.en.title });
+    fireEvent.click(screen.getByRole("button", { name: /Start sync/ }));
+    expect(api.invoke).not.toHaveBeenCalledWith("sync_start");
+    fireEvent.click(screen.getByRole("button", { name: messages.en.save }));
+    await waitFor(() =>
+      expect(api.invoke).toHaveBeenCalledWith("save_settings", {
+        settings: { ...settings, cloudProvider: "onedrive-folder" },
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Start sync/ }));
+    await waitFor(() => expect(api.invoke).toHaveBeenCalledWith("sync_start"));
+    const calls = api.invoke.mock.calls.map(([command]) => command);
+    expect(calls.indexOf("save_settings")).toBeLessThan(
+      calls.indexOf("sync_start"),
+    );
+  });
+
+  it("retains a persisted provider and existing saved spaces across an explicit switch", async () => {
+    api.native = true;
+    const legacy = {
+      ...defaults("en"),
+      deviceName: "Legacy",
+      cloudProvider: "onedrive-folder" as const,
+      folder: "/google-space",
+      selectedAgents: ["codex"],
+      customPaths: { codex: "/codex" },
+    };
+    api.invoke.mockImplementation(
+      async (command: string, args?: { provider?: string }) => {
+        if (command === "bootstrap")
+          return { settings: legacy, agents: [], trayAvailable: true };
+        if (command === "folder_status")
+          return {
+            provider: args?.provider ?? "onedrive-folder",
+            path: "/space",
+            space: "space",
+            complete: true,
+            handoff: "local-folder",
+          };
+        return undefined;
+      },
+    );
+    render(<App />);
+    const selector = (await screen.findByLabelText(
+      folderMessages.en.provider,
+    )) as HTMLSelectElement;
+    await waitFor(() => expect(selector.value).toBe("onedrive-folder"));
+    // The persisted OneDrive destination keeps routing the local-folder backend.
+    await waitFor(() =>
+      expect(api.invoke).toHaveBeenCalledWith("folder_status", {
+        provider: "onedrive-folder",
+      }),
+    );
+    // An ordinary save does not silently convert the destination.
+    fireEvent.click(screen.getByRole("button", { name: messages.en.save }));
+    await waitFor(() =>
+      expect(api.invoke).toHaveBeenCalledWith("save_settings", {
+        settings: legacy,
+      }),
+    );
+    const firstSaves = api.invoke.mock.calls.filter(
+      ([command]) => command === "save_settings",
+    );
+    expect(firstSaves).toHaveLength(1);
+    expect(
+      (firstSaves[0][1] as { settings: { cloudProvider: string } }).settings
+        .cloudProvider,
+    ).toBe("onedrive-folder");
+    // An explicit switch saves only the provider and keeps every existing space.
+    fireEvent.change(selector, { target: { value: "icloud-drive" } });
+    fireEvent.click(screen.getByRole("button", { name: messages.en.save }));
+    await waitFor(() => {
+      const saves = api.invoke.mock.calls.filter(
+        ([command]) => command === "save_settings",
+      );
+      expect(saves.at(-1)?.[1]).toMatchObject({
+        settings: {
+          cloudProvider: "icloud-drive",
+          folder: "/google-space",
+          selectedAgents: ["codex"],
+          customPaths: { codex: "/codex" },
+        },
+      });
+    });
+    const commands = api.invoke.mock.calls.map(([command]) => command);
+    expect(
+      commands.some((command) => /migrat|erase|purge|delete/i.test(command)),
+    ).toBe(false);
+  });
+});

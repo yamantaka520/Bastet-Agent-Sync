@@ -1,4 +1,13 @@
-# 🐈 0.7.0 completed release checklist
+# 🐈 Release scope and completed checklists
+
+## 0.8.0 — prepared 2026-10-10, pending publication
+
+- Include the [Hermes continuation implementation](HERMES_AGENT.md) together with **three mutually exclusive sync relays**: Google Drive API (default), iCloud Drive folder, or OneDrive folder.
+- OneDrive remains a selectable, supported folder transport, not a legacy-only option. The user's final three-choice decision supersedes the briefly considered two-choice picker.
+- iCloud and OneDrive use the existing encrypted folder worker and installed provider sync clients; direct Apple/Microsoft OAuth is not implied. Keep existing provider configuration and recovery kits; pause before switching, save setup, then explicitly Start. Switching does not migrate old history or enable simultaneous mirroring.
+- Local folder handoff tests do not prove physical-device cloud delivery. Follow [validation](VALIDATION.md) for exact executed checks and remaining gates. This scope record does not claim publication, installation replacement or completed release packaging.
+
+## 0.7.0 completed release checklist
 
 Authorized 2026-10-03: offer one selected destination from Google Drive API, iCloud Drive folder, and OneDrive folder, plus an actionable credentials/recovery entry. The folder modes use installed provider desktop clients and the encrypted worker. The historical synthetic folder diagnostic remains separate.
 

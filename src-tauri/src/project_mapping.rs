@@ -426,6 +426,9 @@ pub(crate) fn validate_provider_group(manifest: &Manifest) -> Result<()> {
         "claude" | "claude-code" => format!("projects/{}/", claude_group(&manifest.cwd)?),
         "pi" => format!("sessions/{}/", pi_group(&manifest.cwd)),
         "grok" => format!("sessions/{}/", grok_group(&manifest.cwd)),
+        // Hermes keeps every session in one state.db keyed by id; its exported
+        // bundle carries exactly one verified session and no project group.
+        "hermes" => return crate::native_sessions::validate_hermes_manifest(manifest),
         _ => return Err("project_mapping_format_unsupported".into()),
     };
     if manifest.agent == "grok" {
@@ -563,6 +566,9 @@ fn relocate(relative: &str, agent: &str, old_cwd: &str, new_cwd: &str) -> Result
 /// Return a new snapshot with verified location metadata and provider grouping
 /// adapted to the receiving device. The original immutable snapshot is intact.
 pub fn transform_manifest(manifest: &Manifest, mappings: &[Mapping]) -> Result<Manifest> {
+    if manifest.agent == "hermes" {
+        return crate::native_sessions::transform_hermes_manifest(manifest, mappings);
+    }
     let prepared = prepare(mappings)?;
     if mappings.is_empty() || manifest.cwd.is_empty() {
         return Ok(manifest.clone());

@@ -1,5 +1,7 @@
 //! Allowlisted session snapshots. Receiving never writes into a live agent profile.
 #[cfg(test)]
+mod hermes_tests;
+#[cfg(test)]
 mod perf_tests;
 #[cfg(test)]
 mod real_drive_perf_tests;
@@ -80,6 +82,20 @@ struct Handoff {
     stream_profile: String,
     base: String,
     fingerprint: String,
+    // The NEW isolated project working directory restored alongside the profile,
+    // when the received snapshot carried one. Never the receiver's mapped
+    // worktree. Defaults absent so pre-project registries still parse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    project: Option<PathBuf>,
+    // Readiness blockers recorded for that project working tree; surfaced so a
+    // copied project sidecar is never reported ready.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    project_blockers: Vec<String>,
+    // Real external-memory readiness recorded when the managed home was
+    // restored (verified by re-export, never a synthetic ready). Defaults absent
+    // so pre-memory registries still parse.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    memory: Option<crate::hermes_memory::MemoryReadiness>,
 }
 #[derive(Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -149,6 +165,7 @@ fn main_file(m: &Manifest) -> Result<String> {
             "grok" => path.ends_with("/updates.jsonl"),
             "claude" | "claude-code" => path.ends_with(".jsonl") && !path.contains("/subagents/"),
             "agy" => path.ends_with(".db"),
+            "hermes" => path.as_str() == "state.db",
             _ => path.ends_with(".jsonl"),
         })
         .cloned()
@@ -216,6 +233,18 @@ fn allowed(agent: &str, path: &str) -> bool {
                             "rewind_points.jsonl",
                         ]
                         .contains(&parts[3])))
+        }
+        // Hermes Agent keeps every session in one SQLite store. An exported
+        // bundle carries the selected session's lineage graph as `state.db`,
+        // the merged portable workspace and the content-hashed referenced
+        // attachments.
+        "hermes" => {
+            path == "state.db"
+                || crate::hermes_workspace::allowed(path)
+                || crate::hermes_project::allowed(path)
+                || crate::hermes_memory::allowed(path)
+                || hermes_attachment_path(path)
+                || path == HERMES_ASYNC_INDEX
         }
         _ => false,
     }
@@ -301,6 +330,2830 @@ fn sqlite_snapshot(path: &Path, staging: &Path) -> Result<Vec<u8>> {
     drop(backup);
     drop(target);
     storage::read(tmp.path(), MAX_RAW)
+}
+// ── Hermes Agent: one SQLite store (state.db) holds every session ──────────
+// The live store is never copied raw and never written. A consistent
+// point-in-time image is taken with the SQLite online backup API, then a fresh,
+// minimal, KNOWN store is rebuilt containing exactly one session. Rebuilding
+// (rather than copying and deleting) guarantees that other sessions, foreign
+// tables, FTS indexes/triggers/views, gateway routing and runtime leases cannot
+// leak into an export, and makes the export a pure function of the target
+// session's own data so an unrelated session's edits never change it.
+//
+// The schema below is sourced from the installed Hermes source
+// (`hermes_state_common.py`, SCHEMA_VERSION 31): tables + indexes only. FTS
+// objects, triggers and views are deliberately absent — Hermes recreates them
+// when it next opens the restored store, and excluding them keeps a received
+// database free of foreign SQL that would run on open.
+const HERMES_SCHEMA_VERSION: i64 = 31;
+const HERMES_TABLES: [&str; 13] = [
+    "schema_version",
+    "system_prompts",
+    "sessions",
+    "messages",
+    "session_model_usage",
+    "state_meta",
+    "gateway_routing",
+    "gateway_hygiene_state",
+    "conversation_generations",
+    "gateway_heartbeats",
+    "compression_locks",
+    "session_turn_leases",
+    "async_delegations",
+];
+const HERMES_SCHEMA_DDL: &str = r#"
+CREATE TABLE schema_version (version INTEGER NOT NULL);
+CREATE TABLE system_prompts (hash TEXT PRIMARY KEY, prompt TEXT NOT NULL);
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY, source TEXT NOT NULL, created_source TEXT, user_id TEXT,
+    session_key TEXT, chat_id TEXT, chat_type TEXT, thread_id TEXT, display_name TEXT,
+    origin_json TEXT, expiry_finalized INTEGER DEFAULT 0, model TEXT, model_config TEXT,
+    system_prompt TEXT, system_prompt_hash TEXT, parent_session_id TEXT,
+    started_at REAL NOT NULL, ended_at REAL, end_reason TEXT, message_count INTEGER DEFAULT 0,
+    tool_call_count INTEGER DEFAULT 0, input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0, cache_read_tokens INTEGER DEFAULT 0,
+    cache_write_tokens INTEGER DEFAULT 0, reasoning_tokens INTEGER DEFAULT 0, cwd TEXT,
+    git_branch TEXT, git_repo_root TEXT, git_metadata_generation INTEGER NOT NULL DEFAULT 0,
+    billing_provider TEXT, billing_base_url TEXT, billing_mode TEXT,
+    estimated_cost_usd REAL, actual_cost_usd REAL, cost_status TEXT, cost_source TEXT,
+    pricing_version TEXT, title TEXT, title_source TEXT, last_activity_at REAL,
+    last_activity_description TEXT, last_activity_provenance TEXT, api_call_count INTEGER DEFAULT 0,
+    handoff_state TEXT, handoff_platform TEXT, handoff_error TEXT,
+    compression_failure_cooldown_until REAL, compression_failure_error TEXT,
+    compression_fallback_streak INTEGER NOT NULL DEFAULT 0,
+    compression_ineffective_count INTEGER NOT NULL DEFAULT 0,
+    compression_recovery_deadline REAL, compression_overload_streak INTEGER NOT NULL DEFAULT 0,
+    profile_name TEXT, transport_profile TEXT, rewind_count INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0, auto_archived INTEGER NOT NULL DEFAULT 0,
+    pinned INTEGER NOT NULL DEFAULT 0, hidden INTEGER NOT NULL DEFAULT 0, last_read_at REAL,
+    tool_names TEXT,
+    FOREIGN KEY (parent_session_id) REFERENCES sessions(id),
+    FOREIGN KEY (system_prompt_hash) REFERENCES system_prompts(hash)
+);
+CREATE TABLE messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL REFERENCES sessions(id),
+    role TEXT NOT NULL, content TEXT, tool_call_id TEXT, tool_calls TEXT, tool_name TEXT,
+    effect_disposition TEXT, timestamp REAL NOT NULL, token_count INTEGER, finish_reason TEXT,
+    reasoning TEXT, reasoning_content TEXT, reasoning_details TEXT, codex_reasoning_items TEXT,
+    codex_message_items TEXT, platform_message_id TEXT, observed INTEGER DEFAULT 0,
+    _compressed_summary INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+    compacted INTEGER NOT NULL DEFAULT 0, api_content TEXT, display_kind TEXT,
+    display_metadata TEXT, display_identity BLOB, display_order INTEGER, message_uid TEXT,
+    absorbed_message_uids TEXT, tool_call_uids TEXT, tool_call_uid TEXT
+);
+CREATE TABLE session_model_usage (
+    session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, model TEXT NOT NULL,
+    billing_provider TEXT NOT NULL DEFAULT '', billing_base_url TEXT NOT NULL DEFAULT '',
+    billing_mode TEXT NOT NULL DEFAULT '', task TEXT NOT NULL DEFAULT '',
+    api_call_count INTEGER NOT NULL DEFAULT 0, input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0, cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+    cache_write_tokens INTEGER NOT NULL DEFAULT 0, reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+    estimated_cost_usd REAL NOT NULL DEFAULT 0, actual_cost_usd REAL NOT NULL DEFAULT 0,
+    cost_status TEXT, cost_source TEXT, first_seen REAL, last_seen REAL,
+    PRIMARY KEY (session_id, model, billing_provider, billing_base_url, billing_mode, task)
+);
+CREATE TABLE state_meta (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE gateway_routing (
+    scope TEXT NOT NULL DEFAULT '', session_key TEXT NOT NULL, entry_json TEXT NOT NULL,
+    updated_at REAL NOT NULL, PRIMARY KEY (scope, session_key)
+);
+CREATE TABLE gateway_hygiene_state (
+    session_key TEXT PRIMARY KEY, failure_streak INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE conversation_generations (
+    source TEXT NOT NULL, session_key TEXT NOT NULL, generation INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (source, session_key)
+);
+CREATE TABLE gateway_heartbeats (
+    backend_id TEXT PRIMARY KEY, pid INTEGER NOT NULL, started_at REAL NOT NULL,
+    last_heartbeat REAL NOT NULL, profile TEXT NOT NULL DEFAULT '', host TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE compression_locks (
+    session_id TEXT PRIMARY KEY, holder TEXT NOT NULL, acquired_at REAL NOT NULL,
+    expires_at REAL NOT NULL
+);
+CREATE TABLE session_turn_leases (
+    conversation_id TEXT PRIMARY KEY, holder TEXT NOT NULL, acquired_at REAL NOT NULL,
+    expires_at REAL NOT NULL
+);
+CREATE TABLE async_delegations (
+    delegation_id TEXT PRIMARY KEY, origin_session TEXT NOT NULL,
+    origin_ui_session_id TEXT NOT NULL DEFAULT '', parent_session_id TEXT, state TEXT NOT NULL,
+    dispatched_at REAL NOT NULL, completed_at REAL, updated_at REAL NOT NULL,
+    event_json TEXT, result_json TEXT, delivery_state TEXT NOT NULL DEFAULT 'pending',
+    delivery_attempts INTEGER NOT NULL DEFAULT 0, delivered_at REAL, owner_pid INTEGER,
+    owner_started_at INTEGER, task_json TEXT, delivery_claim TEXT, delivery_claimed_at REAL,
+    origin_session_id TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX idx_sessions_source ON sessions(source);
+CREATE INDEX idx_sessions_source_id ON sessions(source, id);
+CREATE INDEX idx_sessions_parent ON sessions(parent_session_id);
+CREATE INDEX idx_sessions_started ON sessions(started_at DESC);
+CREATE INDEX idx_messages_session ON messages(session_id, timestamp);
+CREATE INDEX idx_messages_session_id ON messages(session_id, id);
+CREATE INDEX idx_messages_assistant_calls_by_session
+    ON messages(session_id) WHERE role = 'assistant' AND tool_calls IS NOT NULL;
+CREATE INDEX idx_session_model_usage_session ON session_model_usage(session_id);
+CREATE INDEX idx_session_model_usage_model ON session_model_usage(model);
+"#;
+fn hermes_stat(path: &Path) -> Result<()> {
+    let meta = fs::symlink_metadata(path).map_err(|_| "source_unreadable")?;
+    if meta.file_type().is_symlink() || !meta.is_file() {
+        return Err("unsafe_store".into());
+    }
+    Ok(())
+}
+fn hermes_columns(conn: &rusqlite::Connection, table: &str) -> Result<Vec<String>> {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info('{table}')"))
+        .map_err(|_| "session_invalid")?;
+    let rows = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|_| "session_invalid")?;
+    let mut names = Vec::new();
+    for row in rows {
+        names.push(row.map_err(|_| "session_invalid")?);
+    }
+    Ok(names)
+}
+fn hermes_is_store(conn: &rusqlite::Connection) -> Result<()> {
+    let tables: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN \
+             ('sessions','messages','system_prompts','schema_version')",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|_| "session_invalid")?;
+    if tables != 4 {
+        return Err("session_format_unsupported".into());
+    }
+    let (count, version): (i64, Option<i64>) = conn
+        .query_row(
+            "SELECT count(*), max(version) FROM schema_version",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .map_err(|_| "session_invalid")?;
+    if count != 1 || version != Some(HERMES_SCHEMA_VERSION) {
+        return Err("session_format_unsupported".into());
+    }
+    // A shape we could not read back faithfully is refused rather than copied
+    // with silently missing data.
+    if !hermes_columns(conn, "sessions")?.iter().any(|c| c == "id")
+        || !hermes_columns(conn, "messages")?
+            .iter()
+            .any(|c| c == "session_id")
+    {
+        return Err("session_format_unsupported".into());
+    }
+    Ok(())
+}
+fn hermes_open_readonly(path: &Path) -> Result<rusqlite::Connection> {
+    rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|_| "source_unreadable".into())
+}
+// Consistent point-in-time image of the live store via the online backup API.
+fn hermes_backup_bytes(source: &Path, staging: &Path) -> Result<Vec<u8>> {
+    hermes_stat(source)?;
+    let source_conn = hermes_open_readonly(source)?;
+    hermes_is_store(&source_conn)?;
+    let tmp = tempfile::NamedTempFile::new_in(staging).map_err(|_| "store_unavailable")?;
+    let mut target = rusqlite::Connection::open(tmp.path()).map_err(|_| "store_unavailable")?;
+    let backup =
+        rusqlite::backup::Backup::new(&source_conn, &mut target).map_err(|_| "source_changing")?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    loop {
+        match backup.step(4096).map_err(|_| "source_changing")? {
+            rusqlite::backup::StepResult::Done => break,
+            _ if std::time::Instant::now() > deadline => return Err("source_changing".into()),
+            _ => std::thread::sleep(std::time::Duration::from_millis(5)),
+        }
+    }
+    drop(backup);
+    drop(target);
+    storage::read(tmp.path(), MAX_RAW)
+}
+// Copy known columns only. Reject schema drift rather than silently discarding
+// message context or filling missing fields while claiming native fidelity.
+fn hermes_copy(
+    src: &rusqlite::Connection,
+    dst: &rusqlite::Connection,
+    table: &str,
+    filter: &str,
+    bind: &[rusqlite::types::Value],
+    overrides: &[(&str, rusqlite::types::Value)],
+) -> Result<usize> {
+    let target = hermes_columns(dst, table)?;
+    let available = hermes_columns(src, table)?;
+    if available.len() != target.len() || available.iter().any(|name| !target.contains(name)) {
+        return Err("session_format_unsupported".into());
+    }
+    let columns = target
+        .iter()
+        .filter(|column| available.iter().any(|name| name == *column))
+        .cloned()
+        .collect::<Vec<_>>();
+    if columns.is_empty() {
+        return Err("session_format_unsupported".into());
+    }
+    let list = columns.join(",");
+    // Both the table name and the filter are compile-time constants and the
+    // column list only ever contains names from our own canonical schema, so
+    // nothing here is attacker-controlled SQL.
+    let mut select = src
+        .prepare(&format!("SELECT {list} FROM {table} WHERE {filter}"))
+        .map_err(|_| "session_invalid")?;
+    let rows = select
+        .query_map(rusqlite::params_from_iter(bind.iter()), |row| {
+            let mut values = Vec::with_capacity(columns.len());
+            for index in 0..columns.len() {
+                values.push(row.get::<_, rusqlite::types::Value>(index)?);
+            }
+            Ok(values)
+        })
+        .map_err(|_| "session_invalid")?;
+    let placeholders = (1..=columns.len())
+        .map(|index| format!("?{index}"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let insert = format!("INSERT INTO {table} ({list}) VALUES ({placeholders})");
+    let mut copied = 0usize;
+    for row in rows {
+        let mut values = row.map_err(|_| "session_invalid")?;
+        for (name, value) in overrides {
+            if let Some(position) = columns.iter().position(|column| column == name) {
+                values[position] = value.clone();
+            }
+        }
+        dst.execute(&insert, rusqlite::params_from_iter(values.iter()))
+            .map_err(|_| "session_invalid")?;
+        copied += 1;
+    }
+    Ok(copied)
+}
+// ── Hermes lineage graph ───────────────────────────────────────────────────
+// A Hermes store keeps every session in one database and links them with
+// `parent_session_id`. The connected, *required* lineage of a session — its
+// ancestor chain plus its surviving lineage children — must travel with it so
+// every reference resolves on the receiver. Child edges are explicit and match
+// the installed source's own predicates (`hermes_state_common.py`):
+//   * continuation — a compression continuation (parent `end_reason`
+//     'compression'); a child that is itself a branch/delegate/reset fork or a
+//     tool session is excluded and reached by its own explicit edge;
+//   * branch — a `_branched_from` marker or the legacy 'branched' heuristic;
+//   * reset — a `_reset_from` marker or the legacy same-key reset heuristic;
+//   * delegated — a `_delegate_from` marker (an async delegation child) whose
+//     completed task/result travels with the graph.
+// The walk is bounded and cycle-safe: a self-parent or a parent cycle terminates
+// on the visited set and never loops forever.
+const HERMES_GRAPH_MAX: usize = 256;
+
+fn sql_placeholders(n: usize) -> String {
+    (1..=n)
+        .map(|index| format!("?{index}"))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+fn hermes_session_exists(conn: &rusqlite::Connection, id: &str) -> Result<bool> {
+    match conn.query_row("SELECT 1 FROM sessions WHERE id = ?1", [id], |_| Ok(())) {
+        Ok(()) => Ok(true),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(false),
+        Err(_) => Err("session_invalid".into()),
+    }
+}
+fn hermes_session_cwd(conn: &rusqlite::Connection, id: &str) -> Result<String> {
+    conn.query_row(
+        "SELECT COALESCE(cwd,'') FROM sessions WHERE id = ?1",
+        [id],
+        |r| r.get::<_, String>(0),
+    )
+    .map_err(|_| "session_invalid".into())
+}
+fn hermes_parent_of(conn: &rusqlite::Connection, id: &str) -> Result<Option<String>> {
+    conn.query_row(
+        "SELECT parent_session_id FROM sessions WHERE id = ?1",
+        [id],
+        |r| r.get::<_, Option<String>>(0),
+    )
+    .map_err(|_| "session_invalid".into())
+}
+// ── Explicit lineage edge types ────────────────────────────────────────────
+// Each required child edge is one of four explicit types, matching the installed
+// source's own predicate. A delegate child (an async sub-agent delegation) is a
+// *delegated* edge, never a compression continuation; the compression edge
+// excludes branch/delegate/reset/tool children exactly as the installed
+// `_expand_compression_lineage_ids` child_filter does. `json_extract` is guarded
+// by `json_valid` (inside a CASE) so a malformed `model_config` row can never
+// make the scan raise.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LineageEdge {
+    Continuation,
+    Branch,
+    Reset,
+    Delegated,
+}
+
+const HERMES_RESET_END_REASONS_SQL: &str =
+    "'session_reset', 'session_switch', 'idle', 'daily', 'suspended', 'resume_pending_expired'";
+
+/// A non-throwing JSON marker lookup for `<alias>.model_config`, mirroring
+/// `hermes_state_common._sql_json_extract`.
+fn hermes_marker(alias: &str, marker: &str) -> String {
+    let col = format!("{alias}.model_config");
+    format!(
+        "(SELECT json_extract(CASE WHEN json_valid({col}) THEN {col} ELSE json_object() END, '$.{marker}'))"
+    )
+}
+
+/// `_reset_from` marker or the legacy same-session-key reset heuristic
+/// (`hermes_state_common._RESET_CHILD_SQL`).
+fn hermes_reset_child_sql(alias: &str) -> String {
+    format!(
+        "({} IS NOT NULL OR EXISTS (SELECT 1 FROM sessions p \
+         WHERE p.id = {alias}.parent_session_id AND p.end_reason IN ({}) \
+         AND {alias}.session_key IS NOT NULL AND {alias}.session_key != '' \
+         AND {alias}.session_key = p.session_key))",
+        hermes_marker(alias, "_reset_from"),
+        HERMES_RESET_END_REASONS_SQL,
+    )
+}
+
+/// `_branched_from` marker or the legacy parent-ended-`branched` heuristic
+/// (`hermes_state_common._BRANCH_CHILD_SQL`).
+fn hermes_branch_child_sql(alias: &str) -> String {
+    format!(
+        "({} IS NOT NULL OR EXISTS (SELECT 1 FROM sessions p \
+         WHERE p.id = {alias}.parent_session_id AND p.end_reason = 'branched' \
+         AND {alias}.started_at >= COALESCE(p.ended_at, p.started_at)))",
+        hermes_marker(alias, "_branched_from"),
+    )
+}
+
+/// A child that is NOT a compression continuation of its parent: a branch,
+/// delegate or reset fork, or a tool session (`_non_continuation_child_sql`).
+fn hermes_non_continuation_sql(alias: &str) -> String {
+    format!(
+        "({} IS NULL AND {} IS NULL AND NOT {} AND COALESCE({alias}.source, '') != 'tool')",
+        hermes_marker(alias, "_branched_from"),
+        hermes_marker(alias, "_delegate_from"),
+        hermes_reset_child_sql(alias),
+    )
+}
+
+/// Required children of `parent` reached by one explicit edge type.
+fn hermes_edge_children(
+    conn: &rusqlite::Connection,
+    parent: &str,
+    edge: LineageEdge,
+) -> Result<Vec<String>> {
+    let predicate = match edge {
+        LineageEdge::Continuation => format!(
+            "p.end_reason = 'compression' AND {}",
+            hermes_non_continuation_sql("c")
+        ),
+        LineageEdge::Branch => hermes_branch_child_sql("c"),
+        LineageEdge::Reset => hermes_reset_child_sql("c"),
+        LineageEdge::Delegated => format!("{} IS NOT NULL", hermes_marker("c", "_delegate_from")),
+    };
+    // `predicate` is built only from the canonical marker/predicate helpers
+    // above; the child id is bound, never interpolated.
+    let mut stmt = conn
+        .prepare(&format!(
+            "SELECT c.id FROM sessions c JOIN sessions p ON p.id = c.parent_session_id \
+             WHERE c.parent_session_id = ?1 AND ({predicate}) ORDER BY c.id"
+        ))
+        .map_err(|_| "session_invalid")?;
+    let rows = stmt
+        .query_map([parent], |r| r.get::<_, String>(0))
+        .map_err(|_| "session_invalid")?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|_| "session_invalid")?);
+        if out.len() > HERMES_GRAPH_MAX {
+            return Err("session_limit".into());
+        }
+    }
+    Ok(out)
+}
+
+/// Required lineage children of a parent, deduplicated across every explicit
+/// edge type. A delegate child is reached only by the *delegated* edge; a
+/// compression continuation excludes any child that is itself a branch, delegate
+/// or reset fork or a tool session.
+fn hermes_lineage_children(conn: &rusqlite::Connection, id: &str) -> Result<Vec<String>> {
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut out = Vec::new();
+    for edge in [
+        LineageEdge::Continuation,
+        LineageEdge::Branch,
+        LineageEdge::Reset,
+        LineageEdge::Delegated,
+    ] {
+        for child in hermes_edge_children(conn, id, edge)? {
+            if seen.insert(child.clone()) {
+                out.push(child);
+            }
+        }
+    }
+    out.sort();
+    Ok(out)
+}
+// Connected required lineage of `root`. Returns the sorted session ids plus any
+// non-fatal issue codes. A parent id the store references but does not contain
+// cannot be captured; it is reported (`hermes_parent_missing`) and the dangling
+// reference is cleared rather than silently followed.
+fn hermes_graph_sessions(
+    conn: &rusqlite::Connection,
+    root: &str,
+) -> Result<(Vec<String>, Vec<String>)> {
+    if !bundle::token(root) || !hermes_session_exists(conn, root)? {
+        return Err("session_invalid".into());
+    }
+    let mut seen: BTreeSet<String> = BTreeSet::new();
+    let mut order: Vec<String> = Vec::new();
+    let mut issues: Vec<String> = Vec::new();
+    let mut current = Some(root.to_string());
+    while let Some(id) = current {
+        if !seen.insert(id.clone()) || seen.len() > HERMES_GRAPH_MAX {
+            break;
+        }
+        order.push(id.clone());
+        match hermes_parent_of(conn, &id)? {
+            Some(parent) if !parent.is_empty() && parent != id => {
+                if !hermes_session_exists(conn, &parent)? {
+                    issues.push("hermes_parent_missing".into());
+                    break;
+                }
+                current = Some(parent);
+            }
+            _ => break,
+        }
+    }
+    let mut queue = order.clone();
+    while let Some(id) = queue.pop() {
+        for child in hermes_lineage_children(conn, &id)? {
+            if seen.insert(child.clone()) {
+                if seen.len() > HERMES_GRAPH_MAX {
+                    return Err("session_limit".into());
+                }
+                order.push(child.clone());
+                queue.push(child);
+            }
+        }
+    }
+    order.sort();
+    Ok((order, issues))
+}
+fn hermes_assert_graph_consistent(conn: &rusqlite::Connection) -> Result<()> {
+    let dangling: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM sessions c WHERE c.parent_session_id IS NOT NULL \
+             AND c.parent_session_id != '' \
+             AND NOT EXISTS (SELECT 1 FROM sessions p WHERE p.id = c.parent_session_id)",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|_| "session_invalid")?;
+    if dangling != 0 {
+        return Err("session_format_unsupported".into());
+    }
+    Ok(())
+}
+// Rebuild a fresh canonical store holding the connected required lineage of
+// `root`. The result has no other sessions, no foreign tables, no triggers/views
+// and no FTS leftovers; runtime/gateway tables exist but are empty. The root's
+// own `cwd` is overridden to the (possibly remapped) value while every other
+// session's recorded metadata is preserved verbatim. `parent_session_id` is kept
+// whenever its parent is inside the exported graph and only cleared when the
+// store itself lacks the parent (a dangling foreign key).
+fn hermes_canonicalize_with_issues(
+    source: &rusqlite::Connection,
+    session: &str,
+    cwd: &str,
+    staging: &Path,
+) -> Result<(Vec<u8>, Vec<String>)> {
+    if !bundle::token(session) {
+        return Err("session_invalid".into());
+    }
+    hermes_is_store(source)?;
+    let (graph, issues) = hermes_graph_sessions(source, session)?;
+    let tmp = tempfile::NamedTempFile::new_in(staging)
+        .map_err(|_| "store_unavailable")?
+        .into_temp_path();
+    {
+        let target = rusqlite::Connection::open(&tmp).map_err(|_| "store_unavailable")?;
+        // rusqlite ships SQLite with foreign_keys ON; turn it off so a store whose
+        // rows reference a prompt outside this isolated export still copies
+        // cleanly. Rows are inserted parent-first anyway.
+        target
+            .execute_batch("PRAGMA foreign_keys=OFF;")
+            .map_err(|_| "store_unavailable")?;
+        target
+            .execute_batch(HERMES_SCHEMA_DDL)
+            .map_err(|_| "store_unavailable")?;
+        target
+            .execute(
+                "INSERT INTO schema_version(version) VALUES (?1)",
+                [HERMES_SCHEMA_VERSION],
+            )
+            .map_err(|_| "store_unavailable")?;
+        let ids = graph
+            .iter()
+            .map(|id| rusqlite::types::Value::Text(id.clone()))
+            .collect::<Vec<_>>();
+        hermes_copy(
+            source,
+            &target,
+            "system_prompts",
+            &format!(
+                "hash IN (SELECT system_prompt_hash FROM sessions WHERE id IN ({}))",
+                sql_placeholders(graph.len())
+            ),
+            &ids,
+            &[],
+        )?;
+        for id in &graph {
+            let mut overrides: Vec<(&str, rusqlite::types::Value)> = Vec::new();
+            if id == session {
+                overrides.push(("cwd", rusqlite::types::Value::Text(cwd.to_string())));
+            }
+            let parent = hermes_parent_of(source, id)?;
+            let parent_inside = parent
+                .as_deref()
+                .is_some_and(|value| !value.is_empty() && graph.iter().any(|g| g == value));
+            if parent.as_deref().is_some_and(|value| !value.is_empty()) && !parent_inside {
+                overrides.push(("parent_session_id", rusqlite::types::Value::Null));
+            }
+            let idv = vec![rusqlite::types::Value::Text(id.clone())];
+            if hermes_copy(source, &target, "sessions", "id = ?1", &idv, &overrides)? != 1 {
+                return Err("session_invalid".into());
+            }
+            hermes_copy(source, &target, "messages", "session_id = ?1", &idv, &[])?;
+            hermes_copy(
+                source,
+                &target,
+                "session_model_usage",
+                "session_id = ?1",
+                &idv,
+                &[],
+            )?;
+        }
+        target
+            .execute_batch("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;")
+            .map_err(|_| "session_invalid")?;
+        // The connection is dropped here so every page (and any rollback/WAL
+        // flush) is on disk before the file is read back; Windows will not let a
+        // file with a live exclusive SQLite handle be read.
+    }
+    Ok((storage::read(&tmp, MAX_RAW)?, issues))
+}
+fn hermes_canonicalize(
+    source: &rusqlite::Connection,
+    session: &str,
+    cwd: &str,
+    staging: &Path,
+) -> Result<Vec<u8>> {
+    hermes_canonicalize_with_issues(source, session, cwd, staging).map(|(bytes, _)| bytes)
+}
+fn hermes_with_image<T>(
+    bytes: &[u8],
+    staging: &Path,
+    action: impl FnOnce(&rusqlite::Connection) -> Result<T>,
+) -> Result<T> {
+    let path = tempfile::NamedTempFile::new_in(staging)
+        .map_err(|_| "store_unavailable")?
+        .into_temp_path();
+    fs::write(&path, bytes).map_err(|_| "store_unavailable")?;
+    let conn = hermes_open_readonly(&path)?;
+    let out = action(&conn)?;
+    drop(conn);
+    drop(path);
+    Ok(out)
+}
+fn hermes_sessions_of(conn: &rusqlite::Connection) -> Result<Vec<(String, String)>> {
+    hermes_is_store(conn)?;
+    let mut stmt = conn
+        .prepare("SELECT id, COALESCE(cwd,'') FROM sessions ORDER BY id")
+        .map_err(|_| "session_invalid")?;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|_| "session_invalid")?;
+    let mut out = Vec::new();
+    for row in rows {
+        let (id, cwd) = row.map_err(|_| "session_invalid")?;
+        if !bundle::token(&id) {
+            continue;
+        }
+        out.push((id, cwd));
+        if out.len() > 20000 {
+            return Err("session_limit".into());
+        }
+    }
+    Ok(out)
+}
+// A received store must be the exact canonical shape we produce: only allowlisted
+// tables and no trigger or view. A foreign trigger would run arbitrary SQL the
+// moment the user opens the restored profile, and a leftover FTS index would leak
+// another session's content.
+fn hermes_assert_canonical(bytes: &[u8], staging: &Path) -> Result<()> {
+    hermes_with_image(bytes, staging, |conn| {
+        let unsafe_objects: i64 = conn
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type IN ('trigger','view')",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|_| "session_invalid")?;
+        if unsafe_objects != 0 {
+            return Err("session_format_unsupported".into());
+        }
+        let mut stmt = conn
+            .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+            .map_err(|_| "session_invalid")?;
+        let names = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .map_err(|_| "session_invalid")?;
+        for name in names {
+            let name = name.map_err(|_| "session_invalid")?;
+            if name.starts_with("sqlite_") {
+                continue;
+            }
+            if !HERMES_TABLES.contains(&name.as_str()) {
+                return Err("session_format_unsupported".into());
+            }
+        }
+        Ok(())
+    })
+}
+pub(crate) fn validate_hermes_manifest(manifest: &Manifest) -> Result<()> {
+    if manifest.agent != "hermes" || !manifest.files.contains_key("state.db") {
+        return Err("project_mapping_format_unsupported".into());
+    }
+    if !manifest_paths_safe(manifest) {
+        return Err("project_mapping_format_unsupported".into());
+    }
+    let bytes = STANDARD
+        .decode(manifest.files.get("state.db").ok_or("session_invalid")?)
+        .map_err(|_| "session_invalid")?;
+    if !bytes.starts_with(b"SQLite format 3\0") {
+        return Err("session_invalid".into());
+    }
+    let dir = tempfile::tempdir().map_err(|_| "store_unavailable")?;
+    hermes_with_image(&bytes, dir.path(), |conn| {
+        // The manifest's session id is the unambiguous root of the exported
+        // lineage graph, even when the store holds many sessions.
+        if !hermes_session_exists(conn, &manifest.session)? {
+            return Err("project_mapping_format_unsupported".into());
+        }
+        if hermes_session_cwd(conn, &manifest.session)? != manifest.cwd {
+            return Err("project_mapping_format_unsupported".into());
+        }
+        hermes_assert_graph_consistent(conn)?;
+        Ok(())
+    })?;
+    hermes_assert_canonical(&bytes, dir.path())?;
+    hermes_validate_workspace_files(&manifest.files)?;
+    hermes_validate_attachments(&manifest.files)?;
+    Ok(())
+}
+// Rebuild the received store into the canonical schema even when no mapping
+// applies: a bundle that predates the rebuild exporter, or a tampered one, can
+// therefore never place a foreign trigger, view or extra table into a managed
+// profile. Writes always happen against this rebuilt, known-schema database.
+// Non-native companion files (portable workspace and content-hashed attachments)
+// are preserved; only `state.db` is rebuilt.
+pub(crate) fn transform_hermes_manifest(
+    manifest: &Manifest,
+    mappings: &[crate::project_mapping::Mapping],
+) -> Result<Manifest> {
+    let bytes = STANDARD
+        .decode(
+            manifest
+                .files
+                .get("state.db")
+                .ok_or("project_mapping_format_unsupported")?,
+        )
+        .map_err(|_| "session_invalid")?;
+    if !bytes.starts_with(b"SQLite format 3\0") {
+        return Err("session_invalid".into());
+    }
+    let dir = tempfile::tempdir().map_err(|_| "store_unavailable")?;
+    let session = manifest.session.clone();
+    let (cwd, rebuilt) = hermes_with_image(&bytes, dir.path(), |conn| {
+        if !hermes_session_exists(conn, &session)? {
+            return Err("project_mapping_format_unsupported".into());
+        }
+        let recorded = hermes_session_cwd(conn, &session)?;
+        let cwd = if mappings.is_empty() || recorded.is_empty() {
+            recorded
+        } else {
+            crate::project_mapping::remap_path(&recorded, mappings)?.unwrap_or(recorded)
+        };
+        let rebuilt = hermes_canonicalize(conn, &session, &cwd, dir.path())?;
+        Ok((cwd, rebuilt))
+    })?;
+    // Project-rooted attachment references follow their project mapping
+    // (Windows/POSIX aware, via the shared mapping code).
+    let rebuilt = hermes_rewrite_references(&rebuilt, dir.path(), |kind, target| {
+        if kind != "file" && kind != "folder" {
+            return Ok(None);
+        }
+        if !hermes_is_absolute_target(target) {
+            return Ok(None);
+        }
+        crate::project_mapping::remap_path(target, mappings)
+    })?;
+    let mut files = manifest.files.clone();
+    files.insert("state.db".into(), STANDARD.encode(rebuilt));
+    Ok(Manifest {
+        cwd,
+        files,
+        ..manifest.clone()
+    })
+}
+
+// ── Content-hashed referenced attachments ──────────────────────────────────
+// A user message may explicitly reference a local file with `@file:<path>` (or
+// `@folder:`), the same syntax the installed runtime expands
+// (`agent/context_references.py`). Only those *explicitly referenced* files are
+// captured, and only when they sit under a selected root (the Hermes home or a
+// recorded session cwd) — there is no directory enumeration. Symlinks and
+// credential files are refused, sizes are bounded and every blob is keyed by its
+// SHA-256. Unresolvable references are reported as explicit problems, never
+// silently dropped.
+const HERMES_ATTACHMENT_MAX: u64 = 8 * 1024 * 1024;
+const HERMES_ATTACHMENT_TOTAL: usize = 32 * 1024 * 1024;
+const HERMES_ATTACHMENT_FILES: usize = 64;
+const HERMES_ATTACHMENT_INDEX: &str = "attachments/index.json";
+/// Inert async-delegation sidecar. Finished `async_delegations` rows travel here
+/// as data only — never into `state.db`'s live `async_delegations` table — so a
+/// received snapshot can never re-lease or replay a runtime job.
+const HERMES_ASYNC_INDEX: &str = "bastet/hermes-async-delegations.json";
+const HERMES_ASYNC_MAX: usize = 1024 * 1024;
+const HERMES_ASYNC_RECORDS: usize = 512;
+const HERMES_ASYNC_FIELD_MAX: usize = 128 * 1024;
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AttachmentEntry {
+    reference: String,
+    kind: String,
+    target: String,
+    source_path: String,
+    sha256: String,
+    key: String,
+    bytes: u64,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AttachmentProblem {
+    reference: String,
+    kind: String,
+    reason: String,
+    blocking: bool,
+}
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AttachmentIndex {
+    version: u32,
+    agent: String,
+    root: String,
+    entries: Vec<AttachmentEntry>,
+    problems: Vec<AttachmentProblem>,
+}
+struct AttachmentCapture {
+    files: BTreeMap<String, String>,
+    entries: Vec<AttachmentEntry>,
+    problems: Vec<AttachmentProblem>,
+}
+fn hermes_attachment_path(path: &str) -> bool {
+    if !crate::portable_paths::path_is_portable(path) {
+        return false;
+    }
+    if path == HERMES_ATTACHMENT_INDEX {
+        return true;
+    }
+    let mut parts = path.split('/');
+    if parts.next() != Some("attachments") {
+        return false;
+    }
+    let Some(sha) = parts.next() else {
+        return false;
+    };
+    if !bundle::is_hash(sha) {
+        return false;
+    }
+    let Some(name) = parts.next() else {
+        return false;
+    };
+    parts.next().is_none() && !name.is_empty()
+}
+fn hermes_trim_reference(value: &str) -> &str {
+    let mut trimmed = value.trim_end_matches([',', '.', ';', '!', '?']);
+    while let Some(last) = trimmed.chars().last() {
+        let (open, close) = match last {
+            ')' => ('(', ')'),
+            ']' => ('[', ']'),
+            '}' => ('{', '}'),
+            _ => break,
+        };
+        let _ = close;
+        if trimmed.matches(last).count() > trimmed.matches(open).count() {
+            trimmed = &trimmed[..trimmed.len() - last.len_utf8()];
+        } else {
+            break;
+        }
+    }
+    trimmed
+}
+fn hermes_strip_line_range(value: &str) -> &str {
+    if let Some(index) = value.rfind(':') {
+        let suffix = &value[index + 1..];
+        let digits = !suffix.is_empty()
+            && suffix
+                .split('-')
+                .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()));
+        if digits {
+            return &value[..index];
+        }
+    }
+    value
+}
+// Explicit `@file:` / `@folder:` references with their byte span in `content`.
+fn hermes_reference_spans(content: &str) -> Vec<(usize, usize, String, String)> {
+    let bytes = content.as_bytes();
+    let mut spans = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'@' {
+            i += 1;
+            continue;
+        }
+        if i > 0 {
+            let prev = bytes[i - 1];
+            if prev.is_ascii_alphanumeric() || prev == b'_' || prev == b'/' {
+                i += 1;
+                continue;
+            }
+        }
+        let after_at = i + 1;
+        let (kind, prefix) = if content[after_at..].starts_with("file:") {
+            ("file", 5)
+        } else if content[after_at..].starts_with("folder:") {
+            ("folder", 7)
+        } else if content[after_at..].starts_with("image:") {
+            // The desktop/gateway persists attached images as `@image:<path>`
+            // (tui_gateway/session_history.py, gateway/platforms/event.py).
+            ("image", 6)
+        } else if content[after_at..].starts_with("url:") {
+            // `@url:` is a remote reference, never a local file.
+            ("url", 4)
+        } else {
+            i += 1;
+            continue;
+        };
+        let mut j = after_at + prefix;
+        let (vstart, vend);
+        if j < bytes.len() && matches!(bytes[j], b'`' | b'"' | b'\'') {
+            let quote = bytes[j];
+            vstart = j + 1;
+            match content[vstart..].find(quote as char) {
+                Some(offset) => {
+                    vend = vstart + offset;
+                    j = vend + 1;
+                }
+                None => {
+                    i += 1;
+                    continue;
+                }
+            }
+        } else {
+            vstart = j;
+            let mut k = vstart;
+            while k < bytes.len() && !bytes[k].is_ascii_whitespace() {
+                k += 1;
+            }
+            vend = k;
+            j = k;
+        }
+        let raw = hermes_trim_reference(&content[vstart..vend]);
+        let target = if kind == "file" {
+            hermes_strip_line_range(raw).trim()
+        } else {
+            raw.trim()
+        };
+        if !target.is_empty() {
+            spans.push((i, j, kind.to_string(), target.to_string()));
+        }
+        i = i.max(j).max(i + 1);
+        if j <= i {
+            i += 1;
+        }
+    }
+    spans
+}
+fn hermes_references(text: &str) -> Vec<(String, String, String)> {
+    hermes_reference_spans(text)
+        .into_iter()
+        .map(|(_, _, kind, target)| {
+            let reference = format!("@{kind}:{target}");
+            (reference, kind, target)
+        })
+        .collect()
+}
+// A target the mapping code can resolve on this host. Windows drive and UNC
+// forms count as absolute even on POSIX, so a Windows-authored reference is
+// remapped when received on POSIX (and vice versa).
+fn hermes_is_absolute_target(target: &str) -> bool {
+    if Path::new(target).is_absolute() {
+        return true;
+    }
+    let bytes = target.as_bytes();
+    if bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'/' || bytes[2] == b'\\')
+    {
+        return true;
+    }
+    target.starts_with("\\\\") || target.starts_with("//")
+}
+fn hermes_quote_reference(value: &str) -> String {
+    if value.chars().any(|c| {
+        c.is_whitespace()
+            || matches!(
+                c,
+                '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | '"' | '\'' | '`'
+            )
+    }) {
+        if !value.contains('`') {
+            return format!("`{value}`");
+        }
+        if !value.contains('"') {
+            return format!("\"{value}\"");
+        }
+    }
+    value.to_string()
+}
+// Rewrite explicit `@file:`/`@folder:` targets in every message. `f` returns the
+// replacement target (or None to leave the token untouched). Returns the original
+// bytes when nothing changed so deduplication is preserved.
+fn hermes_rewrite_references(
+    bytes: &[u8],
+    staging: &Path,
+    f: impl Fn(&str, &str) -> Result<Option<String>>,
+) -> Result<Vec<u8>> {
+    let path = tempfile::NamedTempFile::new_in(staging)
+        .map_err(|_| "store_unavailable")?
+        .into_temp_path();
+    fs::write(&path, bytes).map_err(|_| "store_unavailable")?;
+    let conn = rusqlite::Connection::open(&path).map_err(|_| "store_unavailable")?;
+    let mut updates: Vec<(i64, Option<String>, Option<String>)> = Vec::new();
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, content, api_content FROM messages")
+            .map_err(|_| "session_invalid")?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok((
+                    r.get::<_, i64>(0)?,
+                    r.get::<_, Option<String>>(1)?,
+                    r.get::<_, Option<String>>(2)?,
+                ))
+            })
+            .map_err(|_| "session_invalid")?;
+        for row in rows {
+            let (id, content, api) = row.map_err(|_| "session_invalid")?;
+            let new_content = content
+                .as_deref()
+                .map(|text| hermes_rewrite_text(text, &f))
+                .transpose()?
+                .flatten();
+            let new_api = api
+                .as_deref()
+                .map(|text| hermes_rewrite_text(text, &f))
+                .transpose()?
+                .flatten();
+            if new_content.is_some() || new_api.is_some() {
+                updates.push((id, new_content.or(content), new_api.or(api)));
+            }
+        }
+    }
+    if updates.is_empty() {
+        return Ok(bytes.to_vec());
+    }
+    for (id, content, api) in &updates {
+        conn.execute(
+            "UPDATE messages SET content=?2, api_content=?3 WHERE id=?1",
+            rusqlite::params![id, content, api],
+        )
+        .map_err(|_| "session_invalid")?;
+    }
+    drop(conn);
+    storage::read(&path, MAX_RAW)
+}
+fn hermes_rewrite_text(
+    text: &str,
+    f: &impl Fn(&str, &str) -> Result<Option<String>>,
+) -> Result<Option<String>> {
+    let spans = hermes_reference_spans(text);
+    if spans.is_empty() {
+        return Ok(None);
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    let mut changed = false;
+    for (start, end, kind, target) in spans {
+        if start < last {
+            continue;
+        }
+        out.push_str(&text[last..start]);
+        match f(&kind, &target)? {
+            Some(new_target) => {
+                out.push_str(&format!("@{kind}:{}", hermes_quote_reference(&new_target)));
+                changed = true;
+            }
+            None => out.push_str(&text[start..end]),
+        }
+        last = end;
+    }
+    out.push_str(&text[last..]);
+    Ok(changed.then_some(out))
+}
+fn hermes_attachment_name(path: &Path) -> String {
+    let raw = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "attachment".into());
+    let cleaned: String = raw
+        .chars()
+        .map(|c| {
+            if c.is_control() || matches!(c, '\\' | ':' | '<' | '>' | '"' | '|' | '?' | '*' | '/') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let trimmed = cleaned.trim_end_matches([' ', '.']);
+    let candidate = if trimmed.is_empty() || trimmed.len() > 200 {
+        "attachment".to_string()
+    } else {
+        trimmed.to_string()
+    };
+    if crate::portable_paths::path_is_portable(&candidate) {
+        candidate
+    } else {
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .filter(|e| e.bytes().all(|b| b.is_ascii_alphanumeric()))
+            .map(|e| format!(".{e}"))
+            .unwrap_or_default();
+        format!("attachment{ext}")
+    }
+}
+fn hermes_credential_name(path: &Path) -> bool {
+    const DENY: [&str; 14] = [
+        ".env",
+        "auth.json",
+        ".netrc",
+        ".pgpass",
+        ".npmrc",
+        ".pypirc",
+        ".bashrc",
+        ".zshrc",
+        ".profile",
+        ".bash_profile",
+        ".zprofile",
+        "config.yaml",
+        ".envrc",
+        ".htpasswd",
+    ];
+    if path
+        .components()
+        .any(|c| c.as_os_str() == ".ssh" || c.as_os_str() == ".gnupg")
+    {
+        return true;
+    }
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    DENY.contains(&name.as_str())
+        || name.contains("credential")
+        || name.contains("token")
+        || name.contains("secret")
+        || name.ends_with(".pem")
+        || name.ends_with(".key")
+        || name.starts_with("id_rsa")
+        || name.starts_with("id_ed25519")
+}
+fn hermes_expand_target(target: &str) -> String {
+    if target == "~" {
+        if let Some(home) = std::env::var_os("HOME") {
+            return home.to_string_lossy().into_owned();
+        }
+    }
+    if let Some(rest) = target
+        .strip_prefix("~/")
+        .or_else(|| target.strip_prefix("~\\"))
+    {
+        if let Some(home) = std::env::var_os("HOME") {
+            return Path::new(&home).join(rest).to_string_lossy().into_owned();
+        }
+    }
+    target.to_string()
+}
+// Lexical normalisation: reject `..` escapes, keep everything else as written so
+// the recorded path is the one the user referenced.
+fn hermes_lexical(path: &Path) -> Result<PathBuf> {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => return Err("outside_roots".into()),
+            std::path::Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    Ok(out)
+}
+fn hermes_under(child: &Path, root: &Path) -> bool {
+    child == root || child.starts_with(root)
+}
+enum AttachmentOutcome {
+    Captured(PathBuf),
+    Problem(&'static str),
+}
+// Read-denial sets ported from the installed `agent/file_safety.py` and
+// `agent/context_references.py`. Exact credential files and directory prefixes
+// live under both the active HERMES_HOME and its global root; `HOME_CREDENTIAL_*`
+// cover the OS user's home; `PROJECT_ENV_*` cover secret env files anywhere.
+const HERMES_CREDENTIAL_FILES: [&str; 8] = [
+    "auth.json",
+    "auth.lock",
+    ".anthropic_oauth.json",
+    ".env",
+    "webhook_subscriptions.json",
+    "auth/google_oauth.json",
+    "cache/bws_cache.json",
+    "cache/bws_cache.enc.json",
+];
+const HERMES_PROTECTED_SUBPATHS: [&str; 6] = [
+    "state.db",
+    "sessions",
+    "mcp-tokens",
+    "pairing",
+    "vault",
+    "browser-profile",
+];
+const HOME_CREDENTIAL_DIRS: [&str; 8] = [
+    ".ssh",
+    ".aws",
+    ".gnupg",
+    ".kube",
+    ".docker",
+    ".azure",
+    ".config/gh",
+    ".config/gcloud",
+];
+const HOME_CREDENTIAL_FILES: [&str; 8] = [
+    ".ssh/authorized_keys",
+    ".ssh/id_rsa",
+    ".ssh/id_ed25519",
+    ".netrc",
+    ".pgpass",
+    ".npmrc",
+    ".pypirc",
+    ".git-credentials",
+];
+const PROJECT_ENV_BASENAMES: [&str; 7] = [
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.production",
+    ".env.test",
+    ".env.staging",
+    ".envrc",
+];
+const SYSTEM_DENY_PREFIXES: [&str; 5] = [
+    "/etc/passwd",
+    "/etc/shadow",
+    "/etc/sudoers",
+    "/etc/sudoers.d",
+    "/etc/systemd",
+];
+// Hermes runtime cache dirs that legitimately hold user-referenced files. Only
+// these (plus the session's own project working directory) are readable roots —
+// never the entire home, which would expose the credential stores above.
+const HERMES_CACHE_DIRS: [&str; 11] = [
+    "cache/documents",
+    "cache/images",
+    "cache/audio",
+    "cache/videos",
+    "cache/screenshots",
+    "cache/web",
+    "cache/delegation",
+    "cache/spillover",
+    "images",
+    "attachments",
+    "composer-pastes",
+];
+// The Hermes home and, for a profile home (`<root>/profiles/<name>`), its global
+// root, so credential stores at either level stay guarded.
+fn hermes_home_roots(home: &Path) -> Vec<PathBuf> {
+    let mut roots = vec![home.to_path_buf()];
+    if let Some(parent) = home.parent() {
+        if parent.file_name().is_some_and(|n| n == "profiles") {
+            if let Some(root) = parent.parent() {
+                roots.push(root.to_path_buf());
+            }
+        }
+    }
+    roots.sort();
+    roots.dedup();
+    roots
+}
+// Windows NT/device-namespace prefixes: never legitimate targets, and resolving
+// one can trigger an outbound SMB (NTLM) authentication, so they are refused on
+// the RAW string before any path resolution.
+fn hermes_nt_namespace(target: &str) -> bool {
+    let s = target.replace('/', "\\");
+    if s.starts_with("\\\\??\\") || s.starts_with("\\\\.\\") {
+        return true;
+    }
+    if let Some(rest) = s.strip_prefix("\\\\?\\") {
+        let upper = rest.to_ascii_uppercase();
+        if upper.starts_with("UNC\\") || upper.starts_with("GLOBALROOT\\") {
+            return true;
+        }
+    }
+    false
+}
+// Canonical read denial for an already-resolved path.
+fn hermes_read_denied(canonical: &Path, home: &Path, home_dir: Option<&Path>) -> bool {
+    if canonical
+        .file_name()
+        .map(|n| n.to_string_lossy().to_ascii_lowercase())
+        .is_some_and(|n| PROJECT_ENV_BASENAMES.contains(&n.as_str()))
+    {
+        return true;
+    }
+    for root in hermes_home_roots(home) {
+        for name in HERMES_CREDENTIAL_FILES {
+            if canonical == root.join(name) {
+                return true;
+            }
+        }
+        for sub in HERMES_PROTECTED_SUBPATHS {
+            if hermes_under(canonical, &root.join(sub)) {
+                return true;
+            }
+        }
+        if hermes_under(canonical, &root.join("skills").join(".hub")) {
+            return true;
+        }
+    }
+    if let Some(home_dir) = home_dir {
+        for dir in HOME_CREDENTIAL_DIRS {
+            if hermes_under(canonical, &home_dir.join(dir)) {
+                return true;
+            }
+        }
+        for name in HOME_CREDENTIAL_FILES {
+            if canonical == home_dir.join(name) {
+                return true;
+            }
+        }
+    }
+    for prefix in SYSTEM_DENY_PREFIXES {
+        if hermes_under(canonical, Path::new(prefix)) {
+            return true;
+        }
+    }
+    hermes_credential_name(canonical)
+}
+fn hermes_resolve_attachment(
+    home: Option<&Path>,
+    cwd: Option<&Path>,
+    target: &str,
+) -> AttachmentOutcome {
+    if target.is_empty() {
+        return AttachmentOutcome::Problem("unsupported");
+    }
+    if hermes_nt_namespace(target) {
+        return AttachmentOutcome::Problem("credential");
+    }
+    let expanded = hermes_expand_target(target);
+    let candidate = if Path::new(&expanded).is_absolute() {
+        PathBuf::from(&expanded)
+    } else {
+        match cwd {
+            Some(cwd) => cwd.join(&expanded),
+            // A relative reference can only resolve under an authorized project
+            // root; without one it is outside every allowed root.
+            None => return AttachmentOutcome::Problem("outside_roots"),
+        }
+    };
+    let Ok(candidate) = hermes_lexical(&candidate) else {
+        return AttachmentOutcome::Problem("outside_roots");
+    };
+    let Ok(meta) = fs::symlink_metadata(&candidate) else {
+        return AttachmentOutcome::Problem("missing");
+    };
+    if meta.file_type().is_symlink() {
+        return AttachmentOutcome::Problem("symlink");
+    }
+    if !meta.is_file() {
+        return AttachmentOutcome::Problem("unsupported");
+    }
+    if hermes_credential_name(&candidate) {
+        return AttachmentOutcome::Problem("credential");
+    }
+    let Ok(canonical) = fs::canonicalize(&candidate) else {
+        return AttachmentOutcome::Problem("unreadable");
+    };
+    if let Some(home) = home {
+        let home_dir = std::env::var_os("HOME").map(PathBuf::from);
+        if hermes_read_denied(&canonical, home, home_dir.as_deref()) {
+            return AttachmentOutcome::Problem("credential");
+        }
+    }
+    // Only the Hermes runtime cache dirs and the session's own project working
+    // directory are readable roots — never the entire home (which would expose
+    // state.db, mcp-tokens, vault, browser-profile, oauth/credential stores) and
+    // never an arbitrary absolute path.
+    let in_home_cache = home.is_some_and(|home| {
+        HERMES_CACHE_DIRS
+            .iter()
+            .any(|sub| hermes_under(&canonical, &home.join(sub)))
+    });
+    let in_project = cwd.is_some_and(|root| hermes_under(&canonical, root));
+    if !in_home_cache && !in_project {
+        return AttachmentOutcome::Problem("outside_roots");
+    }
+    AttachmentOutcome::Captured(candidate)
+}
+fn hermes_problem_code(reason: &str) -> &'static str {
+    match reason {
+        "missing" => "hermes_attachment_missing",
+        "symlink" => "hermes_attachment_symlink",
+        "credential" => "hermes_attachment_credential",
+        "outside_roots" => "hermes_attachment_outside_roots",
+        "oversized" => "hermes_attachment_oversized",
+        "limit" => "hermes_attachment_limit",
+        "unreadable" => "hermes_attachment_unreadable",
+        _ => "hermes_attachment_unsupported",
+    }
+}
+fn hermes_capture_attachments(
+    home: &Path,
+    image: &rusqlite::Connection,
+    root_session: &str,
+    _staging: &Path,
+    authorized_roots: &[PathBuf],
+) -> Result<AttachmentCapture> {
+    let (graph, _) = hermes_graph_sessions(image, root_session)?;
+    let home_real = fs::canonicalize(home).ok();
+    let mut files = BTreeMap::new();
+    let mut entries: Vec<AttachmentEntry> = Vec::new();
+    let mut problems: Vec<AttachmentProblem> = Vec::new();
+    let mut seen_keys: BTreeSet<String> = BTreeSet::new();
+    let mut seen_refs: BTreeSet<(String, String)> = BTreeSet::new();
+    let mut total = 0usize;
+    for session in &graph {
+        let cwd = hermes_session_cwd(image, session)?;
+        // A recorded session cwd is an attachment read root ONLY when an
+        // explicit, user-authorized project mapping covers it — exactly like
+        // project working-tree capture. An arbitrary persisted cwd is never a
+        // grant and is never read; references under it are reported as
+        // `outside_roots`, never silently captured.
+        let cwd_real = authorized_attachment_root(&cwd, authorized_roots);
+        let mut stmt = image
+            .prepare("SELECT content, api_content FROM messages WHERE session_id = ?1")
+            .map_err(|_| "session_invalid")?;
+        let rows = stmt
+            .query_map([session], |r| {
+                Ok((
+                    r.get::<_, Option<String>>(0)?,
+                    r.get::<_, Option<String>>(1)?,
+                ))
+            })
+            .map_err(|_| "session_invalid")?;
+        for row in rows {
+            let (content, api) = row.map_err(|_| "session_invalid")?;
+            for text in [content, api].into_iter().flatten() {
+                for (reference, kind, target) in hermes_references(&text) {
+                    // Only local file/folder/image references are capturable;
+                    // `@url:` (and any other remote token) is not a file read.
+                    if !matches!(kind.as_str(), "file" | "folder" | "image") {
+                        continue;
+                    }
+                    if !seen_refs.insert((kind.clone(), reference.clone())) {
+                        continue;
+                    }
+                    match hermes_resolve_attachment(
+                        home_real.as_deref(),
+                        cwd_real.as_deref(),
+                        &target,
+                    ) {
+                        AttachmentOutcome::Problem(reason) => {
+                            problems.push(AttachmentProblem {
+                                reference,
+                                kind,
+                                reason: reason.into(),
+                                blocking: reason == "oversized" || reason == "limit",
+                            });
+                        }
+                        AttachmentOutcome::Captured(path) => {
+                            let source_path = path.to_string_lossy().into_owned();
+                            let bytes = match storage::read(&path, HERMES_ATTACHMENT_MAX) {
+                                Ok(bytes) => bytes,
+                                Err(code) if code == "bundle_limit" => {
+                                    problems.push(AttachmentProblem {
+                                        reference,
+                                        kind,
+                                        reason: "oversized".into(),
+                                        blocking: true,
+                                    });
+                                    continue;
+                                }
+                                Err(code) if code == "unsafe_store" => {
+                                    problems.push(AttachmentProblem {
+                                        reference,
+                                        kind,
+                                        reason: "symlink".into(),
+                                        blocking: false,
+                                    });
+                                    continue;
+                                }
+                                Err(_) => {
+                                    problems.push(AttachmentProblem {
+                                        reference,
+                                        kind,
+                                        reason: "unreadable".into(),
+                                        blocking: false,
+                                    });
+                                    continue;
+                                }
+                            };
+                            if total + bytes.len() > HERMES_ATTACHMENT_TOTAL
+                                || entries.len() >= HERMES_ATTACHMENT_FILES
+                            {
+                                problems.push(AttachmentProblem {
+                                    reference,
+                                    kind,
+                                    reason: "limit".into(),
+                                    blocking: true,
+                                });
+                                continue;
+                            }
+                            let sha256 = bundle::hash(&bytes);
+                            let key =
+                                format!("attachments/{sha256}/{}", hermes_attachment_name(&path));
+                            if !hermes_attachment_path(&key) {
+                                problems.push(AttachmentProblem {
+                                    reference,
+                                    kind,
+                                    reason: "unsupported".into(),
+                                    blocking: false,
+                                });
+                                continue;
+                            }
+                            if seen_keys.insert(key.clone()) {
+                                total += bytes.len();
+                                files.insert(key.clone(), STANDARD.encode(&bytes));
+                            }
+                            entries.push(AttachmentEntry {
+                                reference,
+                                kind,
+                                target,
+                                source_path,
+                                sha256,
+                                key,
+                                bytes: bytes.len() as u64,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(AttachmentCapture {
+        files,
+        entries,
+        problems,
+    })
+}
+// ── Inert async-delegation sidecar ─────────────────────────────────────────
+// `delegate_task(background=true)` records each async job in `async_delegations`
+// (`tools/async_delegation.py`). A finished job's task/result is durable user
+// knowledge; an *in-flight* job is a running process that must never be claimed
+// "transferred". The canonical store rebuild already leaves the live table empty,
+// so a received snapshot can never re-lease or replay a job (Hermes replays
+// pending rows on restart). Finished jobs therefore travel as an inert,
+// read-only sidecar materialized into the isolated home but never imported into
+// any table; in-flight jobs are reported as an explicit blocker.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AsyncDelegationRecord {
+    delegation_id: String,
+    origin_session: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    origin_session_id: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    origin_ui_session_id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    parent_session_id: Option<String>,
+    state: String,
+    delivery_state: String,
+    dispatched_at: f64,
+    updated_at: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    completed_at: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    delivered_at: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    task: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    result: Option<serde_json::Value>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AsyncDelegationIndex {
+    version: u32,
+    agent: String,
+    root: String,
+    /// Always `true`: this sidecar is data only and is never imported into the
+    /// live `async_delegations` table (no lease, no replay).
+    inert: bool,
+    records: Vec<AsyncDelegationRecord>,
+    blockers: Vec<String>,
+}
+
+fn hermes_suspected_secret(text: &str) -> bool {
+    [
+        "-----BEGIN PRIVATE KEY",
+        "-----BEGIN RSA PRIVATE KEY",
+        "-----BEGIN OPENSSH PRIVATE KEY",
+        "sk-proj-",
+        "sk-ant-",
+        "ghp_",
+        "github_pat_",
+        "xoxb-",
+        "AIza",
+        "AKIA",
+        "Bearer ",
+    ]
+    .iter()
+    .any(|pattern| text.contains(pattern))
+}
+
+/// A bounded, secret-free JSON field. An oversize or secret-bearing value is
+/// dropped rather than shipped.
+fn hermes_async_json(text: Option<String>) -> Option<serde_json::Value> {
+    let text = text?;
+    if text.is_empty() || text.len() > HERMES_ASYNC_FIELD_MAX || hermes_suspected_secret(&text) {
+        return None;
+    }
+    serde_json::from_str(&text).ok()
+}
+
+fn hermes_table_exists(conn: &rusqlite::Connection, table: &str) -> Result<bool> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT count(*) FROM sqlite_master WHERE type='table' AND name = ?1",
+            [table],
+            |r| r.get(0),
+        )
+        .map_err(|_| "session_invalid")?;
+    Ok(count == 1)
+}
+
+/// The inert async-delegation sidecar for an exported graph, plus the blocker
+/// codes it contributes. Absent when the store has no related delegation rows.
+fn hermes_capture_async_delegations(
+    image: &rusqlite::Connection,
+    root_session: &str,
+) -> Result<(BTreeMap<String, String>, Vec<String>)> {
+    let empty = BTreeMap::new();
+    if !hermes_table_exists(image, "async_delegations")? {
+        return Ok((empty, Vec::new()));
+    }
+    let (graph, _) = hermes_graph_sessions(image, root_session)?;
+    if graph.is_empty() {
+        return Ok((empty, Vec::new()));
+    }
+    let ids = graph
+        .iter()
+        .map(|id| rusqlite::types::Value::Text(id.clone()))
+        .collect::<Vec<_>>();
+    let placeholders = sql_placeholders(graph.len());
+    let mut stmt = image
+        .prepare(&format!(
+            "SELECT delegation_id, origin_session, origin_session_id, origin_ui_session_id, \
+                    parent_session_id, state, delivery_state, dispatched_at, updated_at, \
+                    completed_at, delivered_at, task_json, result_json \
+             FROM async_delegations \
+             WHERE origin_session IN ({placeholders}) \
+                OR origin_session_id IN ({placeholders}) \
+                OR parent_session_id IN ({placeholders}) \
+             ORDER BY delegation_id"
+        ))
+        .map_err(|_| "session_invalid")?;
+    // The numbered placeholders `?1..?n` are reused across the three IN clauses,
+    // so each id is bound exactly once.
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(ids.iter()), |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+                r.get::<_, String>(3)?,
+                r.get::<_, Option<String>>(4)?,
+                r.get::<_, String>(5)?,
+                r.get::<_, String>(6)?,
+                r.get::<_, f64>(7)?,
+                r.get::<_, f64>(8)?,
+                r.get::<_, Option<f64>>(9)?,
+                r.get::<_, Option<f64>>(10)?,
+                r.get::<_, Option<String>>(11)?,
+                r.get::<_, Option<String>>(12)?,
+            ))
+        })
+        .map_err(|_| "session_invalid")?;
+    let mut records: Vec<AsyncDelegationRecord> = Vec::new();
+    let mut blockers: Vec<String> = Vec::new();
+    let mut incomplete = false;
+    let mut limited = false;
+    for row in rows {
+        let (
+            delegation_id,
+            origin_session,
+            origin_session_id,
+            origin_ui_session_id,
+            parent_session_id,
+            state,
+            delivery_state,
+            dispatched_at,
+            updated_at,
+            completed_at,
+            delivered_at,
+            task_json,
+            result_json,
+        ) = row.map_err(|_| "session_invalid")?;
+        // An in-flight job is a running process, never a transferred outcome.
+        if matches!(state.as_str(), "running" | "finalizing") {
+            incomplete = true;
+            continue;
+        }
+        if records.len() >= HERMES_ASYNC_RECORDS {
+            limited = true;
+            break;
+        }
+        records.push(AsyncDelegationRecord {
+            delegation_id,
+            origin_session,
+            origin_session_id,
+            origin_ui_session_id,
+            parent_session_id,
+            state,
+            delivery_state,
+            dispatched_at,
+            updated_at,
+            completed_at,
+            delivered_at,
+            task: hermes_async_json(task_json),
+            result: hermes_async_json(result_json),
+        });
+    }
+    if incomplete {
+        blockers.push("hermes_async_delegation_incomplete".into());
+    }
+    if limited {
+        blockers.push("hermes_async_delegation_limit".into());
+    }
+    if records.is_empty() && blockers.is_empty() {
+        return Ok((empty, Vec::new()));
+    }
+    blockers.sort();
+    blockers.dedup();
+    let index = AsyncDelegationIndex {
+        version: 1,
+        agent: "hermes".into(),
+        root: root_session.into(),
+        inert: true,
+        records,
+        blockers: blockers.clone(),
+    };
+    let json = serde_json::to_vec(&index).map_err(|_| "session_invalid")?;
+    if json.len() > HERMES_ASYNC_MAX {
+        return Err("session_limit".into());
+    }
+    let mut files = BTreeMap::new();
+    files.insert(HERMES_ASYNC_INDEX.into(), STANDARD.encode(&json));
+    hermes_validate_async_delegations(&files)?;
+    Ok((files, blockers))
+}
+
+fn hermes_validate_async_delegations(files: &BTreeMap<String, String>) -> Result<()> {
+    let Some(encoded) = files.get(HERMES_ASYNC_INDEX) else {
+        return Ok(());
+    };
+    let bytes = STANDARD.decode(encoded).map_err(|_| "session_invalid")?;
+    if bytes.len() > HERMES_ASYNC_MAX {
+        return Err("session_limit".into());
+    }
+    let index: AsyncDelegationIndex =
+        serde_json::from_slice(&bytes).map_err(|_| "session_invalid")?;
+    if index.version != 1
+        || index.agent != "hermes"
+        || !index.inert
+        || !bundle::token(&index.root)
+        || index.records.len() > HERMES_ASYNC_RECORDS
+        || index.blockers.len() > 64
+    {
+        return Err("session_invalid".into());
+    }
+    for record in &index.records {
+        if !bundle::token(&record.delegation_id) || !bundle::token(&record.origin_session) {
+            return Err("session_invalid".into());
+        }
+        // Only finished outcomes travel; a running job can never be claimed.
+        if matches!(record.state.as_str(), "running" | "finalizing") {
+            return Err("session_invalid".into());
+        }
+        for value in [&record.task, &record.result].into_iter().flatten() {
+            if hermes_suspected_secret(&value.to_string()) {
+                return Err("session_secret".into());
+            }
+        }
+    }
+    for blocker in &index.blockers {
+        if blocker.is_empty() || blocker.len() > 64 {
+            return Err("session_invalid".into());
+        }
+    }
+    Ok(())
+}
+
+/// An already-restored inert sidecar living in the home (`bastet/…`), re-read so
+/// a re-capture of a managed home preserves outcomes without reactivating any
+/// runtime row. An absent, oversize or invalid file contributes nothing.
+fn hermes_home_async(home: &Path) -> Result<BTreeMap<String, String>> {
+    let path = home.join(HERMES_ASYNC_INDEX);
+    let Ok(bytes) = storage::read(&path, HERMES_ASYNC_MAX as u64) else {
+        return Ok(BTreeMap::new());
+    };
+    let mut files = BTreeMap::new();
+    files.insert(HERMES_ASYNC_INDEX.to_string(), STANDARD.encode(&bytes));
+    if hermes_validate_async_delegations(&files).is_err() {
+        return Ok(BTreeMap::new());
+    }
+    Ok(files)
+}
+
+fn hermes_validate_attachments(files: &BTreeMap<String, String>) -> Result<()> {
+    let mut total = 0usize;
+    let mut blobs = 0usize;
+    let mut listed: BTreeSet<String> = BTreeSet::new();
+    for (path, encoded) in files {
+        if !hermes_attachment_path(path) {
+            continue;
+        }
+        let bytes = STANDARD.decode(encoded).map_err(|_| "session_invalid")?;
+        if path == HERMES_ATTACHMENT_INDEX {
+            let index: AttachmentIndex =
+                serde_json::from_slice(&bytes).map_err(|_| "session_invalid")?;
+            if index.version != 1
+                || index.agent != "hermes"
+                || !bundle::token(&index.root)
+                || index.entries.len() > HERMES_ATTACHMENT_FILES
+                || index.problems.len() > HERMES_ATTACHMENT_FILES
+            {
+                return Err("session_invalid".into());
+            }
+            for entry in &index.entries {
+                if !bundle::is_hash(&entry.sha256) || !hermes_attachment_path(&entry.key) {
+                    return Err("session_invalid".into());
+                }
+                listed.insert(entry.key.clone());
+            }
+            continue;
+        }
+        let sha = path.split('/').nth(1).ok_or("session_invalid")?;
+        if bundle::hash(&bytes) != sha {
+            return Err("session_invalid".into());
+        }
+        total += bytes.len();
+        blobs += 1;
+        if total > HERMES_ATTACHMENT_TOTAL || blobs > HERMES_ATTACHMENT_FILES {
+            return Err("session_limit".into());
+        }
+    }
+    // Every indexed attachment must ship its blob.
+    for key in &listed {
+        if !files.contains_key(key) {
+            return Err("session_invalid".into());
+        }
+    }
+    Ok(())
+}
+fn hermes_validate_workspace_files(files: &BTreeMap<String, String>) -> Result<()> {
+    // Each companion namespace has its own validator; the workspace validator
+    // must never judge project/memory entries (it would reject them). Validate
+    // every namespace over exactly its own entries.
+    let subset = files
+        .iter()
+        .filter(|(path, _)| {
+            !hermes_attachment_path(path)
+                && !crate::hermes_project::allowed(path)
+                && !crate::hermes_memory::allowed(path)
+                && path.as_str() != HERMES_ASYNC_INDEX
+        })
+        .map(|(path, encoded)| (path.clone(), encoded.clone()))
+        .collect::<BTreeMap<_, _>>();
+    crate::hermes_workspace::validate(&subset)?;
+    let project = project_subset(files);
+    if !project.is_empty() {
+        crate::hermes_project::validate(&project)?;
+    }
+    let memory = memory_subset(files);
+    if !memory.is_empty() {
+        crate::hermes_memory::validate(&memory)?;
+    }
+    hermes_validate_async_delegations(files)?;
+    Ok(())
+}
+// Once the restore destination is known, rewrite references that point at a
+// captured attachment so they resolve inside the restored home's `attachments/`
+// directory. Absolute references covered by a project mapping were already
+// remapped by `transform_hermes_manifest`; relative references follow the mapped
+// cwd. Matching is by the exact recorded target and by the resolved source path.
+pub(crate) fn finalize_hermes_attachments(
+    manifest: &Manifest,
+    destination: &Path,
+) -> Result<Manifest> {
+    if manifest.agent != "hermes" {
+        return Ok(manifest.clone());
+    }
+    let Some(index_b64) = manifest.files.get(HERMES_ATTACHMENT_INDEX) else {
+        return Ok(manifest.clone());
+    };
+    let index: AttachmentIndex =
+        serde_json::from_slice(&STANDARD.decode(index_b64).map_err(|_| "session_invalid")?)
+            .map_err(|_| "session_invalid")?;
+    let mut mapping: BTreeMap<String, String> = BTreeMap::new();
+    for entry in &index.entries {
+        let restored = destination.join(&entry.key).to_string_lossy().into_owned();
+        mapping.insert(entry.target.clone(), restored.clone());
+        mapping.insert(entry.source_path.clone(), restored);
+    }
+    if mapping.is_empty() {
+        return Ok(manifest.clone());
+    }
+    let bytes = STANDARD
+        .decode(manifest.files.get("state.db").ok_or("session_invalid")?)
+        .map_err(|_| "session_invalid")?;
+    let dir = tempfile::tempdir().map_err(|_| "store_unavailable")?;
+    let rewritten = hermes_rewrite_references(&bytes, dir.path(), |_, target| {
+        if let Some(restored) = mapping.get(target) {
+            return Ok(Some(restored.clone()));
+        }
+        if hermes_is_absolute_target(target) {
+            if let Ok(canonical) = fs::canonicalize(target) {
+                if let Some(restored) = mapping.get(&canonical.to_string_lossy().into_owned()) {
+                    return Ok(Some(restored.clone()));
+                }
+            }
+        }
+        Ok(None)
+    })?;
+    let mut files = manifest.files.clone();
+    files.insert("state.db".into(), STANDARD.encode(rewritten));
+    Ok(Manifest {
+        files,
+        ..manifest.clone()
+    })
+}
+// Root session id → managed profile path, read-only, so the UI can resolve a
+// restored conversation without mutating any store.
+#[allow(dead_code)] // integration seam used by the UI/worker after this module lands
+pub(crate) fn managed_profile_for_session(root: &Path, session: &str) -> Result<Option<String>> {
+    if !bundle::token(session) {
+        return Err("session_invalid".into());
+    }
+    let registry = load_handoffs(root)?;
+    Ok(registry
+        .entries
+        .iter()
+        .find(|h| h.agent == "hermes" && h.session == session)
+        .map(|h| h.path.to_string_lossy().into_owned()))
+}
+
+// ── Project working-tree continuity ────────────────────────────────────────
+// The native conversation snapshot also carries the *selected* project working
+// tree as an inert base64 namespace (`bastet/project-*`, owned by
+// `hermes_project`). It is captured only for a user-authorized project root —
+// never by crawling an arbitrary persisted `cwd` — and restored into a NEW
+// isolated directory, never into the receiver's mapped worktree. Readiness
+// blockers recorded by `hermes_project` persist into source/received issues: a
+// copied sidecar is never reported ready merely because its bytes arrived.
+
+/// Machine-readable project-continuity readiness for a Hermes snapshot.
+enum ProjectReadiness {
+    /// The snapshot carries no project working tree at all.
+    Absent,
+    /// The project working tree fully reconstructs the captured work.
+    Ready,
+    /// Blocking codes that must persist into source/received issues.
+    Blocked(Vec<String>),
+}
+
+/// The project namespace of a combined Hermes file map.
+fn project_subset(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    files
+        .iter()
+        .filter(|(path, _)| crate::hermes_project::allowed(path))
+        .map(|(path, encoded)| (path.clone(), encoded.clone()))
+        .collect()
+}
+
+/// Blocker codes from a project manifest. A sidecar that arrived but is not
+/// `ready` (missing files, a selected subset, a captured limit, an authorization
+/// gate) must be reported, never accepted because it was copied.
+fn project_blockers(manifest: &crate::hermes_project::ProjectManifest) -> Vec<String> {
+    let mut blockers = manifest.blockers.clone();
+    if manifest.baseline_required && blockers.is_empty() {
+        blockers.push("project_baseline_required".into());
+    }
+    blockers.sort();
+    blockers.dedup();
+    blockers
+}
+
+/// Readiness of the project namespace in a combined Hermes file map.
+fn project_readiness(files: &BTreeMap<String, String>) -> Result<ProjectReadiness> {
+    let subset = project_subset(files);
+    if subset.is_empty() {
+        return Ok(ProjectReadiness::Absent);
+    }
+    let manifest = crate::hermes_project::read_manifest(&subset)?;
+    if crate::hermes_project::ready(&manifest) {
+        Ok(ProjectReadiness::Ready)
+    } else {
+        Ok(ProjectReadiness::Blocked(project_blockers(&manifest)))
+    }
+}
+
+/// The blocker codes the project namespace contributes to an issue report.
+fn project_issue_codes(project: &BTreeMap<String, String>) -> Result<Vec<String>> {
+    match project_readiness(project)? {
+        ProjectReadiness::Blocked(codes) => Ok(codes),
+        _ => Ok(Vec::new()),
+    }
+}
+
+/// A project namespace carrying only a blocker and no captured files. Used for a
+/// session that references a working directory the user has not authorized, so
+/// the snapshot's readiness blocks and asks for a mapping instead of silently
+/// exporting — or omitting — a project tree.
+fn blocked_project_sidecar(cwd: &str, code: &str) -> Result<BTreeMap<String, String>> {
+    let project: String = cwd
+        .trim_end_matches(['/', '\\'])
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|name| !name.is_empty())
+        .unwrap_or("project")
+        .chars()
+        .filter(|c| !c.is_control())
+        .take(128)
+        .collect();
+    let manifest = crate::hermes_project::ProjectManifest {
+        version: 1,
+        kind: "files".into(),
+        project,
+        repo: None,
+        baseline_required: true,
+        files: Vec::new(),
+        excluded: Vec::new(),
+        blockers: vec![code.to_string()],
+    };
+    let json = serde_json::to_vec(&manifest).map_err(|_| "project_invalid")?;
+    Ok(BTreeMap::from([(
+        crate::hermes_project::MANIFEST_PATH.to_string(),
+        STANDARD.encode(json),
+    )]))
+}
+
+/// The user-authorized project root for a session cwd, if any. Authorization is
+/// explicit: the cwd must be an existing plain directory covered by one of the
+/// user's project mappings (a whole-component ancestor). An arbitrary persisted
+/// cwd is never a grant and is never read.
+fn authorized_project_root(
+    cwd: &str,
+    mappings: &[crate::project_mapping::Mapping],
+) -> Option<PathBuf> {
+    if cwd.is_empty() || mappings.is_empty() {
+        return None;
+    }
+    crate::project_mapping::remap_path(cwd, mappings)
+        .ok()
+        .flatten()?;
+    let meta = fs::symlink_metadata(cwd).ok()?;
+    (meta.is_dir() && !meta.file_type().is_symlink()).then(|| PathBuf::from(cwd))
+}
+
+/// A recorded session cwd is an attachment read root only when it is covered by
+/// an explicit, user-authorized project root (a mapping target). An arbitrary
+/// persisted cwd is never a grant: relative references cannot resolve and every
+/// reference is reported `outside_roots`, exactly like project capture.
+fn authorized_attachment_root(cwd: &str, roots: &[PathBuf]) -> Option<PathBuf> {
+    if cwd.is_empty() || roots.is_empty() {
+        return None;
+    }
+    let canonical = fs::canonicalize(cwd).ok()?;
+    if !canonical.is_dir() {
+        return None;
+    }
+    roots
+        .iter()
+        .any(|root| hermes_under(&canonical, root))
+        .then_some(canonical)
+}
+
+/// Capture one project working tree (or its blocker sidecar), converting a
+/// bounded `hermes_project` refusal into an explicit blocker rather than
+/// aborting the whole conversation snapshot.
+fn capture_authorized_project(root: &Path, cwd: &str) -> BTreeMap<String, String> {
+    match crate::hermes_project::capture(root) {
+        Ok(files) => files,
+        Err(code) => blocked_project_sidecar(cwd, &code).unwrap_or_default(),
+    }
+}
+
+/// Capture the project namespace for a session cwd. An unauthorized (or empty)
+/// cwd is never read: it yields a blocker sidecar or nothing.
+fn capture_project(
+    cwd: &str,
+    mappings: &[crate::project_mapping::Mapping],
+) -> Result<BTreeMap<String, String>> {
+    if cwd.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    match authorized_project_root(cwd, mappings) {
+        Some(root) => Ok(capture_authorized_project(&root, cwd)),
+        None => blocked_project_sidecar(cwd, "project_mapping_required"),
+    }
+}
+
+/// Outcome of materializing a captured project working tree on receive.
+struct ProjectRestore {
+    /// The NEW isolated working directory, when the project had files to place.
+    workdir: Option<PathBuf>,
+    /// Readiness blockers to persist into received issues.
+    blockers: Vec<String>,
+}
+
+/// Restore a received Hermes snapshot's captured project working tree into a NEW
+/// isolated directory (`project_destination`) and re-root the session cwd and
+/// every project-rooted reference to that directory. The project entries are
+/// removed from the managed HOME manifest, so the receiver's mapped worktree is
+/// never written. A blocking sidecar (no files) is recorded, not materialized.
+fn restore_hermes_project(
+    manifest: &Manifest,
+    project_destination: &Path,
+) -> Result<(Manifest, Option<ProjectRestore>)> {
+    if manifest.agent != "hermes" {
+        return Ok((manifest.clone(), None));
+    }
+    let subset = project_subset(&manifest.files);
+    if subset.is_empty() {
+        return Ok((manifest.clone(), None));
+    }
+    let project = crate::hermes_project::read_manifest(&subset)?;
+    let blockers = project_blockers(&project);
+    let mut files = manifest.files.clone();
+    for path in subset.keys() {
+        files.remove(path);
+    }
+    let adjusted = Manifest {
+        files,
+        ..manifest.clone()
+    };
+    // An authorization gate, an explicit empty selection, or a session with no
+    // usable cwd carries no placeable tree: record readiness, materialize none.
+    if project.files.is_empty() || adjusted.cwd.is_empty() {
+        return Ok((
+            adjusted,
+            Some(ProjectRestore {
+                workdir: None,
+                blockers,
+            }),
+        ));
+    }
+    if !project_destination.exists() {
+        if let Some(parent) = project_destination.parent() {
+            storage::directory(parent)?;
+        }
+        crate::hermes_project::restore_to_new_directory(&subset, project_destination)?;
+    }
+    // Re-root to the canonical path so the recorded cwd, the DB value and the
+    // reported workdir agree on every platform (macOS `/var` is a symlink).
+    let workdir = fs::canonicalize(project_destination).map_err(|_| "store_unavailable")?;
+    let target = workdir.to_string_lossy().into_owned();
+    let rerooted = crate::project_mapping::transform_manifest(
+        &adjusted,
+        &[crate::project_mapping::Mapping {
+            source: adjusted.cwd.clone(),
+            target,
+        }],
+    )?;
+    Ok((
+        rerooted,
+        Some(ProjectRestore {
+            workdir: Some(workdir),
+            blockers,
+        }),
+    ))
+}
+
+/// The memory namespace of a combined Hermes file map.
+fn memory_subset(files: &BTreeMap<String, String>) -> BTreeMap<String, String> {
+    files
+        .iter()
+        .filter(|(path, _)| crate::hermes_memory::allowed(path))
+        .map(|(path, encoded)| (path.clone(), encoded.clone()))
+        .collect()
+}
+
+/// Memory-continuation readiness from a Hermes manifest's file map.
+enum MemoryStatus {
+    Ready,
+    Blocked(Vec<String>),
+    Absent,
+}
+fn memory_readiness(files: &BTreeMap<String, String>) -> MemoryStatus {
+    let subset = memory_subset(files);
+    if subset.is_empty() {
+        return MemoryStatus::Absent;
+    }
+    match crate::hermes_memory::read_manifest(&subset) {
+        Ok(manifest) => {
+            if !manifest.blockers.is_empty() {
+                MemoryStatus::Blocked(manifest.blockers)
+            } else if manifest.provider == "builtin" {
+                // Built-in file memory travels with the workspace payload;
+                // there is nothing external to import.
+                MemoryStatus::Ready
+            } else if manifest.provider == "agent-memory-os" {
+                if manifest.exported {
+                    MemoryStatus::Ready
+                } else {
+                    MemoryStatus::Blocked(vec!["memory_export_missing".into()])
+                }
+            } else if manifest.provider.is_empty() {
+                MemoryStatus::Blocked(vec!["memory_provider_unresolved".into()])
+            } else {
+                MemoryStatus::Blocked(vec!["memory_provider_unknown".into()])
+            }
+        }
+        Err(_) => MemoryStatus::Blocked(vec!["memory_invalid".into()]),
+    }
+}
+
+/// Aggregated continuation readiness the UI gates copy/resume on. A copied
+/// packet is never `ready`: workspace blocking deps/issues, attachment problems,
+/// project readiness and the memory binding each contribute blockers/warnings,
+/// and a missing recipient binding keeps the state `blocked`/`unverified`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Continuation {
+    /// `"blocked"`, `"unverified"` or `"ready"`.
+    state: String,
+    blockers: Vec<String>,
+    warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    project_path: Option<String>,
+    verified: Vec<String>,
+}
+
+fn continuation_for(manifest: &Manifest, project_path: Option<String>) -> Continuation {
+    let mut blockers: Vec<String> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
+    let mut verified: Vec<String> = Vec::new();
+
+    // External-memory readiness is computed first so a verified binding can
+    // resolve the workspace's own memory dependency instead of blocking forever.
+    let memory = memory_readiness(&manifest.files);
+
+    // Workspace: blocking dependencies/issues block; the rest warn.
+    match manifest.files.get(crate::hermes_workspace::MANIFEST) {
+        Some(encoded) => match STANDARD
+            .decode(encoded)
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+        {
+            Some(text) => {
+                if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                    for issue in value["issues"].as_array().into_iter().flatten() {
+                        let code =
+                            format!("workspace_{}", issue["reason"].as_str().unwrap_or("issue"));
+                        if issue["blocking"].as_bool().unwrap_or(false) {
+                            blockers.push(code);
+                        } else {
+                            warnings.push(code);
+                        }
+                    }
+                }
+                // Dependencies are re-scored for the RECEIVING host: an `os`
+                // requirement is judged where the restored home will actually run,
+                // never from the sender's serialized verdict. New kinds
+                // (`credential`, `app`, ...) yield `workspace_dependency_<kind>`.
+                match crate::hermes_workspace::receive_dependencies_here(&text) {
+                    Ok(deps) => {
+                        for dep in deps {
+                            // A verified external-memory binding resolves the
+                            // workspace memory dependency; it must not stay blocked
+                            // after local setup.
+                            if dep.kind == "memory" && matches!(memory, MemoryStatus::Ready) {
+                                verified.push("external_memory_bound".into());
+                                continue;
+                            }
+                            let code = format!("workspace_dependency_{}", dep.kind);
+                            if dep.blocking {
+                                blockers.push(code);
+                            } else {
+                                warnings.push(code);
+                            }
+                        }
+                        verified.push("workspace".into());
+                    }
+                    Err(_) => blockers.push("workspace_invalid".into()),
+                }
+            }
+            None => blockers.push("workspace_invalid".into()),
+        },
+        None => blockers.push("workspace_missing".into()),
+    }
+
+    // Attachments: blocking problems block; the rest warn.
+    if let Some(encoded) = manifest.files.get("attachments/index.json") {
+        if let Some(value) = STANDARD
+            .decode(encoded)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        {
+            for problem in value["problems"].as_array().into_iter().flatten() {
+                let code = format!(
+                    "attachment_{}",
+                    problem["reason"].as_str().unwrap_or("problem")
+                );
+                if problem["blocking"].as_bool().unwrap_or(false) {
+                    blockers.push(code);
+                } else {
+                    warnings.push(code);
+                }
+            }
+            verified.push("attachments".into());
+        }
+    }
+
+    // Project continuity + the restored (new, isolated) working directory.
+    match project_readiness(&manifest.files) {
+        Ok(ProjectReadiness::Ready) => verified.push("project".into()),
+        Ok(ProjectReadiness::Absent) => warnings.push("project_absent".into()),
+        Ok(ProjectReadiness::Blocked(codes)) => blockers.extend(codes),
+        Err(_) => blockers.push("project_invalid".into()),
+    }
+
+    // External memory: a missing or unresolved binding is never ready.
+    match memory {
+        MemoryStatus::Ready => verified.push("memory".into()),
+        MemoryStatus::Blocked(codes) => blockers.extend(codes),
+        MemoryStatus::Absent => blockers.push("memory_unverified".into()),
+    }
+
+    blockers.sort();
+    blockers.dedup();
+    warnings.sort();
+    warnings.dedup();
+    verified.sort();
+    verified.dedup();
+    let state = if !blockers.is_empty() {
+        "blocked"
+    } else if !warnings.is_empty() {
+        "unverified"
+    } else {
+        "ready"
+    };
+    Continuation {
+        state: state.into(),
+        blockers,
+        warnings,
+        project_path,
+        verified,
+    }
+}
+
+/// Overwrite a continuation's memory verdict with a restored managed home's real
+/// readiness: a verified binding clears the capture-side memory blockers and adds
+/// the verified facts; otherwise the readiness blockers are surfaced verbatim.
+fn apply_memory_readiness(
+    continuation: &mut Continuation,
+    readiness: &crate::hermes_memory::MemoryReadiness,
+) {
+    continuation
+        .blockers
+        .retain(|code| !code.starts_with("memory_"));
+    continuation
+        .verified
+        .retain(|fact| fact != "memory" && fact != "external_memory_bound");
+    if readiness.ready {
+        continuation.verified.push("memory".into());
+        continuation.verified.push("external_memory_bound".into());
+    } else if readiness.blockers.is_empty() {
+        continuation.blockers.push("memory_unverified".into());
+    } else {
+        continuation
+            .blockers
+            .extend(readiness.blockers.iter().cloned());
+    }
+    continuation.blockers.sort();
+    continuation.blockers.dedup();
+    continuation.verified.sort();
+    continuation.verified.dedup();
+    continuation.state = if !continuation.blockers.is_empty() {
+        "blocked"
+    } else if !continuation.warnings.is_empty() {
+        "unverified"
+    } else {
+        "ready"
+    }
+    .into();
+}
+
+/// App-config root plus settings, threaded so a cycle can capture — and a
+/// receive can restore — the external-memory continuation with the user's
+/// configured AgentMemoryOS CLI and explicit authorization.
+#[derive(Clone, Copy)]
+pub struct MemoryContext<'a> {
+    pub app_root: &'a Path,
+    pub settings: &'a crate::model::Settings,
+}
+
+/// Capture the external-memory continuation for one authorized selected home,
+/// exactly once per cycle. [`crate::hermes_memory::capture_with_context`] fails
+/// closed: an unresolved or unauthorized provider yields a manifest carrying a
+/// blocker and no export — never a silent private dump.
+fn capture_memory_for_cycle(
+    home: &Path,
+    memory: Option<MemoryContext>,
+) -> Result<(BTreeMap<String, String>, Vec<String>)> {
+    let Some(ctx) = memory else {
+        return Ok((BTreeMap::new(), Vec::new()));
+    };
+    match crate::hermes_memory::capture_with_context(ctx.app_root, home, ctx.settings) {
+        Ok(files) => {
+            let manifest = crate::hermes_memory::read_manifest(&files)?;
+            Ok((files, manifest.blockers))
+        }
+        Err(code) => Ok((BTreeMap::new(), vec![code])),
+    }
+}
+
+/// Restore the received external-memory continuation into the isolated managed
+/// home and report the *real* readiness (verified by re-export, never a
+/// synthetic ready). Absent memory, or a home with no provider binding, yields
+/// `None`.
+fn hermes_restore_memory(
+    memory: Option<MemoryContext>,
+    files: &BTreeMap<String, String>,
+    managed_home: &Path,
+) -> Result<Option<crate::hermes_memory::MemoryReadiness>> {
+    let Some(ctx) = memory else {
+        return Ok(None);
+    };
+    let subset = memory_subset(files);
+    if subset.is_empty() {
+        return Ok(None);
+    }
+    let provider = crate::hermes_memory::read_manifest(&subset)
+        .map(|manifest| manifest.provider)
+        .unwrap_or_default();
+    match crate::hermes_memory::restore_with_context(
+        ctx.app_root,
+        &subset,
+        managed_home,
+        ctx.settings,
+    ) {
+        Ok(readiness) => Ok(Some(readiness)),
+        // A restore that cannot run (store unavailable, invalid payload) is a
+        // real, reported blocker — never a fabricated ready.
+        Err(code) => Ok(Some(crate::hermes_memory::MemoryReadiness {
+            provider,
+            ready: false,
+            exported: true,
+            imported: false,
+            records: 0,
+            agent_id: None,
+            store: None,
+            contains_authority_changes: false,
+            blockers: vec![code],
+        })),
+    }
+}
+
+/// The JSON text of the received workspace manifest, if the snapshot carries one.
+fn workspace_manifest_text(files: &BTreeMap<String, String>) -> Option<String> {
+    files
+        .get(crate::hermes_workspace::MANIFEST)
+        .and_then(|encoded| STANDARD.decode(encoded).ok())
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+}
+
+/// Resolve the received workspace requirements against the *receiving* host via
+/// the shared receiver-side resolver, and replace the coarse dependency codes in
+/// a continuation report with its verdict: `env`/`runtime`/`os` are probed
+/// locally (never executed), while opaque requirements (MCP/model/app/
+/// credential) stay blocking until the recipient explicitly acknowledges them
+/// for this exact manifest — and even then they are warnings, never verified.
+/// The external-memory dependency stays governed by the memory binding, so its
+/// codes are left to `continuation_for`/`apply_memory_readiness`.
+fn apply_requirements_evidence(
+    continuation: &mut Continuation,
+    files: &BTreeMap<String, String>,
+    home: &Path,
+) {
+    let Some(text) = workspace_manifest_text(files) else {
+        return;
+    };
+    let Ok(evidence) = crate::hermes_workspace::hermes_requirements::receive_for_home(&text, home)
+    else {
+        return;
+    };
+    let memory_code = |code: &str| code.starts_with("workspace_dependency_memory");
+    let dependency = |code: &String| code.starts_with("workspace_dependency_");
+    continuation
+        .blockers
+        .retain(|code| !(dependency(code) && !memory_code(code)));
+    continuation
+        .warnings
+        .retain(|code| !(dependency(code) && !memory_code(code)));
+    continuation
+        .verified
+        .retain(|code| !(dependency(code) && !memory_code(code)));
+    for code in evidence.blockers {
+        if !memory_code(&code) {
+            continuation.blockers.push(code);
+        }
+    }
+    for code in evidence.warnings {
+        if !memory_code(&code) {
+            continuation.warnings.push(code);
+        }
+    }
+    for code in evidence.verified {
+        if !memory_code(&code) {
+            continuation.verified.push(code);
+        }
+    }
+    continuation.blockers.sort();
+    continuation.blockers.dedup();
+    continuation.warnings.sort();
+    continuation.warnings.dedup();
+    continuation.verified.sort();
+    continuation.verified.dedup();
+    continuation.state = if !continuation.blockers.is_empty() {
+        "blocked"
+    } else if !continuation.warnings.is_empty() {
+        "unverified"
+    } else {
+        "ready"
+    }
+    .into();
+}
+
+/// Resolve a registered managed home from the app's own registry by the
+/// received version id (`base`) and agent. The caller can never supply a path:
+/// an unregistered id is refused, and a registered path that is a symlink or no
+/// longer a directory is refused rather than followed.
+fn resolve_registered_home(registry: &Handoffs, agent: &str, id: &str) -> Result<(PathBuf, usize)> {
+    if !bundle::is_hash(id) {
+        return Err("session_invalid".into());
+    }
+    let index = registry
+        .entries
+        .iter()
+        .position(|h| h.agent == agent && h.base == id)
+        .ok_or("session_invalid")?;
+    let managed = registry.entries[index].path.clone();
+    let metadata = fs::symlink_metadata(&managed).map_err(|_| "session_invalid")?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err("unsafe_store".into());
+    }
+    Ok((managed, index))
+}
+
+/// Outcome of an explicit continuation recheck (and optional provider setup or
+/// requirement acknowledgment), returned to the UI so it can refresh the report.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecheckResult {
+    /// The authoritative, freshly recomputed continuation report.
+    continuation: Continuation,
+    /// The real external-memory readiness after the recheck, when the snapshot
+    /// carries external memory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    memory: Option<crate::hermes_memory::MemoryReadiness>,
+    /// Opaque requirement codes acknowledged by this call (empty otherwise).
+    acknowledged: Vec<String>,
+    /// Whether the isolated managed home now carries a discoverable provider
+    /// plugin (read back from disk, never inferred from a CLI exit status).
+    provider_installed: bool,
+}
+
+/// Re-run a received Hermes version's continuation readiness against its
+/// *already registered* isolated managed home. The target is resolved from the
+/// registry by version id — never a caller-supplied path — and only that home is
+/// touched; no new managed profile is ever created. The explicit user actions
+/// this backs are: install the trusted local provider (`agent-memory hermes
+/// install --hermes-home <EXACT HOME>`, nothing else) into that home, re-run the
+/// official memory import/verify, and/or record a hash-bound acknowledgment of
+/// the opaque workspace requirements. Every result is persisted on the registry
+/// entry and re-derived from the received snapshot, so the backend report stays
+/// authoritative and a version is never marked ready while a binding is
+/// unverified.
+#[allow(clippy::too_many_arguments)]
+fn recheck_continuation_with(
+    sessions_root: &Path,
+    app_root: &Path,
+    space: &str,
+    settings: &crate::model::Settings,
+    agent: &str,
+    id: &str,
+    acknowledge: bool,
+    setup_provider: bool,
+    staging: &Path,
+) -> Result<RecheckResult> {
+    if agent != "hermes" {
+        return Err("session_invalid".into());
+    }
+    let mut registry = load_handoffs(sessions_root)?;
+    let (managed, index) = resolve_registered_home(&registry, agent, id)?;
+    // The registered home must be the isolated profile this app created: an
+    // app-private managed profile, or an explicitly re-granted external folder.
+    handoff_parent_scope(
+        sessions_root.parent().ok_or("store_unavailable")?,
+        managed.parent().ok_or("sandbox_reauthorize")?,
+    )?;
+    // The received snapshot stays the authoritative source of the requirements.
+    let replica = Replica::open(&sessions_root.join("replica"), space)?;
+    let all = replica.transport_bundles()?;
+    let b = all.get(id).ok_or("session_invalid")?;
+    b.validate()?;
+    let incoming = unpack(b, &all)?;
+    if incoming.agent != "hermes"
+        || bundle::hash(incoming.session.as_bytes()) != b.snapshot.stream.conversation
+    {
+        return Err("session_invalid".into());
+    }
+    let project_path = registry.entries[index]
+        .project
+        .as_ref()
+        .map(|path| path.to_string_lossy().into_owned());
+
+    // The provider plugin is proven by reading the shim back from this exact
+    // home; a build without the external channel never runs a CLI.
+    if setup_provider {
+        #[cfg(feature = "mac-app-store")]
+        {
+            let _ = staging;
+            return Err("memory_unavailable_store".into());
+        }
+        #[cfg(not(feature = "mac-app-store"))]
+        {
+            // Only the known external provider may be set up; anything else is
+            // refused rather than handed an arbitrary CLI invocation.
+            let provider = crate::hermes_memory::read_manifest(&memory_subset(&incoming.files))
+                .map(|manifest| manifest.provider)
+                .unwrap_or_default();
+            if provider != "agent-memory-os" {
+                return Err("memory_unavailable_store".into());
+            }
+            let cli = crate::amos_runtime::configured(app_root)?;
+            crate::hermes_memory::install_provider(&cli, &managed, staging)?;
+        }
+    }
+    let provider_installed = crate::hermes_memory::provider_plugin_present(&managed);
+
+    // Re-run the official external-memory import/verify against the SAME home.
+    // An already-changed store is preserved (never overwritten) and reported.
+    let readiness = hermes_restore_memory(
+        Some(MemoryContext { app_root, settings }),
+        &incoming.files,
+        &managed,
+    )?;
+
+    let mut continuation = continuation_for(&incoming, project_path);
+    if let Some(readiness) = readiness.as_ref() {
+        apply_memory_readiness(&mut continuation, readiness);
+    }
+
+    // The recipient may explicitly acknowledge the opaque requirements for this
+    // exact manifest; the shared resolver stores that acknowledgment in the
+    // managed home and is re-run so acknowledged items show as honest warnings
+    // while verifiable misses stay blocking. Nothing here is ever marked
+    // verified, and a changed manifest invalidates the acknowledgment.
+    let mut acknowledged: Vec<String> = Vec::new();
+    if acknowledge {
+        if let Some(text) = workspace_manifest_text(&incoming.files) {
+            let requirements =
+                crate::hermes_workspace::hermes_requirements::receive_for_home(&text, &managed)
+                    .map(|evidence| evidence.requirements)
+                    .unwrap_or_default();
+            for requirement in requirements {
+                if requirement.status == "unverified" {
+                    // A verifiable requirement is refused by the store itself.
+                    let _ = crate::hermes_workspace::hermes_requirements::acknowledge(
+                        &managed,
+                        &text,
+                        &requirement.kind,
+                        &requirement.name,
+                    );
+                }
+            }
+            acknowledged =
+                crate::hermes_workspace::hermes_requirements::receive_for_home(&text, &managed)
+                    .map(|evidence| evidence.warnings)
+                    .unwrap_or_default();
+        }
+    }
+    apply_requirements_evidence(&mut continuation, &incoming.files, &managed);
+
+    registry.entries[index].memory = readiness.clone();
+    save_handoffs(sessions_root, &registry)?;
+    Ok(RecheckResult {
+        continuation,
+        memory: readiness,
+        acknowledged,
+        provider_installed,
+    })
+}
+
+// Assemble the full native manifest for `root_session`: the rebuilt lineage
+// graph as `state.db`, the merged portable workspace and the content-hashed
+// referenced attachments (plus their index and any problems).
+#[allow(clippy::too_many_arguments)]
+fn capture_hermes_manifest(
+    home: &Path,
+    image: &rusqlite::Connection,
+    root_session: &str,
+    cwd: &str,
+    staging: &Path,
+    workspace: &BTreeMap<String, String>,
+    project: Option<&BTreeMap<String, String>>,
+    attachment_roots: &[PathBuf],
+    memory: &BTreeMap<String, String>,
+) -> Result<(Manifest, Vec<String>)> {
+    let (bytes, mut issues) = hermes_canonicalize_with_issues(image, root_session, cwd, staging)?;
+    let mut files = BTreeMap::new();
+    files.insert("state.db".into(), STANDARD.encode(bytes));
+    for (path, encoded) in workspace {
+        if !crate::hermes_workspace::allowed(path) {
+            return Err("workspace_unsafe".into());
+        }
+        files.insert(path.clone(), encoded.clone());
+    }
+    // The project working tree (or its authorization/readiness blocker). Its
+    // blockers join the conversation's issues so a blocked snapshot is never
+    // reported ready merely because the sidecar was captured.
+    if let Some(project) = project {
+        for (path, encoded) in project {
+            if !crate::hermes_project::allowed(path) {
+                return Err("project_invalid".into());
+            }
+            files.insert(path.clone(), encoded.clone());
+        }
+        for code in project_issue_codes(project)? {
+            issues.push(code);
+        }
+    }
+    let attachments =
+        hermes_capture_attachments(home, image, root_session, staging, attachment_roots)?;
+    for problem in &attachments.problems {
+        issues.push(hermes_problem_code(&problem.reason).into());
+    }
+    for (path, encoded) in attachments.files {
+        files.insert(path, encoded);
+    }
+    if !attachments.entries.is_empty() {
+        let index = AttachmentIndex {
+            version: 1,
+            agent: "hermes".into(),
+            root: root_session.into(),
+            entries: attachments.entries,
+            problems: attachments.problems,
+        };
+        let json = serde_json::to_vec(&index).map_err(|_| "session_invalid")?;
+        files.insert(HERMES_ATTACHMENT_INDEX.into(), STANDARD.encode(json));
+    }
+    // Finished async-delegation outcomes travel as an inert sidecar (never into
+    // the live table). A restored managed home already carries that sidecar on
+    // disk; read it back so a re-capture preserves the outcomes even though the
+    // managed store's own `async_delegations` table is (correctly) empty. A
+    // table-derived record supersedes a stale on-disk one.
+    let mut async_files = hermes_home_async(home)?;
+    let (derived, async_blockers) = hermes_capture_async_delegations(image, root_session)?;
+    for code in async_blockers {
+        issues.push(code);
+    }
+    for (path, encoded) in derived {
+        async_files.insert(path, encoded);
+    }
+    for (path, encoded) in async_files {
+        files.insert(path, encoded);
+    }
+    // External-memory continuation (bound provider + official export, or an
+    // explicit blocker). Captured once per cycle from the selected home and
+    // merged into every session snapshot; blockers join the session's issues.
+    if !memory.is_empty() {
+        for (path, encoded) in memory {
+            if !crate::hermes_memory::allowed(path) {
+                return Err("memory_unsafe".into());
+            }
+            files.insert(path.clone(), encoded.clone());
+        }
+        let manifest = crate::hermes_memory::read_manifest(memory)?;
+        for code in manifest.blockers {
+            issues.push(code);
+        }
+    }
+    hermes_validate_workspace_files(&files)?;
+    Ok((
+        Manifest {
+            version: 1,
+            agent: "hermes".into(),
+            session: root_session.into(),
+            cwd: cwd.into(),
+            files,
+        },
+        issues,
+    ))
+}
+#[allow(clippy::too_many_arguments)]
+fn capture_hermes_session(
+    home: &Path,
+    image: &rusqlite::Connection,
+    session: &str,
+    cwd: &str,
+    staging: &Path,
+    workspace: &BTreeMap<String, String>,
+    project: Option<&BTreeMap<String, String>>,
+    attachment_roots: &[PathBuf],
+    memory: &BTreeMap<String, String>,
+) -> Result<(Manifest, Vec<String>)> {
+    capture_hermes_manifest(
+        home,
+        image,
+        session,
+        cwd,
+        staging,
+        workspace,
+        project,
+        attachment_roots,
+        memory,
+    )
+}
+#[allow(clippy::too_many_arguments)]
+fn capture_hermes_store(
+    home: &Path,
+    db: &Path,
+    session: &str,
+    staging: &Path,
+    project: Option<&BTreeMap<String, String>>,
+    attachment_roots: &[PathBuf],
+    memory: &BTreeMap<String, String>,
+) -> Result<Manifest> {
+    let snapshot = hermes_backup_bytes(db, staging)?;
+    let workspace = crate::hermes_workspace::capture(home)?;
+    let (manifest, _issues) = hermes_with_image(&snapshot, staging, |conn| {
+        let cwd = hermes_session_cwd(conn, session)?;
+        capture_hermes_manifest(
+            home,
+            conn,
+            session,
+            &cwd,
+            staging,
+            &workspace,
+            project,
+            attachment_roots,
+            memory,
+        )
+    })?;
+    Ok(manifest)
 }
 fn encode(manifest: &Manifest) -> Result<String> {
     #[cfg(test)]
@@ -492,6 +3345,8 @@ fn unpack(b: &bundle::Bundle, all: &BTreeMap<String, bundle::Bundle>) -> Result<
     decode(&packed)
 }
 fn capture_file(agent: &str, root: &Path, path: &Path, staging: &Path) -> Result<Manifest> {
+    // Hermes never reaches here: its store needs a known root session id, so
+    // capture_handoff routes it through `capture_hermes_store`.
     let mut files = BTreeMap::new();
     let bytes = if agent == "agy" {
         sqlite_snapshot(path, staging)?
@@ -678,7 +3533,12 @@ fn capture_grok(root: &Path, directory: &Path) -> Result<Manifest> {
         files,
     })
 }
-fn capture_handoff(h: &Handoff, staging: &Path) -> Result<Manifest> {
+fn capture_handoff(
+    h: &Handoff,
+    staging: &Path,
+    with_project: bool,
+    memory: Option<MemoryContext>,
+) -> Result<Manifest> {
     let _parent_scope = handoff_parent_scope(
         staging.parent().ok_or("store_unavailable")?,
         h.path.parent().ok_or("sandbox_reauthorize")?,
@@ -694,6 +3554,41 @@ fn capture_handoff(h: &Handoff, staging: &Path) -> Result<Manifest> {
     safe_profile_file(&h.path, &h.main_file)?;
     let m = if h.agent == "grok" {
         capture_grok(&h.path, file.parent().ok_or("session_invalid")?)?
+    } else if h.agent == "hermes" {
+        // Re-capture the managed home's store with the handoff's own root
+        // session id, keeping the lineage graph and re-capturing the (possibly
+        // grown) portable workspace and referenced attachments. The project
+        // working tree is collected from its registered restored directory —
+        // never the receiver's mapped worktree, and never an unregistered cwd.
+        let project = if with_project {
+            h.project
+                .as_deref()
+                .map(|dir| capture_authorized_project(dir, &dir.to_string_lossy()))
+        } else {
+            None
+        };
+        // The registered restored project directory is the only authorized
+        // attachment root for a managed handoff; an unregistered cwd is never
+        // read.
+        let attachment_roots: Vec<PathBuf> = h
+            .project
+            .as_deref()
+            .and_then(|dir| fs::canonicalize(dir).ok())
+            .into_iter()
+            .collect();
+        // Re-capture the external memory from the MANAGED home (its own bound
+        // store), so edits continue the restored memory, never the original
+        // source.
+        let memory_map = capture_memory_for_cycle(&h.path, memory)?.0;
+        capture_hermes_store(
+            &h.path,
+            &file,
+            &h.session,
+            staging,
+            project.as_ref(),
+            &attachment_roots,
+            &memory_map,
+        )?
     } else {
         capture_file(&h.agent, &h.path, &file, staging)?
     };
@@ -703,7 +3598,13 @@ fn capture_handoff(h: &Handoff, staging: &Path) -> Result<Manifest> {
     if m.cwd != h.cwd {
         return Err("project_mapping_required".into());
     }
-    for relative in m.files.keys() {
+    // Project entries are a self-describing namespace, not profile files; only
+    // the real profile files are resolved back inside the managed home.
+    for relative in m
+        .files
+        .keys()
+        .filter(|path| !crate::hermes_project::allowed(path))
+    {
         safe_profile_file(&h.path, relative)?;
     }
     Ok(m)
@@ -760,6 +3661,7 @@ fn publish_handoffs(
     agent: &str,
     batch: &mut crate::sync::ExportBatch<'_>,
     status: &mut SourceStatus,
+    memory: Option<MemoryContext>,
     stop: &impl Fn() -> bool,
 ) -> Result<()> {
     let mut registry = load_handoffs(root)?;
@@ -772,7 +3674,8 @@ fn publish_handoffs(
         }
         let result: Result<()> = (|| {
             let h = &registry.entries[index];
-            let manifest = capture_handoff(h, root)?;
+            let manifest = capture_handoff(h, root, true, memory)?;
+            let blockers = project_issue_codes(&project_subset(&manifest.files))?;
             let fingerprint = manifest_fingerprint(&manifest)?;
             if fingerprint == h.fingerprint {
                 status.captured += 1;
@@ -789,7 +3692,11 @@ fn publish_handoffs(
             let entry = &mut registry.entries[index];
             entry.base = id;
             entry.fingerprint = fingerprint;
+            entry.project_blockers = blockers.clone();
             save_handoffs(root, &registry)?;
+            for code in blockers {
+                *status.issues.entry(code).or_default() += 1;
+            }
             status.captured += 1;
             Ok(())
         })();
@@ -804,10 +3711,11 @@ fn auto_prepare(
     bundle: &bundle::Bundle,
     incoming: &Manifest,
     mappings: &[crate::project_mapping::Mapping],
-) -> Result<usize> {
+    memory: Option<MemoryContext>,
+) -> Result<(usize, Vec<String>)> {
     if bundle.snapshot.stream.agent == "agy" {
         // A copied database is recoverable data, not a verified standalone CLI profile.
-        return Ok(0);
+        return Ok((0, Vec::new()));
     }
     if incoming.agent != bundle.snapshot.stream.agent
         || bundle::hash(incoming.session.as_bytes()) != bundle.snapshot.stream.conversation
@@ -821,14 +3729,34 @@ fn auto_prepare(
     let manifest = crate::project_mapping::transform_manifest(incoming, mappings)?;
     crate::project_mapping::validate_provider_group(&manifest)?;
     let destination = root.join("managed-profiles").join(&bundle.id);
+    // The captured project working tree is materialized into a NEW isolated
+    // directory — never the receiver's mapped worktree — and the session cwd is
+    // re-rooted to it before attachment references are finalized.
+    let project_destination = root.join("managed-projects").join(&bundle.id);
+    let (manifest, project_restore) = restore_hermes_project(&manifest, &project_destination)?;
+    let issues = project_restore
+        .as_ref()
+        .map(|restore| restore.blockers.clone())
+        .unwrap_or_default();
+    let project = project_restore
+        .as_ref()
+        .and_then(|restore| restore.workdir.clone());
+    // Rewrite captured attachment references to the restored home now that its
+    // absolute path is known (project-rooted references already followed the
+    // restored working tree above).
+    let manifest = if manifest.agent == "hermes" {
+        finalize_hermes_attachments(&manifest, &destination)?
+    } else {
+        manifest
+    };
     let registry = load_handoffs(root)?;
     if let Some(h) = registry.entries.iter().find(|h| h.base == bundle.id) {
-        capture_handoff(h, root)?;
-        return Ok(0);
+        capture_handoff(h, root, true, memory)?;
+        return Ok((0, issues));
     }
     if let Some(h) = registry.entries.iter().find(|h| h.path == destination) {
-        capture_handoff(h, root)?;
-        return Ok(0);
+        capture_handoff(h, root, true, memory)?;
+        return Ok((0, issues));
     }
     if destination.exists() {
         // Recover the narrow crash window after the profile rename but before
@@ -852,8 +3780,19 @@ fn auto_prepare(
         storage::directory(&root.join("managed-profiles"))?;
         restore_manifest(&manifest, &destination)?;
     }
-    register_handoff(root, bundle, &manifest, &destination)?;
-    Ok(1)
+    // Restore the external memory into the isolated managed home and record the
+    // real readiness (verified by re-export, never a synthetic ready).
+    let memory_readiness = hermes_restore_memory(memory, &manifest.files, &destination)?;
+    register_handoff(
+        root,
+        bundle,
+        &manifest,
+        &destination,
+        project.as_deref(),
+        &issues,
+        memory_readiness.as_ref(),
+    )?;
+    Ok((1, issues))
 }
 // Explicit dependencies keep the native cycle fixture-testable without a Tauri runtime.
 #[allow(clippy::too_many_arguments)]
@@ -880,7 +3819,7 @@ pub fn cycle(
         stop,
     )
 }
-#[allow(clippy::too_many_arguments)]
+#[allow(dead_code, clippy::too_many_arguments)]
 pub fn cycle_with_mappings(
     root: &Path,
     binding: &Binding,
@@ -890,6 +3829,26 @@ pub fn cycle_with_mappings(
     source: &Path,
     direction: Direction,
     mappings: &[crate::project_mapping::Mapping],
+    stop: impl Fn() -> bool,
+) -> Result<SourceStatus> {
+    cycle_with_context(
+        root, binding, key, remote, agent, source, direction, mappings, None, stop,
+    )
+}
+/// The full cycle, additionally threading the app-config root and settings so a
+/// Hermes cycle captures — and a Hermes receive restores — the external-memory
+/// continuation with the user's configured CLI and explicit authorization.
+#[allow(clippy::too_many_arguments)]
+pub fn cycle_with_context(
+    root: &Path,
+    binding: &Binding,
+    key: &SpaceKey,
+    remote: &impl Objects,
+    agent: &str,
+    source: &Path,
+    direction: Direction,
+    mappings: &[crate::project_mapping::Mapping],
+    memory: Option<MemoryContext>,
     stop: impl Fn() -> bool,
 ) -> Result<SourceStatus> {
     crate::project_mapping::validate_mappings(mappings)?;
@@ -924,6 +3883,104 @@ pub fn cycle_with_mappings(
         let mut batch = replica.export_batch()?;
         if !source.is_dir() {
             missing_source = true;
+        } else if agent == "hermes" {
+            // One store, many sessions: take exactly ONE consistent snapshot of the
+            // live state.db per cycle and enumerate the sessions from that same
+            // image, so every export in the cycle reflects a single point in time
+            // and a session captured later in the loop cannot observe a store that
+            // changed after the snapshot.
+            let db = source.join("state.db");
+            if !db.is_file() {
+                missing_source = true;
+            } else {
+                let snapshot = hermes_backup_bytes(&db, root)?;
+                let image = tempfile::NamedTempFile::new_in(root)
+                    .map_err(|_| "store_unavailable")?
+                    .into_temp_path();
+                fs::write(&image, &snapshot).map_err(|_| "store_unavailable")?;
+                let image_conn = hermes_open_readonly(&image)?;
+                let sessions = hermes_sessions_of(&image_conn)?;
+                // Capture the portable workspace once for the whole cycle; every
+                // session's snapshot merges the same inert file map.
+                let workspace = crate::hermes_workspace::capture(source)?;
+                // Capture the external-memory continuation once per authorized
+                // selected home, for the whole cycle; every session's snapshot
+                // merges the same map (or the same explicit blockers).
+                let (memory_map, _memory_issues) = capture_memory_for_cycle(source, memory)?;
+                // Capture each unique user-authorized project working tree once
+                // per cycle; sessions that share a cwd reuse the same inert map.
+                let mut project_cache: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
+                crate::progress::stage("scan", Some(sessions.len()));
+                for (session, cwd) in sessions {
+                    crate::progress::advance();
+                    if stop() {
+                        return Err("sync_paused".into());
+                    }
+                    if !project_cache.contains_key(&cwd) {
+                        let captured = capture_project(&cwd, mappings)?;
+                        project_cache.insert(cwd.clone(), captured);
+                    }
+                    let project = &project_cache[&cwd];
+                    // Referenced attachments may only be read from an
+                    // explicitly authorized project root, never an arbitrary
+                    // recorded cwd.
+                    let attachment_roots: Vec<PathBuf> = authorized_project_root(&cwd, mappings)
+                        .and_then(|root| fs::canonicalize(root).ok())
+                        .into_iter()
+                        .collect();
+                    let stamp_key = bundle::hash(session.as_bytes());
+                    let result: Result<Vec<String>> = (|| {
+                        let (m, issues) = capture_hermes_session(
+                            source,
+                            &image_conn,
+                            &session,
+                            &cwd,
+                            root,
+                            &workspace,
+                            Some(project),
+                            &attachment_roots,
+                            &memory_map,
+                        )?;
+                        let content_fingerprint = manifest_content_fingerprint(&m)?;
+                        let conversation = bundle::hash(m.session.as_bytes());
+                        let stream = Stream {
+                            agent: m.agent.clone(),
+                            profile: journal.node.clone(),
+                            conversation: conversation.clone(),
+                        };
+                        if journal.content.get(&stamp_key).is_some_and(|cached| {
+                            cached.fingerprint == content_fingerprint
+                                && journal.bases.get(&conversation) == Some(&cached.bundle)
+                                && cached_native_baseline_complete(&batch, &stream, &cached.bundle)
+                        }) {
+                            return Ok(issues);
+                        }
+                        let id = publish(&m, &mut batch, &mut journal, PART_SIZE)?;
+                        journal.content.insert(
+                            stamp_key,
+                            ContentBaseline {
+                                fingerprint: content_fingerprint,
+                                bundle: id,
+                            },
+                        );
+                        storage::replace(&jp, json(&journal)?.as_bytes())?;
+                        Ok(issues)
+                    })();
+                    match result {
+                        Ok(issues) => {
+                            for code in issues {
+                                *status.issues.entry(code).or_default() += 1;
+                            }
+                            status.captured += 1;
+                        }
+                        Err(e) => {
+                            *status.issues.entry(e).or_default() += 1;
+                        }
+                    }
+                }
+                drop(image_conn);
+                drop(image);
+            }
         } else {
             let sub = match agent {
                 "claude" | "claude-code" => "projects",
@@ -1018,7 +4075,7 @@ pub fn cycle_with_mappings(
         // Explicitly restored profiles have their own baseline and are never
         // scanned as part of the default agent store. Edits form a new child
         // snapshot of the bundle the user restored.
-        publish_handoffs(root, agent, &mut batch, &mut status, &stop)?;
+        publish_handoffs(root, agent, &mut batch, &mut status, memory, &stop)?;
     }
     if stop() {
         return Err("sync_paused".into());
@@ -1064,10 +4121,15 @@ pub fn cycle_with_mappings(
                 {
                     return Err("session_invalid".into());
                 }
-                auto_prepare(root, b, &m, mappings)
+                auto_prepare(root, b, &m, mappings, memory)
             })();
             match result {
-                Ok(n) => status.restored += n,
+                Ok((n, issues)) => {
+                    status.restored += n;
+                    for code in issues {
+                        *status.issues.entry(code).or_default() += 1;
+                    }
+                }
                 Err(e) => {
                     *status.issues.entry(e).or_default() += 1;
                 }
@@ -1098,6 +4160,18 @@ pub struct Received {
     branch_count: usize,
     managed_profile: Option<String>,
     mapped_cwd: Option<String>,
+    /// The NEW isolated project working directory restored with this version,
+    /// used as the resume command's working directory. Never the receiver's
+    /// mapped worktree.
+    project_workdir: Option<String>,
+    /// Project-continuity readiness blockers that must be shown, so a copied
+    /// project sidecar is never presented as ready.
+    project_blockers: Vec<String>,
+    /// Hermes-only aggregated continuation readiness (workspace dependencies,
+    /// attachment problems, project and memory binding). Absent for every other
+    /// agent so their existing contract is unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    continuation: Option<Continuation>,
 }
 fn usable_cwd(cwd: &str, mappings: &[crate::project_mapping::Mapping]) -> Option<String> {
     if cwd.is_empty() {
@@ -1184,7 +4258,7 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
                         h.base == b.id
                             && h.path.parent().is_some_and(|parent| {
                                 handoff_parent_scope(&root, parent)
-                                    .is_ok_and(|_scope| capture_handoff(h, &p).is_ok())
+                                    .is_ok_and(|_scope| capture_handoff(h, &p, false, None).is_ok())
                             })
                     });
                     let branch_count = all
@@ -1229,6 +4303,53 @@ pub async fn list_received_sessions(app: tauri::AppHandle) -> Result<Vec<Receive
                             .or_else(|| {
                                 usable_cwd(v["cwd"].as_str().unwrap_or(""), &permitted_mappings)
                             }),
+                        project_workdir: managed
+                            .and_then(|h| h.project.as_ref())
+                            .map(|dir| dir.to_string_lossy().into_owned()),
+                        project_blockers: managed
+                            .map(|h| h.project_blockers.clone())
+                            .unwrap_or_default(),
+                        // Hermes-only: aggregate the received snapshot's
+                        // continuation prerequisites so the UI can gate
+                        // copy/resume; a copied packet is never automatically
+                        // ready.
+                        continuation: if b.snapshot.stream.agent == "hermes" {
+                            let project_path = managed
+                                .and_then(|h| h.project.as_ref())
+                                .map(|p| p.to_string_lossy().into_owned());
+                            let unpacked = unpack(b, &all);
+                            let mut continuation = match &unpacked {
+                                Ok(received) => continuation_for(received, project_path),
+                                Err(_) => Continuation {
+                                    state: "blocked".into(),
+                                    blockers: vec!["session_invalid".into()],
+                                    warnings: Vec::new(),
+                                    project_path,
+                                    verified: Vec::new(),
+                                },
+                            };
+                            // A restored version carries the real, host-resolved
+                            // requirement verdict: env/runtime/os are probed
+                            // locally, and opaque requirements are honored only
+                            // when explicitly acknowledged for this manifest.
+                            if let (Ok(received), Some(h)) = (&unpacked, managed) {
+                                apply_requirements_evidence(
+                                    &mut continuation,
+                                    &received.files,
+                                    &h.path,
+                                );
+                            }
+                            // A restored managed home carries the real memory
+                            // readiness (verified by re-export); it supersedes
+                            // the capture-side memory verdict so a completed
+                            // restore is never reported as still unverified.
+                            if let Some(readiness) = managed.and_then(|h| h.memory.as_ref()) {
+                                apply_memory_readiness(&mut continuation, readiness);
+                            }
+                            Some(continuation)
+                        } else {
+                            None
+                        },
                     });
                 }
             }
@@ -1292,6 +4413,9 @@ fn register_handoff(
     bundle: &bundle::Bundle,
     manifest: &Manifest,
     destination: &Path,
+    project: Option<&Path>,
+    project_blockers: &[String],
+    memory: Option<&crate::hermes_memory::MemoryReadiness>,
 ) -> Result<()> {
     let mut registry = load_handoffs(root)?;
     if registry.entries.iter().any(|h| h.path == destination) {
@@ -1306,6 +4430,9 @@ fn register_handoff(
         stream_profile: bundle.snapshot.stream.profile.clone(),
         base: bundle.id.clone(),
         fingerprint: manifest_fingerprint(manifest)?,
+        project: project.map(Path::to_path_buf),
+        project_blockers: project_blockers.to_vec(),
+        memory: memory.cloned(),
     });
     save_handoffs(root, &registry)
 }
@@ -1381,14 +4508,46 @@ pub async fn restore_received_session(
             crate::project_mapping::validate_provider_group(&mapped)?;
             mapped
         };
-        let target = folder.join(format!("Bastet-{agent}-{}", uuid::Uuid::new_v4()));
+        let restore_id = uuid::Uuid::new_v4();
+        let target = folder.join(format!("Bastet-{agent}-{restore_id}"));
+        // The captured project working tree is materialized into a NEW isolated
+        // sibling directory — never the receiver's mapped worktree — and the
+        // session cwd is re-rooted to it before attachment references finalize.
+        let project_destination = folder.join(format!("Bastet-{agent}-{restore_id}-project"));
+        let (manifest, project_restore) = restore_hermes_project(&manifest, &project_destination)?;
+        let manifest = if manifest.agent == "hermes" {
+            finalize_hermes_attachments(&manifest, &target)?
+        } else {
+            manifest
+        };
         restore_manifest(&manifest, &target)?;
         if agent != "agy" {
+            let blockers = project_restore
+                .as_ref()
+                .map(|restore| restore.blockers.as_slice())
+                .unwrap_or(&[]);
+            let project = project_restore
+                .as_ref()
+                .and_then(|restore| restore.workdir.as_deref());
+            // Restore the external memory into the NEW isolated home and record
+            // the real readiness; a failure is an explicit blocker, never a
+            // synthetic ready.
+            let memory_readiness = hermes_restore_memory(
+                Some(MemoryContext {
+                    app_root: &root,
+                    settings: &settings,
+                }),
+                &manifest.files,
+                &target,
+            )?;
             register_handoff(
                 &root.join(format!("sessions-{agent}-{space}")),
                 b,
                 &manifest,
                 &target,
+                project,
+                blockers,
+                memory_readiness.as_ref(),
             )?;
         }
         Ok(Some(target.to_string_lossy().into()))
@@ -1434,7 +4593,7 @@ fn compare_session(
     let all = replica.transport_bundles()?;
     let b = all.get(id).ok_or("session_invalid")?;
     let manifest = unpack(b, &all)?;
-    if manifest.agent != canonical || manifest.files.len() > 256 {
+    if manifest.agent != canonical || manifest.files.len() > 2048 {
         return Err("session_invalid".into());
     }
     let mut files = Vec::new();
@@ -1489,6 +4648,84 @@ pub async fn review_received_session(
     .map_err(|_| "store_unavailable".to_string())?
 }
 
+fn run_recheck(
+    app: &tauri::AppHandle,
+    agent: &str,
+    id: &str,
+    acknowledge: bool,
+    setup_provider: bool,
+) -> Result<RecheckResult> {
+    let (root, space) = native_root(app)?;
+    let settings = crate::model::load(&root.join("settings.json"))?.ok_or("invalid_settings")?;
+    let sessions_root = root.join(format!("sessions-{agent}-{space}"));
+    let staging = tempfile::tempdir().map_err(|_| "store_unavailable")?;
+    recheck_continuation_with(
+        &sessions_root,
+        &root,
+        &space,
+        &settings,
+        agent,
+        id,
+        acknowledge,
+        setup_provider,
+        staging.path(),
+    )
+}
+
+/// Explicit, user-initiated continuation recheck of an already-restored Hermes
+/// version. The target is resolved from the app registry by version id (never a
+/// caller-supplied path) and only that isolated managed home is touched: no new
+/// managed profile is created. Re-runs the dependency and memory readiness,
+/// applies the official provider import when the provider is now installed, and
+/// — when asked — records a hash-bound acknowledgment of the opaque workspace
+/// requirements. In a build without the external channel this is non-CLI: the
+/// provider setup path is refused and the memory verdict is reported as
+/// unavailable, never inferred ready. Refused while sync is running.
+#[tauri::command]
+pub async fn recheck_continuation(
+    app: tauri::AppHandle,
+    worker: tauri::State<'_, crate::worker::Worker>,
+    agent: String,
+    id: String,
+    acknowledge_requirements: Option<bool>,
+) -> Result<RecheckResult> {
+    if worker.active() {
+        return Err("sync_running".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        run_recheck(
+            &app,
+            &agent,
+            &id,
+            acknowledge_requirements.unwrap_or(false),
+            false,
+        )
+    })
+    .await
+    .map_err(|_| "store_unavailable".to_string())?
+}
+
+/// Explicit, recipient-approved memory provider setup for an already-restored
+/// Hermes version: runs the trusted configured local CLI's fixed
+/// `hermes install --hermes-home <EXACT MANAGED HOME>` operation into the
+/// registered isolated home only, then re-runs the official memory
+/// import/verify. Never available in a build without the external channel.
+#[cfg(not(feature = "mac-app-store"))]
+#[tauri::command]
+pub async fn setup_memory_provider(
+    app: tauri::AppHandle,
+    worker: tauri::State<'_, crate::worker::Worker>,
+    agent: String,
+    id: String,
+) -> Result<RecheckResult> {
+    if worker.active() {
+        return Err("sync_running".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || run_recheck(&app, &agent, &id, false, true))
+        .await
+        .map_err(|_| "store_unavailable".to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1541,9 +4778,12 @@ mod tests {
             stream_profile: "healthy".into(),
             base: "baseline".into(),
             fingerprint: String::new(),
+            project: None,
+            project_blockers: Vec::new(),
+            memory: None,
         };
         healthy.fingerprint =
-            manifest_fingerprint(&capture_handoff(&healthy, &root).unwrap()).unwrap();
+            manifest_fingerprint(&capture_handoff(&healthy, &root, true, None).unwrap()).unwrap();
         let external = tempfile::tempdir().unwrap();
         let stale = Handoff {
             path: external.path().join("old-restore"),
@@ -2074,7 +5314,7 @@ mod tests {
             .unwrap();
         let target = temp.path().join("managed-pi-profile");
         let manifest = restore(snapshot, &all, &target).unwrap();
-        register_handoff(&b, snapshot, &manifest, &target).unwrap();
+        register_handoff(&b, snapshot, &manifest, &target, None, &[], None).unwrap();
         assert_eq!(load_handoffs(&b).unwrap().entries.len(), 1);
         assert!(!target.join("auth.json").exists());
         let restored = fs::read(target.join(manifest.files.keys().next().unwrap())).unwrap();
@@ -2158,7 +5398,7 @@ mod tests {
         drop(b_replica);
         let b_profile = b_root.join("b-branch");
         restore_manifest(&base_manifest, &b_profile).unwrap();
-        register_handoff(&b_root, &base, &base_manifest, &b_profile).unwrap();
+        register_handoff(&b_root, &base, &base_manifest, &b_profile, None, &[], None).unwrap();
         let branch_file = b_profile.join(main_file(&base_manifest).unwrap());
         assert_eq!(
             cycle(
@@ -2248,7 +5488,7 @@ mod tests {
         let b_manifest = unpack(a_b_head, &a_all).unwrap();
         let a_profile = a_root.join("a-branch");
         restore_manifest(&b_manifest, &a_profile).unwrap();
-        register_handoff(&a_root, a_b_head, &b_manifest, &a_profile).unwrap();
+        register_handoff(&a_root, a_b_head, &b_manifest, &a_profile, None, &[], None).unwrap();
         fs::OpenOptions::new()
             .append(true)
             .open(a_profile.join(main_file(&b_manifest).unwrap()))
@@ -3129,7 +6369,8 @@ mod tests {
                             assert!(all.contains_key(&head.snapshot.parents[0]));
                             assert_eq!(result.restored, 1, "{agent}: {:?}", result.issues);
                             let handoff = load_handoffs(&root).unwrap();
-                            let m = capture_handoff(&handoff.entries[0], &root).unwrap();
+                            let m =
+                                capture_handoff(&handoff.entries[0], &root, true, None).unwrap();
                             let content = m
                                 .files
                                 .values()
@@ -3187,8 +6428,13 @@ mod tests {
                         .unwrap();
                     let child = cross_head(&after, agent);
                     assert_eq!(child.snapshot.parents, vec![prior.head.clone()]);
-                    let edited =
-                        capture_handoff(&load_handoffs(&root).unwrap().entries[0], &root).unwrap();
+                    let edited = capture_handoff(
+                        &load_handoffs(&root).unwrap().entries[0],
+                        &root,
+                        true,
+                        None,
+                    )
+                    .unwrap();
                     restore_manifest(&edited, &profile).unwrap();
                     cross_output(output, agent, &key, &after);
                     cases.push(ExchangeCase {
@@ -3285,7 +6531,7 @@ mod tests {
             assert_eq!(registry.entries.len(), 1);
             let handoff = &registry.entries[0];
             assert_eq!(handoff.base, prior.head);
-            let before = capture_handoff(handoff, &b_root).unwrap();
+            let before = capture_handoff(handoff, &b_root, true, None).unwrap();
             let baseline = manifest_content_fingerprint(&before).unwrap();
             assert_eq!(before.session, prior.session);
             for relative in before.files.keys() {
@@ -3294,7 +6540,7 @@ mod tests {
                 safe_profile_file(&handoff.path, relative).unwrap();
                 fs::copy(profile.join(relative), handoff.path.join(relative)).unwrap();
             }
-            let edited = capture_handoff(handoff, &b_root).unwrap();
+            let edited = capture_handoff(handoff, &b_root, true, None).unwrap();
             assert_ne!(manifest_content_fingerprint(&edited).unwrap(), baseline);
             assert_eq!(edited.session, prior.session);
             let live = STANDARD
@@ -3370,7 +6616,7 @@ mod tests {
                 .unwrap();
             assert_eq!(cross_head(&a_all, agent).id, child.id);
             let a_registry = load_handoffs(&a_root).unwrap();
-            let returned = capture_handoff(&a_registry.entries[0], &a_root).unwrap();
+            let returned = capture_handoff(&a_registry.entries[0], &a_root, true, None).unwrap();
             assert_eq!(returned.session, prior.session);
             let returned_bytes = STANDARD
                 .decode(

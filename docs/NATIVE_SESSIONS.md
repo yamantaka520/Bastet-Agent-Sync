@@ -9,6 +9,7 @@ Selecting sources, saving settings and pressing Start runs the local adapters in
 | Google Agy CLI | One SQLite online backup per conversation database | WAL-aware snapshot; schema checks for trajectory metadata/steps. Dedicated original-profile CLI continuation and restored database integrity passed locally; restored-profile model continuation and auxiliary brain/project state remain unverified. |
 | Grok Build CLI | Summary, update stream, raw chat history, plan, signals and rewind points | Search-index databases are excluded. Compaction checkpoint and external attachment completeness remain unverified. |
 | Pi Agent | Native session JSONL, including inline content | Native format versions 1–3. External attachments and extension state are not bundled. |
+| Hermes Agent (0.8.0) | Per-conversation native `state.db` derived from a consistent SQLite snapshot | Isolated managed `HERMES_HOME`, project mapping and scoped resume command. No configuration/skills/runtime migration or physical-device acceptance; see [Hermes contract](HERMES_AGENT.md). |
 | Agent Memory OS | Official CLI sync export/import with backup | Automatic official merge remains unchanged; see [AMOS contract](AGENT_MEMORY_OS.md). |
 
 Claude and Claude Code, or Codex and Work, share one scan/exchange when their effective paths agree. Each selected card still receives a result; shared sources do not duplicate upload counters. Custom Codex/Work paths are separate scans. Claude's coding data comes from the Claude Code path setting, not its Electron cache directory.

@@ -4,6 +4,7 @@ import { detectLocale, languages, messages, type Locale } from "./i18n";
 import {
   defaults,
   names,
+  withKnownAgents,
   type Agent,
   type Settings,
   type Diagnostic,
@@ -109,11 +110,7 @@ export default function App() {
                 ),
           });
         setMemorySyncAvailable(memoryAvailable);
-        setAgents(
-          memoryAvailable
-            ? b.agents
-            : b.agents.filter((agent) => agent.id !== "agent-memory-os"),
-        );
+        setAgents(withKnownAgents(b.agents, memoryAvailable));
         setTray(b.trayAvailable);
         setVersion(b.version ?? __APP_VERSION__);
         setRevision(b.revision ?? "");
@@ -141,11 +138,7 @@ export default function App() {
   }
   async function scan(s = settings) {
     const found = await invoke<Agent[]>("scan_agents", { settings: s });
-    setAgents(
-      memorySyncAvailable
-        ? found
-        : found.filter((agent) => agent.id !== "agent-memory-os"),
-    );
+    setAgents(withKnownAgents(found, memorySyncAvailable));
   }
   async function choose(id?: string) {
     await action(async () => {

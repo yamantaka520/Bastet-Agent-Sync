@@ -4,6 +4,8 @@ Status: 0.7.0 is published with selectable Google Drive API, iCloud Drive folder
 
 ## Product
 
+Version 0.8.0 adds [Hermes Agent](HERMES_AGENT.md), which joins the native conversation sources with isolated home restoration, mapping-authorized project working state and referenced attachments, an allowlisted portable workspace (skills with assets, project rules, built-in memory and sanitized non-secret config), retained native lineage and an explicitly authorized Agent Memory OS export with a per-version continuation report. Its verification and limitations are separate from the published 0.7.0 release evidence. Recipient credentials, model/provider login and running jobs are not transferred; external acceptance (physical two-device delivery, live model continuation, Windows/Linux runtime) remains open.
+
 A local-first desktop companion that synchronizes selected agent settings, skills, memory and conversations across computers through one selected Google Drive API, iCloud Drive folder or OneDrive folder destination. macOS, Windows and Linux are target platforms. Native session restoration is a required adapter goal; context-based continuation must be labelled as a separate fallback.
 
 ## Architecture

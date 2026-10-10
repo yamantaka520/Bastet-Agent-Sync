@@ -641,7 +641,7 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
                 }
             } else {
                 match &task.path {
-                    Some(source) => crate::native_sessions::cycle_with_mappings(
+                    Some(source) => crate::native_sessions::cycle_with_context(
                         &root.join(format!("sessions-{}-{}", task.canonical, binding.space)),
                         binding,
                         key,
@@ -653,6 +653,10 @@ fn sync_sources<R: Objects + Sync, M: Memory + Sync>(
                         source,
                         direction,
                         &settings.project_mappings,
+                        Some(crate::native_sessions::MemoryContext {
+                            app_root: root,
+                            settings,
+                        }),
                         || worker.stopped(),
                     ),
                     None => Err("source_missing".into()),

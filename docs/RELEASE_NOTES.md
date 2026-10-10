@@ -6,40 +6,40 @@
 
 ## 繁體中文
 
-0.7.0 可選擇一個同步目的地：Google Drive API、iCloud Drive 資料夾或 OneDrive 資料夾。後兩者使用已安裝的雲端桌面同步程式，不提供 Apple／Microsoft 直接登入。選擇已下載的專用資料夾、建立加密空間，並將恢復套件存於同步資料夾外；另一台電腦用同一服務的套件加入。切換目的地不會搬移舊空間資料。憑證入口現在提供恢復套件匯出及儲存方式說明。
+0.8.0 在既有的 Google Drive API、iCloud Drive 資料夾與 OneDrive 資料夾之外，新增 Hermes Agent 來源。選擇 **Hermes Agent**、儲存後明確啟動同步。來源為 `HERMES_HOME` 或 `~/.hermes`；具名 profile 以自訂路徑指定其 home，一次只選取一個 Hermes home。原生對話與必要血緣（已完成的非同步結果以惰性方式攜帶；進行中的工作為 blocker）會還原至獨立受管理目錄，專案工作狀態與引用的附件僅在授權的專案對應下讀取。另會攜帶白名單化的可攜工作區——技能與資產、專案規則、內建記憶檔及去敏的非機密 `config.yaml`。外部 Agent Memory OS 記憶只在顯式綁定 home 時透過官方 CLI 匯出（同身分但範圍廣泛，不保證內容層級機密）。每個還原版本顯示五語接續報告；憑證、模型／供應商登入與機密設定值永不轉移。
 
-本機同步完成只代表 Bastet 將加密封包交給資料夾；雲端上傳、下載及送達另一台電腦由服務的桌面程式負責。iCloud／OneDrive 尚無兩台實機交付驗證。macOS 鑰匙圈選擇「永遠允許」後仍重複提示的問題尚未解決。對話接續與 Agent 限制見 VALIDATION.md；不會覆寫正在使用的 Agent 資料。
+安裝包經三平台 CI、已簽章更新來源與安裝檢查驗證。Hermes 合成測試不等於實際雙機交付、模型實機續聊、Windows／Linux 執行期或 App Store 驗收，這些關卡仍未達成。0.7.0 的目的地選項、恢復套件與尚未解決的 macOS 鑰匙圈重複提示維持不變。
 
-獨立下載安裝包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 資料夾模式需要對應桌面程式。macOS 發布須通過 Developer ID 簽章、公證及安裝驗證。Windows 發行者簽章暫緩；更新包仍驗證簽章。
+獨立下載安裝包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 資料夾模式需要對應桌面程式。macOS 發布須通過 Developer ID 簽章與公證；Windows 發行者簽章暫緩；更新包仍驗證簽章。
 
 ## 简体中文
 
-0.7.0 可选择一个同步目标：Google Drive API、iCloud Drive 文件夹或 OneDrive 文件夹。后两者使用已安装的云端桌面同步程序，不提供 Apple／Microsoft 直接登录。选择已下载的专用文件夹、创建加密空间，并把恢复套件保存在同步文件夹之外；另一台电脑用同一服务的套件加入。切换目标不会迁移旧空间数据。凭据入口现在提供恢复套件导出及存储方式说明。
+0.8.0 在既有 Google Drive API、iCloud Drive 文件夹与 OneDrive 文件夹之外，新增 Hermes Agent 来源。勾选 **Hermes Agent**、保存后明确启动同步。来源为 `HERMES_HOME` 或 `~/.hermes`；具名 profile 以自定义路径指定其 home，一次只选取一个 Hermes home。原生对话与必要血缘（已完成的异步结果以惰性方式携带；进行中的任务为 blocker）会恢复到独立受管目录，项目工作状态与引用的附件仅在授权的项目映射下读取。另会携带白名单化的可携工作区——技能与资产、项目规则、内置记忆文件及脱敏的非机密 `config.yaml`。外部 Agent Memory OS 记忆只在显式绑定 home 时通过官方 CLI 导出（同身份但范围广泛，不保证内容级机密）。每个恢复版本显示五语接续报告；凭据、模型／供应商登录与机密配置值永不转移。
 
-本地同步完成只表示 Bastet 已将加密数据交给文件夹；上传、下载及送达另一台电脑由对应的桌面程序负责。iCloud／OneDrive 尚未完成两台实体电脑交付验证。macOS 钥匙串选择“始终允许”后仍反复提示的问题尚未解决。对话续接和 Agent 限制见 VALIDATION.md；不会覆盖正在使用的 Agent 数据。
+安装包经三平台 CI、已签名更新源与安装检查验证。Hermes 合成测试不等于实际双机交付、模型实机续聊、Windows／Linux 运行期或 App Store 验收，这些关卡仍未达成。0.7.0 的目标选项、恢复套件与尚未解决的 macOS 钥匙串重复提示保持不变。
 
-独立下载安装包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 文件夹模式需要对应桌面程序。macOS 发布须通过 Developer ID 签名、公证和安装验证。Windows 发布者签名暂缓；更新包仍验证签名。
+独立下载安装包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 文件夹模式需要对应桌面程序。macOS 发布须通过 Developer ID 签名与公证；Windows 发布者签名暂缓；更新包仍验证签名。
 
 ## English
 
-0.7.0 lets you select one sync destination: the Google Drive API, an iCloud Drive folder, or a OneDrive folder. Folder modes use the provider's installed desktop sync client; they do not sign in to Apple or Microsoft directly. Choose a dedicated folder kept downloaded, create an encrypted space, and save its recovery kit outside that folder. Join on another computer with a kit for the same provider. Switching destinations does not migrate the old space. The credentials entry now explains storage and exports another recovery kit.
+0.8.0 adds a Hermes Agent source alongside the existing Google Drive API, iCloud Drive folder and OneDrive folder destinations. Select **Hermes Agent**, save and explicitly start synchronization. The source is `HERMES_HOME` or `~/.hermes`; a named profile's home is a custom path, and only one Hermes home is selected at a time. Native conversations and their required lineage (a finished async result travels inert; an in-flight job is a blocker) are restored into a separate managed home, and project working state and referenced attachments are read only under an authorized project mapping. An allowlisted portable workspace travels too — skills with assets, project rules, built-in memory files and a sanitized non-secret `config.yaml`. External Agent Memory OS memory is exported through its official CLI only under an explicit home binding (same identity but broad, with no content-level secret guarantee). Each restored version shows a five-language continuation report; credentials, model/provider login and secret config values are never transferred.
 
-A completed local cycle means Bastet handed encrypted objects to the selected folder. The provider's client handles upload, download, and delivery to another computer. Physical two-device delivery through iCloud or OneDrive has not been verified. Repeated macOS Keychain prompts after “Always Allow” remain unresolved. See VALIDATION.md for conversation continuation and agent limits; active agent stores are not overwritten.
+Installers are verified with three-platform CI, signed updater feeds and installer checks. Hermes fixtures are not physical two-device delivery, live-model continuation, Windows/Linux runtime or App Store acceptance; those gates remain open. The 0.7.0 destination options, recovery kits and the unresolved repeated macOS Keychain prompt are unchanged.
 
-Standalone installers do not require Node.js or Rust. Google API mode needs no Drive Desktop; iCloud and OneDrive folder modes require their respective desktop sync clients. macOS publication requires Developer ID signing, notarization, and installer verification. Windows publisher signing is deferred; update packages still require signature verification.
+Standalone installers do not require Node.js or Rust. Google API mode needs no Drive Desktop; iCloud and OneDrive folder modes require their respective desktop sync clients. macOS publication requires Developer ID signing and notarization; Windows publisher signing is deferred; update packages still require signature verification.
 
 ## 日本語
 
-0.7.0 では同期先を Google Drive API、iCloud Drive フォルダー、OneDrive フォルダーから一つ選べます。フォルダーモードは導入済みの各社デスクトップ同期アプリを使用し、Apple／Microsoft への直接ログインは行いません。ダウンロード済みの専用フォルダーを選び、暗号化スペースを作成して復元キットを同期フォルダーの外に保存します。別端末では同じサービス用のキットで参加します。同期先を変更しても旧スペースのデータは移行されません。認証情報画面から復元キットを再出力できます。
+0.8.0 は既存の Google Drive API、iCloud Drive フォルダー、OneDrive フォルダーに加えて Hermes Agent ソースを追加します。**Hermes Agent** を選択・保存して明示的に同期を開始してください。ソースは `HERMES_HOME` または `~/.hermes`。名前付き profile はホームをカスタムパスで指定し、同時に選択できる Hermes ホームは一つです。会話と必要な系譜（完了済みの非同期結果は不活性な形で伝送、実行中ジョブは blocker）は独立した管理ホームへ復元し、プロジェクト作業状態と参照添付は認可されたプロジェクト対応付けの下でのみ読み取ります。許可リスト化された可搬ワークスペース（アセット付きスキル、プロジェクト規則、内蔵メモリファイル、サニタイズ済みの非機密 `config.yaml`）も伝送します。外部 Agent Memory OS メモリは home を明示的にバインドした場合のみ公式 CLI でエクスポートします（同一アイデンティティですが範囲は広く、内容レベルの機密保証はありません）。各復元版は五言語の再開レポートを表示し、認証情報・モデル／プロバイダーのログイン・機密設定値は伝送されません。
 
-ローカル同期の完了は、Bastet が暗号化データを選択フォルダーに渡したことを示します。クラウドへの送受信と別端末への配信は各社の同期アプリが担います。iCloud／OneDrive を使った実機２台間の配信は未検証です。macOS キーチェーンで「常に許可」を選んだ後の繰り返し確認は未解決です。会話再開と Agent の制限は VALIDATION.md を参照してください。使用中の Agent データは上書きしません。
+インストーラーは三プラットフォーム CI、署名済み更新フィード、インストール検証で確認されます。Hermes の合成テストは実機２台への配信、モデル実機での再開、Windows／Linux 実行時、App Store の受入ではありません。これらのゲートは未達のままです。0.7.0 の同期先オプション、復元キット、未解決の macOS キーチェーン繰り返し確認は変わりません。
 
-単体配布版に Node.js と Rust は不要です。Google API モードに Drive Desktop は不要ですが、iCloud／OneDrive フォルダーモードには対応するデスクトップ同期アプリが必要です。macOS の公開には Developer ID 署名、公証、インストーラー検証が必要です。Windows 発行者署名は延期中で、更新パッケージの署名検証は継続します。
+単体配布版に Node.js と Rust は不要です。Google API モードに Drive Desktop は不要ですが、iCloud／OneDrive フォルダーモードには対応するデスクトップ同期アプリが必要です。macOS の公開には Developer ID 署名と公証が必要です。Windows 発行者署名は延期中で、更新パッケージの署名検証は継続します。
 
 ## 한국어
 
-0.7.0에서는 Google Drive API, iCloud Drive 폴더, OneDrive 폴더 중 하나를 동기화 대상으로 선택할 수 있습니다. 폴더 모드는 설치된 제공업체의 데스크톱 동기화 앱을 사용하며 Apple／Microsoft 계정에 직접 로그인하지 않습니다. 다운로드된 전용 폴더를 선택하고 암호화 공간을 만든 뒤 복구 키트를 동기화 폴더 밖에 보관하세요. 다른 컴퓨터에서는 같은 서비스용 키트로 참여합니다. 대상을 바꿔도 이전 공간의 데이터는 자동으로 옮겨지지 않습니다. 자격 증명 메뉴에서 보관 방법을 확인하고 복구 키트를 다시 내보낼 수 있습니다.
+0.8.0은 기존 Google Drive API, iCloud Drive 폴더, OneDrive 폴더에 더해 Hermes Agent 소스를 추가합니다. **Hermes Agent**를 선택하고 저장한 뒤 명시적으로 동기화를 시작하세요. 소스는 `HERMES_HOME` 또는 `~/.hermes`이며 이름이 있는 profile은 홈을 사용자 지정 경로로 지정하고, 한 번에 하나의 Hermes 홈만 선택합니다. 대화와 필요한 계보(완료된 비동기 결과는 불활성으로 전달, 진행 중 작업은 blocker)는 별도의 관리 홈에 복원하고, 프로젝트 작업 상태와 참조 첨부는 승인된 프로젝트 매핑 아래에서만 읽습니다. 허용 목록화된 휴대형 워크스페이스(에셋 포함 스킬, 프로젝트 규칙, 내장 메모리 파일, 정제된 비밀 아닌 `config.yaml`)도 함께 전송합니다. 외부 Agent Memory OS 메모리는 home을 명시적으로 바인딩한 경우에만 공식 CLI로 내보냅니다(동일 신원이지만 범위가 넓으며 내용 수준 비밀 보장은 없습니다). 각 복원 버전은 5개 언어 재개 보고서를 표시하고, 자격 증명·모델／공급자 로그인·비밀 설정 값은 전송되지 않습니다.
 
-로컬 동기화 완료는 Bastet이 암호화된 데이터를 선택한 폴더에 전달했음을 뜻합니다. 클라우드 업로드, 다운로드, 다른 컴퓨터로의 전달은 제공업체의 앱이 담당합니다. iCloud／OneDrive를 통한 실제 두 컴퓨터 간 전달은 아직 검증하지 않았습니다. macOS 키체인에서 “항상 허용”을 선택한 뒤에도 반복되는 요청은 해결되지 않았습니다. 대화 이어가기와 Agent 지원 범위는 VALIDATION.md를 확인하세요. 사용 중인 Agent 저장소는 덮어쓰지 않습니다.
+설치 프로그램은 3개 플랫폼 CI, 서명된 업데이트 피드, 설치 검증으로 확인됩니다. Hermes 합성 테스트는 실제 두 기기 전달, 모델 실기 재개, Windows／Linux 런타임, App Store 검증이 아니며 이 게이트들은 여전히 미충족입니다. 0.7.0의 대상 옵션, 복구 키트, 미해결 macOS 키체인 반복 요청은 그대로입니다.
 
-독립 설치 파일에는 Node.js와 Rust가 필요하지 않습니다. Google API 모드에는 Drive Desktop이 필요 없지만 iCloud／OneDrive 폴더 모드에는 각 서비스의 데스크톱 동기화 앱이 필요합니다. macOS 공개에는 Developer ID 서명, 공증, 설치 검증이 필요합니다. Windows 게시자 서명은 보류 중이며 업데이트 패키지 서명 검증은 계속 적용됩니다.
+독립 설치 파일에는 Node.js와 Rust가 필요하지 않습니다. Google API 모드에는 Drive Desktop이 필요 없지만 iCloud／OneDrive 폴더 모드에는 각 서비스의 데스크톱 동기화 앱이 필요합니다. macOS 공개에는 Developer ID 서명과 공증이 필요합니다. Windows 게시자 서명은 보류 중이며 업데이트 패키지 서명 검증은 계속 적용됩니다.

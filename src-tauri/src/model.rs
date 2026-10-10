@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const AGENTS: [&str; 8] = [
+pub const AGENTS: [&str; 9] = [
     "claude",
     "claude-code",
     "codex",
@@ -15,10 +15,15 @@ pub const AGENTS: [&str; 8] = [
     "pi",
     "agent-memory-os",
     "chatgpt-work",
+    "hermes",
 ];
 pub const LOCALES: [&str; 5] = ["en", "zh-Hant", "zh-Hans", "ja", "ko"];
 
 pub fn agent_available(id: &str) -> bool {
+    // agent-memory-os depends on a separate MCP integration the sandboxed Store
+    // build does not ship. Hermes restores through a folder picker into an
+    // isolated managed HERMES_HOME exactly like every other source, so it stays
+    // available in the Store build too.
     AGENTS.contains(&id) && !(cfg!(feature = "mac-app-store") && id == "agent-memory-os")
 }
 
@@ -110,6 +115,11 @@ pub fn discover(
             .map(PathBuf::from)
             .unwrap_or(home.join(".agent-memory")),
         codex,
+        // Hermes Agent: HERMES_HOME or the platform default ~/.hermes. Named
+        // profiles (~/.hermes/profiles/<name>) are selected as a custom path.
+        env.get("HERMES_HOME")
+            .map(PathBuf::from)
+            .unwrap_or(home.join(".hermes")),
     ];
     AGENTS
         .iter()
@@ -395,10 +405,40 @@ mod tests {
         let mut paths = HashMap::new();
         paths.insert("codex".into(), custom.to_string_lossy().into_owned());
         let agents = discover(dir.path(), dir.path(), &paths, &HashMap::new());
-        assert_eq!(agents.len(), 8);
+        assert_eq!(agents.len(), 9);
         assert_eq!(agents[2].detected, !cfg!(feature = "mac-app-store"));
         assert!(agents[2].custom);
         assert!(!agents[1].detected);
+    }
+    #[cfg(not(feature = "mac-app-store"))]
+    #[test]
+    fn hermes_home_is_discovered_from_env_default_and_custom_override() {
+        let dir = tempfile::tempdir().unwrap();
+        // Default: a home beside the invoking user's home directory.
+        let default = discover(dir.path(), dir.path(), &HashMap::new(), &HashMap::new());
+        let hermes = default.iter().find(|a| a.id == "hermes").unwrap();
+        assert_eq!(hermes.path, dir.path().join(".hermes").to_string_lossy());
+        assert!(!hermes.custom);
+        // HERMES_HOME overrides the default and is detected when it exists.
+        let env_home = dir.path().join("hermes-env");
+        fs::create_dir(&env_home).unwrap();
+        let env = HashMap::from([(
+            "HERMES_HOME".to_string(),
+            env_home.to_string_lossy().into_owned(),
+        )]);
+        let detected = discover(dir.path(), dir.path(), &HashMap::new(), &env);
+        let hermes = detected.iter().find(|a| a.id == "hermes").unwrap();
+        assert_eq!(hermes.path, env_home.to_string_lossy());
+        assert!(hermes.detected);
+        // A named profile is selectable as a custom path.
+        let profile = env_home.join("profiles/coder");
+        fs::create_dir_all(&profile).unwrap();
+        let overrides =
+            HashMap::from([("hermes".to_string(), profile.to_string_lossy().into_owned())]);
+        let custom = discover(dir.path(), dir.path(), &overrides, &env);
+        let hermes = custom.iter().find(|a| a.id == "hermes").unwrap();
+        assert_eq!(hermes.path, profile.to_string_lossy());
+        assert!(hermes.custom);
     }
     #[test]
     fn ancestor_and_descendant_destinations_rejected() {
@@ -470,6 +510,17 @@ mod tests {
             dir.path().to_string_lossy().into_owned(),
         );
         assert_eq!(validate(&s), Err("invalid_source".into()));
+    }
+
+    // Hermes restores through the folder picker into an isolated managed home,
+    // so it must remain selectable in the Store build (only the MCP-backed memory
+    // source is withheld).
+    #[cfg(feature = "mac-app-store")]
+    #[test]
+    fn store_keeps_hermes_available() {
+        assert!(agent_available("hermes"));
+        assert!(!agent_available("agent-memory-os"));
+        assert!(!agent_available("not-an-agent"));
     }
     #[cfg(feature = "mac-app-store")]
     #[test]
