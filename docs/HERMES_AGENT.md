@@ -1,6 +1,6 @@
 # 🐈 Hermes Agent synchronization
 
-Status: the Hermes Agent source shipped in **0.8.0**; **0.8.1** is a maintenance patch that makes multipart readiness honest (present + index consistency, labelled "parts received — integrity will be verified before restore", never "ready"/"verified"). Published 0.7.0/0.8.0 installers are unchanged by 0.8.1 until its own publication completes. Final executed-test evidence belongs in [VALIDATION.md](VALIDATION.md); fixture success is not physical-device or live-model acceptance.
+Status: the Hermes Agent source shipped in **0.8.0**; **0.8.1** (published 2026-10-11) is a maintenance patch that makes multipart readiness honest (present + index consistency, labelled "parts received — integrity will be verified before restore", never "ready"/"verified"). Published 0.7.0/0.8.0 installers are unchanged. Final executed-test evidence belongs in [VALIDATION.md](VALIDATION.md); fixture success is not physical-device or live-model acceptance.
 
 **Superseded scope.** The first Hermes change restored one conversation database only and treated skills, rules, built-in/external memory, sanitized config, project working state, attachments and native cross-session lineage as out of scope. That scope is superseded by the user's requirement to continue actual work across hosts and operating systems; API keys and login remain recipient-managed. The continuation behavior below is implemented and locally fixture-tested. The external acceptance gates at the end stay open — this document does not claim them.
 

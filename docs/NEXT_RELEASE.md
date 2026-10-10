@@ -2,13 +2,13 @@
 
 ## 0.8.1 multipart readiness honesty repair
 
-Patch release on top of 0.8.0. Published 0.8.0 installers are unchanged until this version's four-target CI, signed packages and publication complete. The running installed application is not replaced.
+Patch release on top of 0.8.0, published 2026-10-11 as [v0.8.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.8.1) (public/latest, 19 assets, tagged source `a8d40873662ddf44d07a2dfc658d1764bb08ad49`). The running installed application is not replaced.
 
 - [x] Replace presence-only multipart `ready` with `complete` (present + index consistency) and label it "parts received — integrity will be verified before restore" in five locales; never "ready"/"verified".
 - [x] Accept part presence only from a well-formed `PortablePart`, so a forged/truncated bundle embedding a transfer id as a substring cannot inflate presence.
 - [x] Align the native crash-window profile enumerator to `MAX_MANIFEST_FILES` instead of a fixed 2048.
 - [x] Regression tests (RED then GREEN), frontend honesty test, both feature sets and five-language notes.
-- [ ] Publish v0.8.1 (four installer targets, macOS Developer ID signing/notarization, updater signatures, public readback) and record immutable evidence.
+- [x] Publish v0.8.1 (four installer targets, macOS Developer ID signing/notarization, updater signatures, public readback) and record immutable evidence.
 
 A buffered, not streaming, transport and an in-memory mock relay mean fixture coverage is not real cloud delivery. The pre-existing Store-parallel `sync_busy` flake is unchanged. Physical two-device delivery, live model/provider continuation, Windows/Linux runtime acceptance and signed Store sandbox acceptance remain open.
 

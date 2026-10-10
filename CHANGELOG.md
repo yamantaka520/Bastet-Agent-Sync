@@ -2,7 +2,7 @@
 
 ## 0.8.1 — Hermes multipart readiness honesty repair (2026-10-11)
 
-Patch release on top of the published 0.8.0 Hermes source. Published installers are unchanged until this version's four-target CI, signed packages and publication complete; the running installed application is not replaced by this release.
+Patch release on top of the published 0.8.0 Hermes source. Published 2026-10-11: [v0.8.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.8.1) is public/latest with 19 assets and five-language notes; tagged source `a8d40873662ddf44d07a2dfc658d1764bb08ad49`. All four installer targets built (both macOS architectures Developer ID signed and Apple notarized; Windows publisher signing explicitly deferred), all 7 updater signatures were cryptographically verified, and the installed user application is not replaced by this release.
 
 - Replace the presence-only multipart readiness `ready` flag with `complete` (every declared part present and the index internally consistent) and label it, in all five locales, "parts received — integrity will be verified before restore" — never "ready" or "verified". Compare/restore still verify every chunk, so a complete-but-tampered transfer is refused there; incomplete transfers still gate compare/restore. Backend type/serialized key, frontend type, badge state and tests updated together.
 - Attribute part presence only from a well-formed `PortablePart` (matching part-number and hash transfer): a forged/unparseable bundle embedding a transfer id as a substring can no longer inflate presence to a false `complete`.
