@@ -1751,8 +1751,15 @@ fn hermes_transform_remaps_windows_attachment_reference() {
             r.get(0)
         })
         .unwrap();
+    // The rewritten reference uses the platform separator, so join it the same
+    // way on Windows (`\`) and POSIX (`/`).
+    let expected_ref = Path::new(&target_str)
+        .join("assets")
+        .join("logo.png")
+        .to_string_lossy()
+        .into_owned();
     assert!(
-        content.contains(&format!("@file:{target_str}/assets/logo.png")),
+        content.contains(&format!("@file:{expected_ref}")),
         "{content}"
     );
     assert!(!content.contains(r"C:\work"));
