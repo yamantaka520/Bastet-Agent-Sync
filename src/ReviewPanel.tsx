@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Locale } from "./i18n";
 import { ops } from "./operations-i18n";
 import { formatBytes } from "./TrafficStatus";
+import { portableErrorText } from "./portable-errors";
 type FileDiff = {
   path: string;
   state: string;
@@ -22,6 +23,7 @@ export default function ReviewPanel({
   portable = false,
   disabled,
   onRestore,
+  onError,
 }: {
   locale: Locale;
   agent: string;
@@ -29,15 +31,16 @@ export default function ReviewPanel({
   portable?: boolean;
   disabled: boolean;
   onRestore?: () => void;
+  onError?: (code: string) => void;
 }) {
   const t = ops[locale];
   const [sourceAgent, setSourceAgent] = useState(agent);
   const [comparison, setComparison] = useState<Comparison | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState("");
   async function compare() {
     setBusy(true);
-    setError(false);
+    setError("");
     try {
       setComparison(
         await invoke(
@@ -45,8 +48,10 @@ export default function ReviewPanel({
           { agent, id, ...(!portable ? { sourceAgent } : {}) },
         ),
       );
-    } catch {
-      setError(true);
+    } catch (e) {
+      const code = String(e);
+      setError(code);
+      onError?.(code);
     } finally {
       setBusy(false);
     }
@@ -54,7 +59,7 @@ export default function ReviewPanel({
   async function mark() {
     if (!comparison) return;
     setBusy(true);
-    setError(false);
+    setError("");
     try {
       await invoke("review_received_session", {
         agent,
@@ -63,12 +68,19 @@ export default function ReviewPanel({
         sourceAgent,
       });
       setComparison({ ...comparison, reviewed: true });
-    } catch {
-      setError(true);
+    } catch (e) {
+      setError(String(e));
     } finally {
       setBusy(false);
     }
   }
+  // A multipart transport code gets its own actionable, localized message (an
+  // incomplete transfer reads as waiting for its missing parts, never ready);
+  // any other failure keeps the shared generic text. When a parent owns the
+  // per-item state (onError), it renders the message and this stays silent so
+  // the same alert is never duplicated.
+  const errorText =
+    (portable ? portableErrorText(error, locale) : null) ?? t.error;
   return (
     <div className="review-panel">
       {!portable && agent === "codex" && (
@@ -90,7 +102,7 @@ export default function ReviewPanel({
       <button disabled={disabled || busy} onClick={() => void compare()}>
         {t.compare}
       </button>
-      {error && <p role="alert">{t.error}</p>}
+      {error && !onError && <p role="alert">{errorText}</p>}
       {comparison && (
         <div>
           <p>{comparison.reviewed ? t.reviewed : t.compare}</p>

@@ -69,7 +69,7 @@ const VERSION: u32 = 1;
 
 /// Bounds applied to a single capture. Exceeding any of them is reported as an
 /// explicit `project_limit` blocker, never a silent drop.
-const MAX_FILES: usize = 2048;
+pub(crate) const MAX_FILES: usize = 2048;
 const MAX_FILE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_DEPTH: usize = 32;

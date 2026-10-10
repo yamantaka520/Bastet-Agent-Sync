@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.1 — Hermes multipart readiness honesty repair (2026-10-11)
+
+Patch release on top of the published 0.8.0 Hermes source. Published installers are unchanged until this version's four-target CI, signed packages and publication complete; the running installed application is not replaced by this release.
+
+- Replace the presence-only multipart readiness `ready` flag with `complete` (every declared part present and the index internally consistent) and label it, in all five locales, "parts received — integrity will be verified before restore" — never "ready" or "verified". Compare/restore still verify every chunk, so a complete-but-tampered transfer is refused there; incomplete transfers still gate compare/restore. Backend type/serialized key, frontend type, badge state and tests updated together.
+- Attribute part presence only from a well-formed `PortablePart` (matching part-number and hash transfer): a forged/unparseable bundle embedding a transfer id as a substring can no longer inflate presence to a false `complete`.
+- Align the native crash-window profile enumerator to the derived `MAX_MANIFEST_FILES` (was a fixed 2048) so a legitimate >2048-file home is recoverable rather than refused as `session_limit`.
+- Local: default Rust **273 passed / 9 ignored** and Store-feature Rust **260 passed / 6 ignored** (both serial), strict Clippy for both feature sets, `cargo fmt --check`, frontend `npm test` **104 passed** and the production build all pass. The multipart transport is buffered, not streaming; fixtures use an in-memory mock relay, not real cloud delivery; the pre-existing Store-parallel `sync_busy` flake remains. See [validation](docs/VALIDATION.md).
+
 ## 0.8.0 — Hermes Agent (2026-10-10)
 
 Release candidate prepared 2026-10-10; cross-platform CI, signed packages and publication are pending. Not yet published or installed. Published 0.7.0 installers are unchanged. The initial scope (a single restored conversation database, with skills/memory/config/project/attachments/lineage out of scope) is superseded; the continuation behavior below is implemented and locally fixture-tested, and external acceptance is not yet earned.

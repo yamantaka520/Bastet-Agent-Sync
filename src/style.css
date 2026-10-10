@@ -967,6 +967,25 @@ details summary {
   border: 1px solid #e3e2d8;
   border-radius: 8px;
 }
+.portable-badge {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.9em;
+}
+.portable-badge.portable-pending,
+.portable-pending {
+  background: #fdf3d6;
+  border: 1px solid #e6c96a;
+}
+.portable-badge.portable-complete {
+  background: #e6f4ea;
+  border: 1px solid #86c48f;
+}
+.portable-badge.portable-error {
+  background: #fbe9e7;
+  border: 1px solid #e08a7d;
+}
 @media (max-width: 700px) {
   .diff-columns {
     grid-template-columns: 1fr;

@@ -1,6 +1,7 @@
 import type { Locale } from "./i18n";
 import { spaceErrorText } from "./space-errors";
 import { projectError } from "./project-errors";
+import { portableErrorText } from "./portable-errors";
 
 const rows = {
   "zh-Hant": [
@@ -171,6 +172,12 @@ export function issueText(code: string, locale: Locale) {
   if (project) return project;
   const spaceError = spaceErrorText(code, locale);
   if (spaceError) return spaceError;
+  // Multipart portable transport codes (incomplete transfer, tampered part,
+  // foreign part, unsupported version, transfer limit) resolve before the
+  // generic `/limit/` and default fallbacks so a pending transfer reads as
+  // waiting for its missing parts, never as a generic total sync failure.
+  const portableError = portableErrorText(code, locale);
+  if (portableError) return portableError;
   if (code === "session_conflict") return t[18];
   if (code === "source_changing") return t[19];
   if (/limit/.test(code)) return t[20];

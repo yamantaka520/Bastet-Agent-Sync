@@ -3601,3 +3601,274 @@ fn installed_cli_provider_setup_imports_and_rechecks() {
         crate::amos_runtime::export(&cli, &managed.join(".agent-memory"), staging.path()).unwrap();
     assert!(text.contains("Legacy A") && text.contains("Legacy B"));
 }
+
+// ---------------------------------------------------------------------------
+// Native Hermes workspace continuity: a home with more than 256 skill files and
+// a binary asset larger than the old single-object budget must travel the
+// *native* capture -> encrypted queue -> receiver -> restore path (the shared
+// `hermes_workspace` capture plus the per-conversation native blob), not merely
+// the optional portable helper. Synthetic homes only; no live profile is read.
+// ---------------------------------------------------------------------------
+
+/// Deterministic, incompressible bytes so the asset does not gzip away and the
+/// native gz/parts split is exercised deterministically.
+fn native_entropy(len: usize) -> Vec<u8> {
+    let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+    (0..len)
+        .map(|_| {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 24) as u8
+        })
+        .collect()
+}
+
+#[test]
+fn hermes_native_home_over_256_skills_and_a_multi_megabyte_asset_round_trips() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path().join("home");
+    fs::create_dir_all(&home).unwrap();
+    hermes_db(&home.join("state.db"), &[(A, "/project")]);
+
+    // 400 skill files: more than the former per-part 256-file capture budget.
+    let mut expected: BTreeMap<String, Vec<u8>> = BTreeMap::new();
+    for i in 0..400 {
+        let rel = format!("skills/skill{i:04}/SKILL.md");
+        let bytes = format!("# skill {i}\nbody {i}\n").into_bytes();
+        fs::create_dir_all(home.join(&rel).parent().unwrap()).unwrap();
+        fs::write(home.join(&rel), &bytes).unwrap();
+        expected.insert(rel, bytes);
+    }
+    // A 2 MiB binary asset: larger than the former 1 MiB per-file capture cap.
+    let asset = native_entropy(2 * 1024 * 1024);
+    let asset_rel = "skills/assets/payload.bin".to_string();
+    fs::create_dir_all(home.join(&asset_rel).parent().unwrap()).unwrap();
+    fs::write(home.join(&asset_rel), &asset).unwrap();
+    expected.insert(asset_rel.clone(), asset.clone());
+
+    let root = temp.path().join("sync");
+    let key = SpaceKey::generate().unwrap();
+    let remote = remote();
+    let status = cycle(
+        &root,
+        &binding(),
+        &key,
+        &remote,
+        "hermes",
+        &home,
+        Direction::Upload,
+        || false,
+    )
+    .unwrap();
+    assert!(status.published >= 1, "{:?}", status.issues);
+
+    // The receiver recovers the native manifest from the encrypted queue.
+    let bundles = remote.0.borrow().clone();
+    let head = bundles
+        .values()
+        .find(|b| {
+            b.snapshot.stream.agent == "hermes"
+                && b.snapshot.stream.conversation == bundle::hash(A.as_bytes())
+        })
+        .expect("a hermes session bundle")
+        .clone();
+    let m = unpack(&head, &bundles).unwrap();
+
+    // Every skill file (>256) survives and the >1 MiB asset is intact.
+    let skills = m.files.keys().filter(|p| p.starts_with("skills/")).count();
+    assert!(skills > 256, "captured {skills} skill files");
+    assert_eq!(
+        STANDARD.decode(m.files.get(&asset_rel).unwrap()).unwrap(),
+        asset
+    );
+
+    // The receiver writes the whole workspace into an isolated destination,
+    // byte-identical — including the multi-megabyte binary asset.
+    let dest = temp.path().join("restored");
+    restore(&head, &bundles, &dest).unwrap();
+    for (rel, bytes) in &expected {
+        assert_eq!(&fs::read(dest.join(rel)).unwrap(), bytes, "{rel}");
+    }
+}
+
+#[test]
+fn hermes_native_oversized_home_travels_as_parts_and_waits_for_every_part() {
+    let temp = tempfile::tempdir().unwrap();
+    // A manifest equivalent to a >256-skill home carrying a multi-megabyte asset.
+    let mut files = BTreeMap::new();
+    files.insert("state.db".to_string(), STANDARD.encode(b"native-store"));
+    for i in 0..400 {
+        files.insert(
+            format!("skills/s{i:04}/SKILL.md"),
+            STANDARD.encode(format!("# {i}\n").as_bytes()),
+        );
+    }
+    let asset = native_entropy(2 * 1024 * 1024);
+    files.insert("skills/big/data.bin".to_string(), STANDARD.encode(&asset));
+    let m = Manifest {
+        version: 1,
+        agent: "hermes".into(),
+        session: A.into(),
+        cwd: "/project".into(),
+        files: files.clone(),
+    };
+
+    let replica = Replica::open(&temp.path().join("replica"), "space").unwrap();
+    let mut journal = Journal {
+        node: "node".into(),
+        ..Default::default()
+    };
+    // A small part size forces the native gz/parts path deterministically; the
+    // wire format is identical to the 23 MiB part the real cycle uses.
+    let mut batch = replica.export_batch().unwrap();
+    let id = publish(&m, &mut batch, &mut journal, 256 * 1024).unwrap();
+    drop(batch);
+    let all = replica.transport_bundles().unwrap();
+    let root = all[&id].clone();
+    assert!(root.snapshot.files.contains_key("session.parts.json"));
+    let parts: Parts =
+        serde_json::from_str(&root.snapshot.files["session.parts.json"].content).unwrap();
+    assert!(
+        parts.ids.len() > 1 && parts.ids.len() <= 64,
+        "{} parts",
+        parts.ids.len()
+    );
+
+    // Readiness is never inferred from a partial transfer: a missing part refuses
+    // and nothing is written.
+    let mut incomplete = all.clone();
+    incomplete.remove(&parts.ids[0]);
+    let target = temp.path().join("restored");
+    assert_eq!(
+        restore(&root, &incomplete, &target).unwrap_err(),
+        "session_parts_pending"
+    );
+    assert!(!target.exists());
+
+    // The complete set reassembles byte-identical, including the binary asset.
+    restore(&root, &all, &target).unwrap();
+    for (rel, encoded) in &m.files {
+        assert_eq!(
+            fs::read(target.join(rel)).unwrap(),
+            STANDARD.decode(encoded).unwrap(),
+            "{rel}"
+        );
+    }
+}
+
+/// BLOCKING BUG (currently FAILS) — producer/receiver file-count ceiling
+/// mismatch. The workspace capture now admits up to `MAX_WORKSPACE_FILES`
+/// (65536) files, but the receiver's `decode` still refuses a manifest with more
+/// than 2048 files, so a legitimately large home is captured and published yet
+/// can never be unpacked (`session_invalid`). Required invariant: a published
+/// home round-trips.
+#[test]
+fn hermes_native_receiver_accepts_a_home_beyond_one_native_file_ceiling() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut files = BTreeMap::new();
+    files.insert("state.db".to_string(), STANDARD.encode(b"native-store"));
+    for i in 0..2100 {
+        files.insert(
+            format!("skills/s{i:04}/SKILL.md"),
+            STANDARD.encode(b"# x\n"),
+        );
+    }
+    let m = Manifest {
+        version: 1,
+        agent: "hermes".into(),
+        session: A.into(),
+        cwd: "/project".into(),
+        files,
+    };
+    let replica = Replica::open(&temp.path().join("replica"), "space").unwrap();
+    let mut journal = Journal {
+        node: "node".into(),
+        ..Default::default()
+    };
+    let mut batch = replica.export_batch().unwrap();
+    let id = publish(&m, &mut batch, &mut journal, PART_SIZE).unwrap();
+    drop(batch);
+    let all = replica.transport_bundles().unwrap();
+    assert_eq!(
+        unpack(&all[&id], &all).unwrap().files.len(),
+        m.files.len(),
+        "a published home must round-trip regardless of its file count"
+    );
+}
+
+/// The producer refuses a source that cannot fit the *shared* manifest ceiling
+/// before upload, with an explicit limit cause — never publishing a home the
+/// receiver would only later reject as `session_invalid`.
+#[test]
+fn hermes_native_producer_rejects_a_home_over_the_manifest_file_ceiling() {
+    let temp = tempfile::tempdir().unwrap();
+    let mut files = BTreeMap::new();
+    files.insert("state.db".to_string(), STANDARD.encode(b"native-store"));
+    for i in 0..MAX_MANIFEST_FILES {
+        files.insert(
+            format!("skills/s{i:06}/SKILL.md"),
+            STANDARD.encode(b"# x\n"),
+        );
+    }
+    assert_eq!(files.len(), MAX_MANIFEST_FILES + 1);
+    let m = Manifest {
+        version: 1,
+        agent: "hermes".into(),
+        session: A.into(),
+        cwd: "/project".into(),
+        files,
+    };
+    let replica = Replica::open(&temp.path().join("replica"), "space").unwrap();
+    let mut journal = Journal {
+        node: "node".into(),
+        ..Default::default()
+    };
+    let mut batch = replica.export_batch().unwrap();
+    assert_eq!(
+        publish(&m, &mut batch, &mut journal, PART_SIZE).unwrap_err(),
+        "session_limit",
+        "an impossible source is refused before upload with an explicit cause"
+    );
+    drop(batch);
+    // The rejected source published nothing.
+    assert!(replica.transport_bundles().unwrap().is_empty());
+}
+
+/// The shared ceiling is *derived* from the namespace budgets it merges, so a
+/// home right at the merged file-count ceiling still round-trips while one past
+/// it is refused: the two ends cannot disagree.
+#[test]
+fn hermes_native_file_ceiling_is_the_derived_union_of_namespaces() {
+    const {
+        assert!(
+            MAX_MANIFEST_FILES
+                == 1 + crate::hermes_workspace::MAX_WORKSPACE_FILES
+                    + crate::hermes_project::MAX_FILES
+                    + MANIFEST_SIDECAR_FILES
+        );
+        assert!(MAX_MANIFEST_FILES >= crate::hermes_workspace::MAX_WORKSPACE_FILES);
+    };
+}
+
+/// The crash-window recovery enumerator (`profile_files`) bounds its walk by the
+/// *same* manifest ceiling the producer and receiver enforce, not the old fixed
+/// 2048: a legitimate home with more than 2048 files is enumerable (so its
+/// pristine re-restore compares equal) instead of being refused as
+/// `session_limit`.
+#[test]
+fn profile_recovery_enumeration_accepts_a_home_beyond_the_old_2048_cap() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("home");
+    fs::create_dir_all(&root).unwrap();
+    for i in 0..2100 {
+        let rel = format!("skills/s{i:05}/SKILL.md");
+        let path = root.join(&rel);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, b"# x\n").unwrap();
+    }
+    let mut found = std::collections::BTreeSet::new();
+    profile_files(&root, &root, 8, &mut found).unwrap();
+    assert_eq!(found.len(), 2100, "a >2048-file home is enumerable");
+    assert!(found.contains("skills/s00000/SKILL.md"));
+}

@@ -29,6 +29,25 @@ use tauri::Manager;
 const MAX_RAW: u64 = 512 * 1024 * 1024;
 const MAX_PACKED: u64 = 384 * 1024 * 1024;
 const PART_SIZE: usize = 23 * 1024 * 1024;
+/// Fixed sidecar entries a native manifest may carry beyond the merged
+/// namespaces: its own `state.db`, the attachment index, the async-delegation
+/// index and the external-memory manifest/export/config/binding. Small and
+/// deliberate so the derived ceiling below is dominated by the real namespace
+/// budgets rather than an arbitrary slack number.
+const MANIFEST_SIDECAR_FILES: usize = 8;
+/// File-count ceiling for one native manifest, shared by the producer
+/// (`encode`) and the receiver (`decode` and the compare path) so *every*
+/// captured home is decodable. It is derived — never an arbitrary number — as
+/// the sum of the independent namespace ceilings the manifest merges:
+/// the portable workspace ([`hermes_workspace::MAX_WORKSPACE_FILES`]), the
+/// project working tree ([`hermes_project::MAX_FILES`]) and a fixed sidecar
+/// overhead. Lowering any namespace ceiling lowers this ceiling, and a source
+/// that cannot fit it is refused before upload (`session_limit`) instead of
+/// being published and only later rejected as `session_invalid`.
+pub(crate) const MAX_MANIFEST_FILES: usize = 1
+    + crate::hermes_workspace::MAX_WORKSPACE_FILES
+    + crate::hermes_project::MAX_FILES
+    + MANIFEST_SIDECAR_FILES;
 #[cfg(test)]
 std::thread_local! {
     static ENCODE_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -3164,6 +3183,12 @@ fn encode(manifest: &Manifest) -> Result<String> {
     if !manifest_paths_safe(manifest) {
         return Err("session_invalid".into());
     }
+    // Reject an impossible source *before* upload, with an explicit limit
+    // cause, at exactly the ceiling the receiver enforces. Without this the
+    // manifest is published and only refused later as `session_invalid`.
+    if manifest.files.len() > MAX_MANIFEST_FILES {
+        return Err("session_limit".into());
+    }
     if manifest.files.values().map(|s| s.len() as u64).sum::<u64>() > MAX_RAW - 1024 * 1024 {
         return Err("session_limit".into());
     }
@@ -3194,7 +3219,7 @@ fn decode(text: &str) -> Result<Manifest> {
         || m.agent == "agent-memory-os"
         || !bundle::token(&m.session)
         || m.files.is_empty()
-        || m.files.len() > 2048
+        || m.files.len() > MAX_MANIFEST_FILES
         || !manifest_paths_safe(&m)
     {
         return Err("session_invalid".into());
@@ -3653,7 +3678,7 @@ fn profile_files(
         } else {
             return Err("unsafe_store".into());
         }
-        if files.len() > 2048 {
+        if files.len() > MAX_MANIFEST_FILES {
             return Err("session_limit".into());
         }
     }
@@ -4596,7 +4621,7 @@ fn compare_session(
     let all = replica.transport_bundles()?;
     let b = all.get(id).ok_or("session_invalid")?;
     let manifest = unpack(b, &all)?;
-    if manifest.agent != canonical || manifest.files.len() > 2048 {
+    if manifest.agent != canonical || manifest.files.len() > MAX_MANIFEST_FILES {
         return Err("session_invalid".into());
     }
     let mut files = Vec::new();

@@ -52,12 +52,30 @@ pub(crate) const MANIFEST: &str = "bastet/workspace-manifest.json";
 
 const AGENT: &str = "hermes";
 const SCHEMA: u32 = 1;
-const MAX_FILE: u64 = 1024 * 1024;
-const MAX_TOTAL: usize = 16 * 1024 * 1024;
-const MAX_FILES: usize = 256;
 const MAX_DEPTH: usize = 8;
 /// Headroom kept free so the manifest plus captured files stay inside the totals.
 const RESERVE: usize = 256 * 1024;
+/// Workspace-wide ceilings. The capture returns the *whole* workspace; the
+/// bounded multipart splitter (see `portable_parts`) then divides it into parts
+/// that each honour the per-part budgets `MAX_PART_FILES` (`256`) /
+/// `MAX_PART_BYTES` (`16 MiB`) / `MAX_CHUNK_BYTES` (`1 MiB`). These totals are
+/// only a resource-abuse backstop, never a truncation point: content beyond the
+/// per-part budget is *chunked into further parts*, and content beyond the totals
+/// is refused explicitly rather than silently dropped.
+const MAX_WORKSPACE_FILE: u64 = 64 * 1024 * 1024;
+pub(crate) const MAX_WORKSPACE_FILES: usize = 65_536;
+const MAX_WORKSPACE_BYTES: usize = 512 * 1024 * 1024;
+/// Upper bound on the number of metadata *rows* (`issues` + `dependencies`) a
+/// single manifest may carry. Those rows are per-source diagnostics and
+/// recipient requirements, not payload entries, so they must not be capped by
+/// the payload file-count budget: a home with many installed skills legitimately
+/// produces far more rows than it ships files. The manifest is one workspace
+/// file bounded to [`MAX_WORKSPACE_FILE`] bytes (checked before the manifest is
+/// validated on the producing and receiving paths), and this bound is derived
+/// from that byte budget divided by a floor on a row's serialized size, so it
+/// cannot bind before the byte budget does while still refusing a pathological,
+/// not-yet-size-checked row array.
+const MAX_MANIFEST_ROWS: usize = MAX_WORKSPACE_FILE as usize / 32;
 
 /// Identity file read from `HERMES_HOME` and project rules discovered by the
 /// runtime's context-file loader.
@@ -362,14 +380,23 @@ impl WorkspaceManifest {
         if self.version != SCHEMA || self.agent != AGENT {
             return Err("workspace_format".into());
         }
-        if self.files.len() > MAX_FILES
-            || self.issues.len() > MAX_FILES
-            || self.dependencies.len() > MAX_FILES
-        {
+        if self.files.len() > MAX_WORKSPACE_FILES {
+            return Err("workspace_limit".into());
+        }
+        // `issues` and `dependencies` are metadata rows (per-source diagnostics
+        // and recipient requirements), not payload entries, so they are bounded
+        // independently of the payload file-count budget [`MAX_FILES`]. The
+        // manifest is a single workspace file already size-bounded to [`MAX_FILE`]
+        // bytes on both the producing and receiving paths, and [`MAX_MANIFEST_ROWS`]
+        // is sized so it cannot bind before that byte budget.
+        if self.issues.len() + self.dependencies.len() > MAX_MANIFEST_ROWS {
             return Err("workspace_limit".into());
         }
         for file in &self.files {
-            if !allowed(&file.path) || !bundle::is_hash(&file.sha256) || file.bytes > MAX_FILE {
+            if !allowed(&file.path)
+                || !bundle::is_hash(&file.sha256)
+                || file.bytes > MAX_WORKSPACE_FILE
+            {
                 return Err("workspace_unsafe".into());
             }
         }
@@ -610,15 +637,15 @@ fn insert(
     kind: &str,
     bytes: &[u8],
 ) -> Result<()> {
-    if files.len() + 1 >= MAX_FILES {
+    if files.len() + 1 > MAX_WORKSPACE_FILES {
         manifest.issue(path, "excluded", "file_count_limit", true);
         return Ok(());
     }
-    if bytes.len() as u64 > MAX_FILE {
+    if bytes.len() as u64 > MAX_WORKSPACE_FILE {
         manifest.issue(path, "excluded", "oversized", true);
         return Ok(());
     }
-    if *total + bytes.len() + RESERVE > MAX_TOTAL {
+    if *total + bytes.len() + RESERVE > MAX_WORKSPACE_BYTES {
         manifest.issue(path, "excluded", "total_limit", true);
         return Ok(());
     }
@@ -647,7 +674,7 @@ fn capture_plain(
     manifest: &mut WorkspaceManifest,
     total: &mut usize,
 ) -> Result<()> {
-    match review::local_file(root, rel, MAX_FILE) {
+    match review::local_file(root, rel, MAX_WORKSPACE_FILE) {
         Ok(Some(bytes)) => insert(files, manifest, total, rel, kind, &bytes),
         Ok(None) => {
             manifest.issue(rel, "missing", "missing", false);
@@ -708,7 +735,7 @@ fn walk(
                 manifest.issue(&rel, "excluded", "unsupported_or_sensitive_path", false);
                 continue;
             }
-            match review::local_file(root, &rel, MAX_FILE) {
+            match review::local_file(root, &rel, MAX_WORKSPACE_FILE) {
                 Ok(Some(bytes)) => insert(files, manifest, total, &rel, "skill", &bytes)?,
                 Ok(None) => {}
                 Err(reason) if reason == "bundle_limit" => {
@@ -1146,7 +1173,7 @@ pub(crate) fn capture(root: &Path) -> Result<BTreeMap<String, String>> {
     let mut manifest = WorkspaceManifest::default();
     let mut total = 0usize;
 
-    match review::local_file(root, CONFIG, MAX_FILE) {
+    match review::local_file(root, CONFIG, MAX_WORKSPACE_FILE) {
         Ok(Some(bytes)) => match std::str::from_utf8(&bytes) {
             Ok(text) => {
                 collect_mcp(&mut manifest, text);
@@ -1215,7 +1242,7 @@ pub(crate) fn validate(files: &BTreeMap<String, String>) -> Result<()> {
             return Err("workspace_unsafe".into());
         }
         let bytes = STANDARD.decode(encoded).map_err(|_| "workspace_format")?;
-        if bytes.len() as u64 > MAX_FILE {
+        if bytes.len() as u64 > MAX_WORKSPACE_FILE {
             return Err("workspace_limit".into());
         }
         total += bytes.len();
@@ -1239,7 +1266,7 @@ pub(crate) fn validate(files: &BTreeMap<String, String>) -> Result<()> {
         }
         workspace.push(path);
     }
-    if total > MAX_TOTAL || workspace.len() > MAX_FILES {
+    if total > MAX_WORKSPACE_BYTES || workspace.len() > MAX_WORKSPACE_FILES {
         return Err("workspace_limit".into());
     }
     if !crate::portable_paths::paths_do_not_collide(workspace.iter().copied()) {
@@ -1516,17 +1543,30 @@ mod tests {
     fn oversize_and_missing_sources_are_explicit_never_silent() {
         let root = tempfile::tempdir().unwrap();
         write(root.path(), "skills/cat/SKILL.md", b"# Cat\n");
+        // A legitimate asset larger than one chunk (1 MiB) is NOT dropped: the
+        // bounded multipart splitter chunks it across parts, so `capture` returns
+        // the whole file untruncated.
+        let large = 2 * 1024 * 1024;
+        write(root.path(), "skills/cat/assets/big.bin", &vec![7u8; large]);
+        // A pathological single file beyond the workspace-wide abuse ceiling is
+        // refused explicitly — still never a silent drop.
         write(
             root.path(),
-            "skills/cat/assets/big.bin",
-            &vec![0u8; MAX_FILE as usize + 1],
+            "skills/cat/assets/huge.bin",
+            &vec![0u8; MAX_WORKSPACE_FILE as usize + 1],
         );
         // SOUL.md, memories and config.yaml are intentionally absent.
         let files = capture(root.path()).unwrap();
         validate(&files).unwrap();
         let manifest = manifest_of(&files);
+
+        assert!(files.contains_key("skills/cat/assets/big.bin"));
+        assert_eq!(
+            decode(&files, "skills/cat/assets/big.bin"),
+            vec![7u8; large]
+        );
         assert!(manifest.issues.iter().any(|i| {
-            i.path == "skills/cat/assets/big.bin" && i.reason == "oversized" && i.blocking
+            i.path == "skills/cat/assets/huge.bin" && i.reason == "oversized" && i.blocking
         }));
         assert!(manifest
             .issues
@@ -1540,12 +1580,12 @@ mod tests {
             .issues
             .iter()
             .any(|i| i.path == "config.yaml" && i.kind == "missing"));
-        assert!(!files.contains_key("skills/cat/assets/big.bin"));
+        assert!(!files.contains_key("skills/cat/assets/huge.bin"));
 
         let mut tampered = files.clone();
         tampered.insert(
-            "skills/cat/assets/big.bin".into(),
-            STANDARD.encode(vec![0u8; MAX_FILE as usize + 1]),
+            "skills/cat/assets/huge2.bin".into(),
+            STANDARD.encode(vec![0u8; MAX_WORKSPACE_FILE as usize + 1]),
         );
         assert_eq!(validate(&tampered).unwrap_err(), "workspace_limit");
     }
@@ -2060,6 +2100,114 @@ mod tests {
         assert!(
             credential.blocking,
             "an opaque requirement without an acknowledgment still blocks"
+        );
+    }
+
+    #[test]
+    fn a_large_but_legitimate_home_with_many_skills_captures_instead_of_aborting() {
+        // A realistic power-user home: many installed skills, each shipping
+        // support files and declaring runtime/env/platform requirements plus a
+        // few excluded runtime/cache trees. None of this is a secret and none
+        // of it is oversized; the whole point of the manifest is to carry these
+        // requirements and the per-source diagnostics. It must capture.
+        let root = tempfile::tempdir().unwrap();
+        for i in 0..120 {
+            write(
+                root.path(),
+                &format!("skills/skill{i}/SKILL.md"),
+                format!(
+                    "---\nname: skill{i}\nplatforms: [linux]\n\
+                     deps: [pkg{i}a, pkg{i}b]\n\
+                     prerequisites:\n  commands: [cmd{i}]\n\
+                     required_environment_variables:\n  - name: ENV{i}\n\
+                     ---\n# Skill {i}\nsee references/guide.md\n"
+                )
+                .as_bytes(),
+            );
+            write(
+                root.path(),
+                &format!("skills/skill{i}/references/guide.md"),
+                b"# guide\n",
+            );
+            write(
+                root.path(),
+                &format!("skills/skill{i}/scripts/run.sh"),
+                b"#!/bin/sh\necho hi\n",
+            );
+            write(
+                root.path(),
+                &format!("skills/skill{i}/__pycache__/mod.pyc"),
+                b"\x00\x01\x02",
+            );
+        }
+
+        let files = capture(root.path()).expect("a legitimate large home must capture");
+        validate(&files).unwrap();
+        let manifest = manifest_of(&files);
+
+        // Every payload file is captured — the bounded multipart splitter carries
+        // the overflow in further parts — and the payload count is never a
+        // blocking drop now that a home may exceed one part's budget.
+        assert_eq!(manifest.files.len(), 360, "every payload file is captured");
+        // Required content is never silently dropped: every skill's declared
+        // requirements still travel as explicit dependencies — more rows than a
+        // single part's file budget, which is exactly why the row budget and the
+        // payload budget are distinct.
+        assert!(
+            manifest.dependencies.len() > 256,
+            "{} dependencies",
+            manifest.dependencies.len()
+        );
+        // Only the excluded runtime/cache trees are recorded; nothing is dropped
+        // at the per-part payload budget.
+        assert!(manifest
+            .issues
+            .iter()
+            .any(|i| i.reason == "excluded_directory"));
+        assert!(
+            !manifest
+                .issues
+                .iter()
+                .any(|i| i.reason == "file_count_limit"),
+            "no payload file is dropped at the per-part budget"
+        );
+
+        // The produced manifest still passes the *receiving* host's validator
+        // and readiness scorer, so a large legitimate home is syncable.
+        let text = String::from_utf8(decode(&files, MANIFEST)).unwrap();
+        validate_manifest(&text).unwrap();
+        assert!(!receive_dependencies_here(&text).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_home_with_far_more_files_than_one_part_captures_without_aborting() {
+        // A home with far more payload files than a single part's budget must
+        // capture every one; the multipart splitter carries the overflow in
+        // further parts rather than dropping it or aborting the whole source.
+        let root = tempfile::tempdir().unwrap();
+        write(root.path(), "skills/big/SKILL.md", b"# Big\\n");
+        for i in 0..600 {
+            write(
+                root.path(),
+                &format!("skills/big/references/file{i}.md"),
+                b"# reference\\n",
+            );
+        }
+
+        let files = capture(root.path()).expect("a legitimate large home must capture");
+        validate(&files).unwrap();
+        let manifest = manifest_of(&files);
+        assert_eq!(
+            manifest.files.len(),
+            601,
+            "all 601 payload files are captured"
+        );
+        assert!(
+            !manifest
+                .issues
+                .iter()
+                .any(|i| i.reason == "file_count_limit"),
+            "no payload file is dropped at the per-part budget"
         );
     }
 }

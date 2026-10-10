@@ -28,7 +28,9 @@
 //! are only ever read out of the restored `SKILL.md` for the recipient's own
 //! review; the credential files themselves are never opened.
 
-use super::{frontmatter, host_os, safe_text, ManifestDependency, WorkspaceManifest, MAX_FILE};
+use super::{
+    frontmatter, host_os, safe_text, ManifestDependency, WorkspaceManifest, MAX_WORKSPACE_FILE,
+};
 use crate::sync::bundle;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -278,7 +280,7 @@ fn recover_declared(home: &Path, skill: &str, kind: &str) -> Vec<String> {
         return Vec::new();
     }
     let relative = format!("skills/{skill}/SKILL.md");
-    let Ok(Some(bytes)) = crate::review::local_file(home, &relative, MAX_FILE) else {
+    let Ok(Some(bytes)) = crate::review::local_file(home, &relative, MAX_WORKSPACE_FILE) else {
         return Vec::new();
     };
     let Ok(text) = std::str::from_utf8(&bytes) else {
