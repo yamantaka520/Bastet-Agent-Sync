@@ -1,5 +1,14 @@
 # Validation
 
+## 0.8.0 published release — 2026-10-11
+
+- [v0.8.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.8.0) is public/latest with 19 assets and five-language release notes with direct installer links. Tagged source: `6d8bf1f0072a1d79773ed44dd2ee0e27b3491021`.
+- [Desktop release packages run 38069099178](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/38069099178) passed all four targets — Linux x64 DEB/RPM/AppImage, both macOS Developer ID signed/notarized/staple-verified architectures, and Windows x64 NSIS/MSI with publisher Signing explicitly deferred — plus draft creation. [Reviewed release metadata run 38070459469](https://github.com/yamantaka520/Bastet-Agent-Sync/actions/runs/38070459469) signed the native Linux package updates and regenerated the manifest before publication.
+- Both macOS architectures passed Developer ID signing, Apple notarization, stapled tickets and Gatekeeper. Windows NSIS/MSI package and native launch checks passed; Windows Authenticode remains explicitly deferred. All 7 tauri updater signatures were cryptographically verified against the repository public key, all 19 GitHub asset digests and 18 SHA256SUMS entries matched the downloaded artifacts, every one of the 9 updater routes and the public latest feed matched the verified 0.8.0 artifact, and 9 public installer/support links returned HTTP 200.
+- Two real Windows-only CI defects in the new Hermes modules were found and fixed before publication (run 38067679480): fixtures that wrote `agent-memory-os.json` with unescaped Windows backslashes (invalid JSON), and assertions comparing raw `fs::canonicalize` verbatim `\\?\` paths against the mapping's normalized output. The restore path also now reports the same normalized working directory the database and handoff record store.
+- The documented pre-existing fs2 `sync_busy` flake recurred on macOS CI jobs (not the Hermes diff); it was resolved by re-running the failed job, as recorded previously.
+- iCloud/OneDrive physical two-device delivery, live model/provider continuation, Windows/Linux runtime folder-provider behavior, signed Store sandbox acceptance and a prompt-free macOS relaunch remain unverified. The running installed user application was not replaced, and this GitHub release does not imply App Store approval.
+
 ## 0.8.0 release preparation — 2026-10-11
 
 - Version prepared as **0.8.0** with `scripts/set_version.py`: `package.json`, `package-lock.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `src-tauri/Cargo.lock` agree. The next public release after 0.7.0 is a minor bump for the Hermes Agent source. This preparation made no commit, push, tag, workflow dispatch or publication; the published 0.7.0 installers are unchanged.

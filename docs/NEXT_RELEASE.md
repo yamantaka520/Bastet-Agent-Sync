@@ -1,6 +1,8 @@
 # 🐈 Release scope and completed checklists
 
-## 0.8.0 — prepared 2026-10-10, pending publication
+## 0.8.0 completed release checklist
+
+Authorized and published 2026-10-11: [v0.8.0](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.8.0) is public/latest with 19 assets and five-language notes; tagged source `6d8bf1f0072a1d79773ed44dd2ee0e27b3491021`. Four installer targets and macOS Developer ID signing/notarization passed; all 7 updater signatures were cryptographically verified; Windows publisher signing remains explicitly deferred. Two real Windows-only Hermes test defects found by CI were fixed before publication. Exact evidence is recorded in [validation](VALIDATION.md).
 
 - Include the [Hermes continuation implementation](HERMES_AGENT.md) together with **three mutually exclusive sync relays**: Google Drive API (default), iCloud Drive folder, or OneDrive folder.
 - OneDrive remains a selectable, supported folder transport, not a legacy-only option. The user's final three-choice decision supersedes the briefly considered two-choice picker.
