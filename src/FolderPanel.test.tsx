@@ -64,9 +64,16 @@ it("keeps a cancelled recovery save pending and completes only from a real resul
   await waitFor(() => expect(prepareCount).toBe(1));
   expect(screen.getByText(t.pending)).toBeTruthy();
   expect(onChange).not.toHaveBeenCalledWith(ready);
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: t.prepare }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
   fireEvent.click(screen.getByRole("button", { name: t.prepare }));
   await screen.findByText(t.complete);
-  expect(onChange).toHaveBeenCalledWith(ready);
+  // The rendered status can precede the separate onChange effect.
+  await waitFor(() => expect(onChange).toHaveBeenCalledWith(ready));
   fireEvent.click(screen.getByRole("button", { name: t.export }));
   await waitFor(() =>
     expect(invoke).toHaveBeenCalledWith("folder_export_recovery", {
@@ -164,5 +171,5 @@ it("clears stale readiness when a saved proof disappears during refresh", async 
   expect(screen.getByRole("alert").textContent).toBe(t.unavailable);
   expect(screen.queryByText(t.complete)).toBeNull();
   expect(screen.getByText(t.pending)).toBeTruthy();
-  expect(onChange).toHaveBeenLastCalledWith(null);
+  await waitFor(() => expect(onChange).toHaveBeenLastCalledWith(null));
 });

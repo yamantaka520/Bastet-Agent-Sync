@@ -4,6 +4,7 @@
 
 - Bound each space download cache to 256 MiB and 4096 remote references, deduplicate validated content by bundle ID, expire references after seven days, and reclaim orphan/legacy cache files. Use one filesystem lock across native/portable cache instances for admission and cleanup; no lock spans network access.
 - Preserve proof freshness, revision-aware restart hits, authenticated space/content checks and isolated session/history storage. A full or contended cache skips optional admission while legitimate synchronization continues.
+- Stabilize folder-recovery tests by waiting for the `onChange` effect and the cancelled action to finish before retrying; preserve all readiness/value assertions. This addresses a CI-only React scheduling race, without changing the product flow.
 - Local Rust default **286 passed / 9 ignored**, Store **273 passed / 6 ignored**, focused replay/capacity/expiry/concurrency/corruption/recovery tests, strict Clippy for both features, frontend baseline **104 passed**, production build and documentation checks pass. Independent candidate review findings were corrected. Release verification remains pending; no live-provider exploit reproduction is claimed.
 
 ## Security review — 2026-10-27 (patch pending)
