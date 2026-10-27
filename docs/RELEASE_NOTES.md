@@ -6,40 +6,30 @@
 
 ## 繁體中文
 
-0.8.1 是 0.8.0（Hermes Agent）的維護修補，修正大型可攜工作區多段傳輸的就緒狀態。只有當索引宣稱的每個分段都存在且索引一致時，才會顯示「已收到分段 — 還原前會驗證完整性」，不再顯示「就緒」或「已驗證」；完整但遭竄改的傳輸仍會在比對／還原時（重新組裝並逐塊驗證後）被拒絕。分段存在性只採信格式正確的 `PortablePart`：偽造或僅以子字串嵌入傳輸 ID 的內容，無法再造成假的完成狀態。原生崩潰視窗的 profile 列舉上限改為對齊 `MAX_MANIFEST_FILES`，使超過 2048 個檔案的正當 home 可被還原，而非被判為 `session_limit`。0.8.0 的 Hermes 來源、三個互斥目的地選項與恢復套件維持不變。
+0.8.2 修補 Google Drive 下載快取的磁碟耗盡風險。相同封包內容共用一份本機快取，遠端檔案 ID 只保留小型索引；快取寫入前會套用容量限制，並清理過期、無引用與舊格式快取。這可防止同一有效密文的多個遠端副本各自占用完整磁碟空間。原有加密、空間驗證、更新簽章與獨立還原保護持續保留。快取是可重建資料，清理不刪除雲端或本機對話歷史。
 
-多段傳輸採緩衝方式而非串流；測試使用記憶體模擬 relay，不等於實際雲端交付。就緒狀態只代表分段存在與索引一致，位元組層級完整性一律由比對／還原驗證。Hermes 合成測試不等於實際雙機交付、模型實機續聊、Windows／Linux 執行期或 App Store 驗收，這些關卡仍未達成。0.7.0 的 macOS 鑰匙圈重複提示問題維持不變。
-
-獨立下載安裝包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 資料夾模式需要對應桌面程式。macOS 發布須通過 Developer ID 簽章與公證；Windows 發行者簽章暫緩；更新包仍驗證簽章。
+回歸測試使用合成物件及隔離暫存目錄，不代表實際 Drive 攻擊或雙機交付驗收。此版不宣稱修復 Hermes 就緒標示、macOS 鑰匙圈重複提示或完成 App Store 審核。獨立安裝包不需要 Node.js/Rust；iCloud／OneDrive 資料夾模式仍需對應桌面程式。macOS 需 Developer ID 簽章與公證；Windows 發行者簽章暫緩，更新包仍驗證簽章。
 
 ## 简体中文
 
-0.8.1 是 0.8.0（Hermes Agent）的维护修补，修正大型可携工作区多段传输的就绪状态。只有当索引声明的每个分段都存在且索引一致时，才显示“已收到分段 — 还原前会验证完整性”，不再显示“就绪”或“已验证”；完整但被篡改的传输仍会在比对／还原时（重新组装并逐块验证后）被拒绝。分段存在性只采信格式正确的 `PortablePart`：伪造或仅以子字符串嵌入传输 ID 的内容，无法再造成假的完成状态。原生崩溃窗口的 profile 枚举上限改为对齐 `MAX_MANIFEST_FILES`，使超过 2048 个文件的正当 home 可被还原，而非被判为 `session_limit`。0.8.0 的 Hermes 来源、三个互斥目标选项与恢复套件保持不变。
+0.8.2 修补 Google Drive 下载缓存的磁盘耗尽风险。相同封包内容共用一份本地缓存，远端文件 ID 只保留小型索引；缓存写入前应用容量限制，并清理过期、无引用和旧格式缓存，避免同一有效密文的多个远端副本分别占用完整磁盘空间。原有加密、空间验证、更新签名及独立恢复保护保留。清理可重建缓存不会删除云端或本地对话历史。
 
-多段传输采用缓冲方式而非流式；测试使用内存模拟 relay，不等于实际云端交付。就绪状态只代表分段存在与索引一致，字节级完整性一律由比对／还原验证。Hermes 合成测试不等于实际双机交付、模型实机续聊、Windows／Linux 运行期或 App Store 验收，这些关卡仍未达成。0.7.0 的 macOS 钥匙串重复提示问题保持不变。
-
-独立下载安装包不需要 Node.js 或 Rust。Google API 模式不需要 Drive Desktop；iCloud／OneDrive 文件夹模式需要对应桌面程序。macOS 发布须通过 Developer ID 签名与公证；Windows 发布者签名暂缓；更新包仍验证签名。
+回归测试使用合成对象和隔离临时目录，不代表实际 Drive 攻击或双机交付验收。此版不宣称修复 Hermes 就绪标记、macOS 钥匙串重复提示或完成 App Store 审核。独立安装包不需要 Node.js/Rust；iCloud／OneDrive 文件夹模式仍需对应桌面程序。macOS 须签名与公证；Windows 发布者签名暂缓，更新包仍验证签名。
 
 ## English
 
-0.8.1 is a maintenance patch on top of 0.8.0 (Hermes Agent) that fixes the readiness state of large portable-workspace multipart transfers. A transfer shows “parts received — integrity will be verified before restore” only when every part named by the index is present and the index is internally consistent — never “ready” or “verified”; a complete-but-tampered transfer is still refused at compare/restore (which reassembles and verifies every chunk). Part presence is attributed only from a well-formed `PortablePart`: a forged or truncated bundle that merely embeds a transfer id as a substring can no longer inflate presence into a false complete state. The native crash-window profile enumerator now bounds its walk by `MAX_MANIFEST_FILES` instead of a fixed 2048, so a legitimate home with more than 2048 captured files is restorable rather than refused as `session_limit`. The 0.8.0 Hermes source, the three mutually exclusive destinations and the recovery kits are unchanged.
+0.8.2 fixes disk exhaustion through the Google Drive download cache. Identical validated bundles share one local content object; remote file IDs retain small revision references. Admission enforces a capacity budget before cache writes and removes expired, unreferenced and legacy cache data, preventing copied valid ciphertext from creating a full local copy for every remote ID. Encryption, space validation, updater signatures and isolated restore remain enforced. Cache cleanup removes only rebuildable data, never cloud or local conversation history.
 
-The multipart transport is buffered, not streaming, and the tests use an in-memory mock relay, which is not real cloud delivery. Readiness means part presence plus index consistency only; byte-level integrity is always verified by compare/restore. Hermes fixtures are not physical two-device delivery, live-model continuation, Windows/Linux runtime or App Store acceptance; those gates remain open. The 0.7.0 unresolved repeated macOS Keychain prompt is unchanged.
-
-Standalone installers do not require Node.js or Rust. Google API mode needs no Drive Desktop; iCloud and OneDrive folder modes require their respective desktop sync clients. macOS publication requires Developer ID signing and notarization; Windows publisher signing is deferred; update packages still require signature verification.
+Regression tests use synthetic objects and isolated temporary directories, not a live Drive attack or physical two-device delivery. This release does not claim to resolve Hermes readiness labels, repeated macOS Keychain prompts or App Store review. Standalone installers need no Node.js/Rust; iCloud/OneDrive folder modes require their desktop clients. macOS requires Developer ID signing and notarization; Windows publisher signing remains deferred, while updater signatures remain required.
 
 ## 日本語
 
-0.8.1 は 0.8.0（Hermes Agent）に対するメンテナンス修正で、大規模な可搬ワークスペースのマルチパート転送の準備状態を修正します。索引が示すすべてのパートが存在し索引が内部的に整合している場合にのみ「パートを受信済み — 復元前に完全性を検証します」と表示し、「準備完了」「検証済み」とは表示しません。完全だが改ざんされた転送は、比較／復元時（再組み立てと全チャンク検証を行う）に拒否されます。パートの存在は整形済みの `PortablePart` のみから判定し、転送 ID を部分文字列として埋め込んだだけの偽造／切詰めバンドルは存在を水増しして誤った「完了」状態にできません。ネイティブのクラッシュウィンドウの profile 列挙上限は固定 2048 ではなく `MAX_MANIFEST_FILES` に揃えられ、2048 ファイルを超える正当な home も `session_limit` で拒否されず復元できます。0.8.0 の Hermes ソース、三つの排他的な同期先、復元キットは変更ありません。
+0.8.2 は Google Drive ダウンロードキャッシュによるディスク枯渇の危険を修正します。同じ検証済みバンドルは一つのローカルデータを共有し、リモートファイル ID は小さな版情報のみを保持します。書き込み前に容量上限を適用し、期限切れ、未参照、旧形式のキャッシュを削除します。同じ有効な暗号文の複製がそれぞれ完全なローカルコピーを作ることを防ぎます。暗号化、スペース検証、更新署名、隔離復元は維持されます。キャッシュ削除でクラウドやローカルの会話履歴は削除しません。
 
-マルチパート転送はストリーミングではなくバッファ方式で、テストはインメモリのモック relay を使用するため実クラウド配信ではありません。準備状態はパート存在と索引整合のみを意味し、バイトレベルの完全性は常に比較／復元で検証されます。Hermes の合成テストは実機２台への配信、モデル実機での再開、Windows／Linux 実行時、App Store の受入ではありません。これらのゲートは未達のままです。0.7.0 の未解決の macOS キーチェーン繰り返し確認は変わりません。
-
-単体配布版に Node.js と Rust は不要です。Google API モードに Drive Desktop は不要ですが、iCloud／OneDrive フォルダーモードには対応するデスクトップ同期アプリが必要です。macOS の公開には Developer ID 署名と公証が必要です。Windows 発行者署名は延期中で、更新パッケージの署名検証は継続します。
+回帰テストは合成データと一時ディレクトリを使用し、実際の Drive 攻撃や実機二台への配信の検証ではありません。Hermes の準備状態、macOS キーチェーンの繰り返し確認、App Store 審査の解決は主張しません。単体版に Node.js/Rust は不要です。iCloud/OneDrive にはデスクトップクライアントが必要です。macOS は Developer ID 署名と公証が必要で、Windows 発行者署名は延期中ですが更新署名は必須です。
 
 ## 한국어
 
-0.8.1은 0.8.0(Hermes Agent)에 대한 유지보수 패치로, 대용량 휴대형 워크스페이스의 멀티파트 전송 준비 상태를 바로잡습니다. 인덱스가 지정한 모든 파트가 존재하고 인덱스가 내부적으로 일관될 때에만 "파트 수신됨 — 복원 전 무결성을 검증합니다"를 표시하며, "준비됨"이나 "검증됨"은 표시하지 않습니다. 완전하지만 변조된 전송은 비교/복원 시(재조립 및 모든 청크 검증) 거부됩니다. 파트 존재는 형식이 올바른 `PortablePart`에서만 판정하며, 전송 ID를 부분 문자열로 끼워 넣은 위조/절단 번들은 존재를 부풀려 잘못된 "완료" 상태를 만들 수 없습니다. 네이티브 크래시 윈도의 profile 열거 상한은 고정 2048이 아니라 `MAX_MANIFEST_FILES`에 맞춰져, 2048개를 초과하는 정당한 home도 `session_limit`으로 거부되지 않고 복원됩니다. 0.8.0의 Hermes 소스, 세 개의 상호 배타적 대상, 복구 키트는 변경되지 않았습니다.
+0.8.2는 Google Drive 다운로드 캐시를 통한 디스크 고갈 위험을 수정합니다. 동일한 검증된 번들은 하나의 로컬 콘텐츠를 공유하고 원격 파일 ID에는 작은 버전 참조만 보관합니다. 캐시 쓰기 전에 용량 제한을 적용하고 만료되거나 참조되지 않는 데이터 및 이전 형식 캐시를 정리하여, 복제된 유효 암호문마다 전체 로컬 사본이 생기는 일을 막습니다. 암호화, 공간 검증, 업데이트 서명 및 격리 복원 보호는 유지됩니다. 캐시 정리는 클라우드나 로컬 대화 기록을 삭제하지 않습니다.
 
-멀티파트 전송은 스트리밍이 아닌 버퍼 방식이며, 테스트는 인메모리 모의 relay를 사용하므로 실제 클라우드 전달이 아닙니다. 준비 상태는 파트 존재와 인덱스 일관성만을 의미하고, 바이트 수준 무결성은 항상 비교/복원으로 검증됩니다. Hermes 합성 테스트는 실제 두 기기 전달, 모델 실기 재개, Windows／Linux 런타임, App Store 검증이 아니며 이 게이트들은 여전히 미충족입니다. 0.7.0의 미해결 macOS 키체인 반복 요청은 그대로입니다.
-
-독립 설치 파일에는 Node.js와 Rust가 필요하지 않습니다. Google API 모드에는 Drive Desktop이 필요 없지만 iCloud／OneDrive 폴더 모드에는 각 서비스의 데스크톱 동기화 앱이 필요합니다. macOS 공개에는 Developer ID 서명과 공증이 필요합니다. Windows 게시자 서명은 보류 중이며 업데이트 패키지 서명 검증은 계속 적용됩니다.
+회귀 테스트는 합성 데이터와 격리 임시 디렉터리를 사용하며 실제 Drive 공격이나 실제 두 기기 전달 검증은 아닙니다. Hermes 준비 상태, 반복되는 macOS 키체인 요청 또는 App Store 심사 해결을 주장하지 않습니다. 독립 설치 파일은 Node.js/Rust가 필요 없고 iCloud/OneDrive 폴더 모드에는 데스크톱 클라이언트가 필요합니다. macOS는 Developer ID 서명과 공증이 필수이며 Windows 게시자 서명은 보류 중이지만 업데이트 서명은 계속 검증합니다.

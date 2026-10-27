@@ -1,4 +1,5 @@
 //! M3 primitives. No automatic connection or native agent-store access.
+pub(crate) mod cache;
 pub mod crypto;
 pub mod desktop;
 pub mod drive;

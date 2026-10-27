@@ -574,14 +574,9 @@ struct ListFlight {
     result: Mutex<Option<Result<Vec<String>>>>,
     ready: Condvar,
 }
-#[derive(Serialize, Deserialize)]
-struct Cached {
-    revision: String,
-    bundle: Bundle,
-}
 impl<'a, R: Objects> CachedObjects<'a, R> {
     pub fn new(remote: &'a R, root: &'a Path) -> Result<Self> {
-        storage::directory(root)?;
+        super::cache::initialize(root)?;
         Ok(Self {
             remote,
             root,
@@ -692,7 +687,7 @@ impl<R: Objects> Objects for CachedObjects<'_, R> {
         if self.fresh.as_deref() == Some(id) {
             return self.remote.get(folder, id, space, key);
         }
-        let hash = crate::sync::bundle::hash(format!("{folder}:{space}:{id}").as_bytes());
+        let hash = super::cache::remote_key(folder, space, id);
         // Fixed stripes bound lock memory and coalesce same-object downloads. Unrelated
         // objects can proceed concurrently; no global lock is held across network I/O.
         let stripe = usize::from_str_radix(&hash[..2], 16).map_err(|_| "invalid_bundle")?
@@ -708,33 +703,18 @@ impl<R: Objects> Objects for CachedObjects<'_, R> {
             .get(&(folder.to_string(), id.to_string()))
             .cloned()
             .flatten();
-        let path = self.root.join(format!("{hash}.json"));
         if let Some(revision) = rev.as_ref() {
-            if path.exists() {
-                let cached: Cached = serde_json::from_slice(&storage::read(
-                    &path,
-                    crate::sync::bundle::MAX_WIRE + 4096,
-                )?)
-                .map_err(|_| "local_store_damaged")?;
-                if &cached.revision == revision {
-                    cached.bundle.validate()?;
-                    if cached.bundle.snapshot.space != space {
-                        return Err("space_mismatch".into());
-                    }
-                    return Ok(cached.bundle);
-                }
+            if let Some(bundle) = super::cache::get(self.root, &hash, revision, space)? {
+                return Ok(bundle);
             }
         }
         let bundle = self.remote.get(folder, id, space, key)?;
+        bundle.validate()?;
+        if bundle.snapshot.space != space {
+            return Err("space_mismatch".into());
+        }
         if let Some(revision) = rev {
-            storage::replace(
-                &path,
-                &serde_json::to_vec(&Cached {
-                    revision,
-                    bundle: bundle.clone(),
-                })
-                .map_err(|_| "invalid_bundle")?,
-            )?;
+            super::cache::put(self.root, &hash, &revision, &bundle)?;
         }
         Ok(bundle)
     }
@@ -744,6 +724,46 @@ impl<R: Objects> Objects for CachedObjects<'_, R> {
 mod cache_tests {
     use super::*;
     use std::cell::Cell;
+    #[test]
+    fn replayed_bundle_under_many_remote_ids_stores_one_payload() {
+        struct Replay;
+        impl Objects for Replay {
+            fn ids(&self, _: &str) -> Result<Vec<String>> {
+                Ok((0..32).map(|i| format!("object-{i}")).collect())
+            }
+            fn revisions(&self, folder: &str) -> Result<Vec<(String, Option<String>)>> {
+                Ok(self
+                    .ids(folder)?
+                    .into_iter()
+                    .map(|id| (id, Some("1".into())))
+                    .collect())
+            }
+            fn allocate(&self) -> Result<String> {
+                unreachable!()
+            }
+            fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+                unreachable!()
+            }
+            fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+                let mut snapshot = proof_bundle(space)?.snapshot;
+                snapshot
+                    .files
+                    .insert("payload.txt".into(), Entry::new("x".repeat(64 * 1024)));
+                Bundle::new(snapshot)
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let key = SpaceKey::generate().unwrap();
+        let cache = CachedObjects::new(&Replay, root.path()).unwrap();
+        for id in cache.ids("folder").unwrap() {
+            cache.get("folder", &id, "space", &key).unwrap();
+        }
+        let bytes: u64 = std::fs::read_dir(root.path())
+            .unwrap()
+            .map(|e| e.unwrap().metadata().unwrap().len())
+            .sum();
+        assert!(bytes < 128 * 1024, "replayed cache bytes: {bytes}");
+    }
     struct Remote {
         revision: Cell<u32>,
         gets: Cell<u32>,
@@ -796,6 +816,97 @@ mod cache_tests {
         let cache = CachedObjects::new(&remote, t.path()).unwrap();
         cache.get("folder", "object", "space", &key).unwrap();
         assert_eq!(remote.gets.get(), 3);
+    }
+    #[test]
+    fn missing_revision_never_caches_and_wrong_remote_space_is_rejected() {
+        struct Unversioned(Cell<usize>, bool);
+        impl Objects for Unversioned {
+            fn ids(&self, _: &str) -> Result<Vec<String>> {
+                Ok(vec!["object".into()])
+            }
+            fn allocate(&self) -> Result<String> {
+                unreachable!()
+            }
+            fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+                unreachable!()
+            }
+            fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+                self.0.set(self.0.get() + 1);
+                proof_bundle(if self.1 { "foreign" } else { space })
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let key = SpaceKey::generate().unwrap();
+        let remote = Unversioned(Cell::new(0), false);
+        let cache = CachedObjects::new(&remote, root.path()).unwrap();
+        cache.ids("folder").unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        assert_eq!(remote.0.get(), 2);
+        assert!(std::fs::read_dir(root.path()).unwrap().all(|entry| {
+            let entry = entry.unwrap();
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            !name.starts_with("ref-") && !name.starts_with("blob-")
+        }));
+        let wrong = Unversioned(Cell::new(0), true);
+        let cache = CachedObjects::new(&wrong, root.path()).unwrap();
+        assert_eq!(
+            cache.get("folder", "object", "space", &key).unwrap_err(),
+            "space_mismatch"
+        );
+    }
+    #[test]
+    fn independent_cache_instances_share_content_addressed_payloads() {
+        struct Shared;
+        impl Objects for Shared {
+            fn ids(&self, _: &str) -> Result<Vec<String>> {
+                Ok(vec!["object".into()])
+            }
+            fn revisions(&self, _: &str) -> Result<Vec<(String, Option<String>)>> {
+                Ok(vec![("object".into(), Some("1".into()))])
+            }
+            fn allocate(&self) -> Result<String> {
+                unreachable!()
+            }
+            fn put(&self, _: &str, _: &str, _: &SpaceKey, _: &Bundle) -> Result<()> {
+                unreachable!()
+            }
+            fn get(&self, _: &str, _: &str, space: &str, _: &SpaceKey) -> Result<Bundle> {
+                proof_bundle(space)
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let key = SpaceKey::generate().unwrap();
+        std::thread::scope(|scope| {
+            for _ in 0..8 {
+                let root = root.path();
+                let key = &key;
+                scope.spawn(move || {
+                    let cache = CachedObjects::new(&Shared, root).unwrap();
+                    cache.ids("folder").unwrap();
+                    assert_eq!(
+                        cache.get("folder", "object", "space", key).unwrap(),
+                        proof_bundle("space").unwrap()
+                    );
+                });
+            }
+        });
+        let cache = CachedObjects::new(&Shared, root.path()).unwrap();
+        cache.ids("folder").unwrap();
+        cache.get("folder", "object", "space", &key).unwrap();
+        assert_eq!(
+            std::fs::read_dir(root.path())
+                .unwrap()
+                .filter(|e| e
+                    .as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("blob-"))
+                .count(),
+            1
+        );
     }
     #[test]
     fn concurrent_reads_share_one_download_but_key_proof_always_fetches() {

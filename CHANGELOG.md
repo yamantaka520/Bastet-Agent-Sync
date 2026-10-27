@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.2 — Google Drive cache security patch (2026-10-27; release preparation)
+
+- Bound each space download cache to 256 MiB and 4096 remote references, deduplicate validated content by bundle ID, expire references after seven days, and reclaim orphan/legacy cache files. Use one filesystem lock across native/portable cache instances for admission and cleanup; no lock spans network access.
+- Preserve proof freshness, revision-aware restart hits, authenticated space/content checks and isolated session/history storage. A full or contended cache skips optional admission while legitimate synchronization continues.
+- Local Rust default **286 passed / 9 ignored**, Store **273 passed / 6 ignored**, focused replay/capacity/expiry/concurrency/corruption/recovery tests, strict Clippy for both features, frontend baseline **104 passed**, production build and documentation checks pass. Independent candidate review findings were corrected. Release verification remains pending; no live-provider exploit reproduction is claimed.
+
+## Security review — 2026-10-27 (patch pending)
+
+- Static review identified a medium-severity Google Drive cache resource-consumption issue: replaying valid ciphertext under multiple app-visible remote file IDs creates separate decrypted cache files before bundle-content deduplication and union-size checks. A shared-folder writer does not need the space key. A patch should enforce cache budgets before writes, share content by validated bundle ID, and evict stale entries.
+- No product fix, release, installed-app replacement or live exploit test was performed. Current dependency advisories were not queried; this is not a claim of exhaustive vulnerability coverage. See [validation](docs/VALIDATION.md).
+
 ## 0.8.1 — Hermes multipart readiness honesty repair (2026-10-11)
 
 Patch release on top of the published 0.8.0 Hermes source. Published 2026-10-11: [v0.8.1](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.8.1) is public/latest with 19 assets and five-language notes; tagged source `a8d40873662ddf44d07a2dfc658d1764bb08ad49`. All four installer targets built (both macOS architectures Developer ID signed and Apple notarized; Windows publisher signing explicitly deferred), all 7 updater signatures were cryptographically verified, and the installed user application is not replaced by this release.

@@ -473,24 +473,7 @@ pub async fn clear_download_cache(
     .map_err(|_| "store_unavailable".to_string())?
 }
 fn clear_cache(path: &Path) -> Result<usize> {
-    if !path.exists() {
-        return Ok(0);
-    }
-    storage::directory(path)?;
-    let mut deleted = 0;
-    for e in std::fs::read_dir(path).map_err(|_| "store_unavailable")? {
-        let e = e.map_err(|_| "store_unavailable")?;
-        let name = e.file_name();
-        let name = name.to_string_lossy();
-        if !name.strip_suffix(".json").is_some_and(bundle::is_hash)
-            || !e.file_type().map_err(|_| "store_unavailable")?.is_file()
-        {
-            continue;
-        }
-        std::fs::remove_file(e.path()).map_err(|_| "store_unavailable")?;
-        deleted += 1;
-    }
-    Ok(deleted)
+    crate::cloud::cache::clear(path)
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
