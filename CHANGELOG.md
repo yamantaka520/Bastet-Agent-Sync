@@ -1,11 +1,11 @@
 # Changelog
 
-## 0.8.2 — Google Drive cache security patch (2026-10-27; release preparation)
+## 0.8.2 — Google Drive cache security patch (published 2026-10-27)
 
 - Bound each space download cache to 256 MiB and 4096 remote references, deduplicate validated content by bundle ID, expire references after seven days, and reclaim orphan/legacy cache files. Use one filesystem lock across native/portable cache instances for admission and cleanup; no lock spans network access.
 - Preserve proof freshness, revision-aware restart hits, authenticated space/content checks and isolated session/history storage. A full or contended cache skips optional admission while legitimate synchronization continues.
 - Stabilize folder-recovery tests by waiting for the `onChange` effect and the cancelled action to finish before retrying; preserve all readiness/value assertions. This addresses a CI-only React scheduling race, without changing the product flow.
-- Local Rust default **286 passed / 9 ignored**, Store **273 passed / 6 ignored**, focused replay/capacity/expiry/concurrency/corruption/recovery tests, strict Clippy for both features, frontend baseline **104 passed**, production build and documentation checks pass. Independent candidate review findings were corrected. Release verification remains pending; no live-provider exploit reproduction is claimed.
+- Local Rust default **286 passed / 9 ignored**, Store **273 passed / 6 ignored**, focused replay/capacity/expiry/concurrency/corruption/recovery tests, strict Clippy for both features, frontend baseline **104 passed**, production build and documentation checks pass. Independent candidate review findings were corrected. [v0.8.2](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.8.2) is public/latest with 19 assets from `064dec54350c8fef52bb7cb73c7882ff9135b0f0`; all 18 checksums, 19 API digests, 7 updater signatures, 9 update routes and 19 public download links were verified. Both macOS architectures are Developer ID signed/notarized; Windows Authenticode remains deferred. No live-provider exploit reproduction or installed-app replacement is claimed.
 
 ## Security review — 2026-10-27 (patch pending)
 

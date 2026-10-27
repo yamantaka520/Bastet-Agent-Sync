@@ -2,13 +2,13 @@
 
 ## 0.8.2 Google Drive cache security patch
 
-Authorized 2026-10-27. Preparation in progress; not yet published.
+Authorized and published 2026-10-27: [v0.8.2](https://github.com/yamantaka520/Bastet-Agent-Sync/releases/tag/v0.8.2) is public/latest, release ID `425077750`, with 19 assets at source `064dec54350c8fef52bb7cb73c7882ff9135b0f0`. Checksums, API digests, all seven updater signatures and nine routes passed; see [validation](VALIDATION.md). The installed app and App Store were not changed.
 
 - [x] Bound cache bytes and reference count before writes across concurrent cache instances.
 - [x] Deduplicate validated bundle content and clean expired, orphan and legacy cache data.
 - [x] Complete exploit regression and legitimate restart/revision/proof behavior tests.
 - [x] Complete default/Store Rust checks, frontend checks and independent candidate review.
-- [ ] Build all four architecture targets, verify signatures and macOS notarization, then publish immutable assets and read back the update feed.
+- [x] Build all four architecture targets, verify signatures and macOS notarization, then publish immutable assets and read back the update feed.
 
 ## 0.8.1 multipart readiness honesty repair
 
