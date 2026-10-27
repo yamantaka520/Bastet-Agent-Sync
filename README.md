@@ -16,7 +16,7 @@
 
 A local-first desktop companion for synchronizing supported local agent conversations and Agent Memory OS data through a selected encrypted cloud destination. Part of the Bastet family.
 
-> **0.8.2 — Google Drive cache security patch, published.** Bounded download-cache admission, content deduplication and seven-day cleanup prevent copied valid ciphertext from creating a full local payload for every remote ID. Regression tests and publication status are recorded in [validation](docs/VALIDATION.md).
+> **0.8.2 — Google Drive cache security patch, published.** Bounded download-cache admission, content deduplication and seven-day cleanup prevent copied valid ciphertext from creating a full local payload for every remote ID. Regression tests and publication status are recorded in [validation](docs/VALIDATION.md). Mac App Store 0.8.2 (3) has been submitted and is waiting for review, with automatic release after approval.
 
 > **0.8.1 — multipart readiness honesty repair.** A maintenance patch on top of the 0.8.0 Hermes Agent source: a large portable-workspace multipart transfer reads "parts received — integrity will be verified before restore" only when every indexed part is present and the index is consistent (never "ready"/"verified"); presence is attributed only from a well-formed `PortablePart`; and the native crash-window profile enumerator is aligned to `MAX_MANIFEST_FILES`. The transport is buffered, not streaming, and fixtures use an in-memory mock relay. [Validation](docs/VALIDATION.md).
 

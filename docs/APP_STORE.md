@@ -1,5 +1,13 @@
 # Mac App Store delivery plan
 
+Status (2026-10-27): **0.8.2 build 3 is WAITING_FOR_REVIEW**, submitted at 18:31:47 Asia/Taipei after successful universal signing, Apple validation, upload and VALID/APP_STORE_ELIGIBLE readback. Release is **automatic after approval**. Store 0.8.1 was read back as READY_FOR_DISTRIBUTION. The new version is not yet approved or publicly available. See the exact source, package hash, independent checks and limitations in [validation](VALIDATION.md). The owner handled the updated program agreement, and explicitly authorized existing Apple credentials and embedded desktop Google OAuth configuration; credential values remain private.
+
+## 0.8.2 security update submission
+
+The Store build includes the bounded/deduplicated/seven-day Google Drive cache repair. Five localized update notes and patch-specific review notes were saved and read back. App Sandbox, profile, privacy manifest, both architectures and installer chain passed independent verification; Apple server validation and upload succeeded. Existing Store scope excludes AMOS and the direct updater. Existing territory and encryption answers were preserved, including France excluded. No installed app was replaced, and no new TestFlight runtime or physical-device acceptance is claimed. Apple approval and public availability remain external gates.
+
+## Earlier status — 2026-10-04
+
 Status (2026-10-04): macOS `0.6.0` build `1` was resubmitted at 02:38 Asia/Taipei and is **WAITING_FOR_REVIEW**, verified on the authenticated App Store Connect review page. The Guideline 2.4.5 network-server entitlement explanation was sent and saved in App Review Notes. The prior Guideline 2.1 recording, synthetic sample and six-part information remain available. Release remains manual, with France excluded (174 territories). No Store approval or public availability is claimed.
 
 ## Network-server entitlement clarification — 2026-10-04
